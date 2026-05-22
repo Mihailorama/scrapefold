@@ -23,7 +23,6 @@ import inspect
 from unittest.mock import MagicMock, patch
 
 import pytest
-from outscraper import ApiClient as RealApiClient
 
 from scrapefold.engines.base import EngineError
 from scrapefold.engines.outscraper import OutscraperEngine
@@ -278,8 +277,13 @@ async def test_regression_kwargs_match_sdk_signature() -> None:
 
     company_insights signature: (query, fields=None, async_request=False, enrichment=None)
     The engine must call it with real kwargs, not wrapped under a 'params' key.
+
+    Skipped when the outscraper SDK is not installed (default ``[test]`` extra
+    excludes it); guard fires only when contributors opt into ``[outscraper]``.
     """
-    valid_param_names = set(inspect.signature(RealApiClient.company_insights).parameters.keys())
+    real_module = pytest.importorskip("outscraper")
+    real_api_client = real_module.ApiClient
+    valid_param_names = set(inspect.signature(real_api_client.company_insights).parameters.keys())
     valid_param_names.discard("self")  # not a kwarg
 
     client_cls = _make_client_cls([_SAMPLE_COMPANY_DATA])
