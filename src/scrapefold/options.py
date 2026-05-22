@@ -80,7 +80,12 @@ class ScrapeOptions:
 
     # --- Escape hatch ---
     extra: dict[str, Any] = field(default_factory=dict)
-    """Engine-prefixed override keys, e.g. ``{"firecrawl_replaceAllPathsWithAbsolutePaths": True}``."""
+    """Engine-prefixed override keys, e.g. ``{"firecrawl_replaceAllPathsWithAbsolutePaths": True}``.
+
+    Also the home for walk-level policy: set ``extra["policy"]`` to a
+    ``scrapefold.ladders.Policy`` instance to override the per-class
+    default in ``DEFAULT_POLICY``.
+    """
 
     def with_updates(self, **changes: Any) -> ScrapeOptions:
         """Return a new ScrapeOptions with the given fields updated. Frozen-safe."""

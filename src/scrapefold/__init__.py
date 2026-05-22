@@ -12,19 +12,39 @@ Public API (v0.1 — scaffold; engines land in later PRs):
 from __future__ import annotations
 
 from scrapefold.engines.base import EngineCapabilities, EngineError, ScrapeEngine
+from scrapefold.ladders import (
+    AllEnginesFailed,
+    BudgetExceeded,
+    Policy,
+    RaceStep,
+    SequentialStep,
+    SiteClass,
+    WalkBudget,
+    classify_url,
+    get_ladder,
+)
 from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
 
-__version__ = "0.1.0a0"
+__version__ = "0.1.0a1"
 
 __all__ = [
+    "AllEnginesFailed",
+    "BudgetExceeded",
     "EngineCapabilities",
     "EngineError",
+    "Policy",
+    "RaceStep",
     "ScrapeEngine",
     "ScrapeOptions",
     "ScrapeResult",
+    "SequentialStep",
+    "SiteClass",
+    "WalkBudget",
     "__version__",
+    "classify_url",
     "crawl_site",
+    "get_ladder",
     "scrape",
 ]
 

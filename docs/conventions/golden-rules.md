@@ -62,11 +62,29 @@ These are the non-negotiable invariants of scrapefold. Read before touching code
 - **Why:** Crawl-many-pages performance and parallel-engine orchestration require it.
 - **Don't:** `requests.get()` inside an engine. Use `httpx`.
 
-### Rule: Escalate cheap-to-expensive, stop at first good response
-- **What:** The router walks T0 (requests) → T1 (free JS) → T2 (free stealth) → T3 (paid fast) → T4 (paid full-unlock). It stops escalating as soon as a tier returns a non-suspicious response. Never run all engines in parallel by default.
-- **Why:** Most pages need only T0. Running T4 on every URL would burn cost and time pointlessly. Conversely, the library must keep going up the ladder for hostile sites so users don't have to hand-pick an engine.
-- **Do:** Use the router default — `await scrape(url)`. Per-call overrides via `opts.extra["max_cost_usd"]`, `["max_engines"]`, `["accept_first_success"]`.
-- **Don't:** Hardcode `opts.engines=["brightdata_unlocker"]` "to be safe". That's exactly the overkill pattern this rule exists to prevent.
+### Rule: Escalate per site class, stop at first good response
+- **What:** The router classifies a URL into a `SiteClass` (LinkedIn family, Amazon, Cloudflare-protected, …), then walks the per-class ladder declared in `src/scrapefold/ladders.py`. Each step is either a `SequentialStep` (one engine) or a `RaceStep` (multiple engines, explicit `winner_policy`/`cancel_policy`/`budget_accounting`). It stops escalating as soon as a step returns a non-suspicious response.
+- **Why:** A universal T0-T5 chain wastes calls — LinkedIn pages 403 on plain HTTP and need a specialized vendor; CDN-protected pages need a stealth browser before any paid fan-out is worthwhile. Per-class ladders encode that knowledge.
+- **Do:** Use the router default — `await scrape(url)`. Per-call overrides via `opts.extra["max_cost_usd"]`, `["max_engines"]`, `["policy"]`.
+- **Don't:** Hardcode `opts.engines=["brightdata_unlocker_sync"]` "to be safe" on every URL. That's exactly the overkill pattern per-class ladders exist to prevent.
+
+### Rule: Ladders are data, not router convention
+- **What:** Race semantics (winner, cancel, budget accounting) live on `RaceStep` fields, not in the router. The router consumes pure functions `is_step_allowed(step, policy)` and `check_budget(step, walk, ...)` and never inspects step subclass beyond the sum-type dispatch.
+- **Why:** Codex round-2 review (R2-C1) flagged ambiguous race semantics when they were router-implicit. Making them data lets reviewers verify ladder behavior by reading the ladder declaration alone.
+- **Do:** When a new race needs different budget accounting, set `budget_accounting="sum_all"` on the `RaceStep` and add a test pinning it.
+- **Don't:** Add `if step is paid_race_step: bill_all_engines()` to the router. Pin it on the step.
+
+### Rule: Multi-mode engines register as distinct names
+- **What:** Engines with multiple operating modes (Bright Data Unlocker async/sync, Scrapling stealth/fast) register as separate engines: `brightdata_unlocker_sync`, `brightdata_unlocker_async`, `scrapling_stealth`, `scrapling_fast`. User-facing aliases (`opts.engines=["scrapling"]`) live in `ENGINE_ALIASES` and resolve at registry lookup.
+- **Why:** `WalkBudget.engines_tried` is a set of names — name-based dedup must be unambiguous (Codex R2-NEW-2).
+- **Do:** `register("scrapling_stealth", _load); register_alias("scrapling", "scrapling_stealth")`.
+- **Don't:** Take a `mode="stealth"` kwarg at engine construction and reuse the same `NAME`.
+
+### Rule: New URL pattern → new `GOLDEN_CORPUS` row
+- **What:** Adding an entry to `URL_PATTERNS` in `ladders.py` requires adding at least one matching row to `GOLDEN_CORPUS`. The test `test_every_url_pattern_class_has_corpus_row` enforces coverage; `test_url_classification_golden_corpus` enforces regex-order safety.
+- **Why:** Specific patterns (e.g. `linkedin\.com/sales/`) must beat general ones (`linkedin\.com/in/`). A reorder regression breaks one corpus row — the unit-test failure is precise and self-explanatory.
+- **Do:** Open `ladders.py`, append a `re.compile(...)` row, append a `(url, class)` row to `GOLDEN_CORPUS`, run tests.
+- **Don't:** Add the pattern without a corpus row and rely on manual testing.
 
 ### Rule: Suspicious-content detection lives in one place
 - **What:** The heuristic "did this scrape actually work?" lives in `scrapefold/detection.py`, not duplicated in every engine.

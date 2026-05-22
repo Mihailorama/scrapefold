@@ -109,46 +109,110 @@ res.get_format("json")  # raises ValueError if not "text|markdown|html|json"
 
 For *structured extraction* (passing a JSON schema and getting native JSON back), engines that support it accept an `extra={"schema": {...}}` key. Engines that don't support structured extraction fill `json=None` and the call falls back to text/markdown/html.
 
-## Anti-bot escalation ladder
+## Anti-bot escalation — per-site-class ladders
 
-The recommended engine order is an explicit **escalation ladder**: start at the cheapest/fastest tier and only escalate when the previous tier failed *or returned suspicious content*. The router stops as soon as a tier returns a good response.
+The router does not walk a universal T0-T5 chain. Each `SiteClass` (27 classes: LinkedIn family, Amazon, social, SERP, Cloudflare/Datadome/Akamai/PerimeterX, paywall, government, `static_general`, …) has its own ordered **ladder** of `SequentialStep` and `RaceStep` entries. The mapping lives in `src/scrapefold/ladders.py`; the router (S7) consumes it.
 
-| Tier | Engines | Cost | Typical latency | When used |
-|---|---|---|---|---|
-| **T0** static | `requests` | 0 | <500 ms | Default first try for any URL |
-| **T1** free JS | `scrapling`, `crawl4ai` | 0 | 3-5 s | T0 returned suspicious content (see below) or static fetch had no JS-rendered text |
-| **T2** free stealth | `cloakbrowser`, `obscura` | 0 | 5-10 s | T1 hit anti-bot wall (Cloudflare challenge, captcha, 403) |
-| **T3** paid fast | `firecrawl`, `scrapingbee`, `scrapingdog`, `cloudflare`, `jina` | ~$0.05-1 / 1k | 2-5 s | T2 still blocked, or site requires real residential IP for SSL/locale |
-| **T4** paid full unlock | `brightdata_unlocker`, ScrapingBee `premium_proxy=True` | ~$1.5-3 / 1k | 10-30 s | T3 failed — site has aggressive bot detection (Akamai, PerimeterX, Datadome) |
-| **T5** site-classified | `apify_linkedin`, `anysite` (LinkedIn/IG/Reddit), `scrapingdog` (LinkedIn/Amazon/Twitter) | varies | 5-15 s | URL pattern matches a vendor-specialized endpoint |
+### Data shape
 
-`selenium` ⚠️ deprecated — opt-in only via `engines=["selenium"]`, never auto-escalated.
+```python
+# src/scrapefold/ladders.py
+SiteClass = Literal["linkedin_profile", "amazon_product", "cloudflare_protected", ...]
 
-### "Suspicious content" detection (T0 → T1 trigger)
+@dataclass(frozen=True)
+class SequentialStep(_StepBase):
+    engine: str
 
-The router treats a response as suspicious if any of:
+@dataclass(frozen=True)
+class RaceStep(_StepBase):
+    engines: tuple[str, ...]
+    winner_policy: Literal["first_non_suspicious", "first_complete", "highest_text_length"]
+    cancel_policy: Literal["cancel_immediately", "cancel_with_grace", "let_finish"]
+    cancel_grace_ms: int
+    budget_accounting: Literal["winner_only", "sum_all", "max"]
 
-- Text length < `min_text_chars` (default 200) after html_to_text
-- Body contains anti-bot signature phrases: `"Just a moment..."`, `"Verify you are human"`, `"Checking your browser"`, `"Access denied"`, `"Please enable JavaScript"`, `"cf-browser-verification"`
-- HTTP 403 / 503 with empty body
-- `<noscript>` tag content dominates rendered body
-- Body is mostly `<script>` tags (JS-rendered SPA with no SSR)
+LadderStep = Union[SequentialStep, RaceStep]
+LADDERS: dict[SiteClass, tuple[LadderStep, ...]]
+```
 
-These heuristics live in `scrapefold/detection.py` (S2). Override per-call via `opts.extra["min_text_chars"]` and `opts.extra["antibot_phrases"]`.
+Race semantics are encoded as data on the step, not as router convention.
+
+### URL classification
+
+`classify_url(url)` walks an ordered `URL_PATTERNS` table (specific-first) and returns a `SiteClass`. The fallback for unknown URLs is `"static_general"` which uses the general ladder. Response-content reclassification (Cloudflare challenge page, Datadome cookie, …) is driven by `SIGNATURES` consumed in `detection.py` (S2). A 22-row `GOLDEN_CORPUS` constant pins URL→class behavior; the parametrized test `test_url_classification_golden_corpus` makes any regex reorder regression visible.
+
+### General ladder (for `static_general`)
+
+| Step | Engines | Cost | Notes |
+|---|---|---|---|
+| 1 | `requests` (SequentialStep) | $0 | Cheapest first |
+| 2 | `scrapling_stealth`, `crawl4ai` (RaceStep, winner_only) | $0 | Free JS rendering |
+| 3 | `cloakbrowser`, `obscura` (RaceStep) | $0 | Free stealth browsers |
+| 4 | `firecrawl`, `scrapingbee`, `scrapingdog`, `cloudflare`, `jina` (RaceStep, **sum_all**) | $0.50-1.50 / 1k | Paid fan-out; every attempt billed |
+| 5 | `brightdata_unlocker_sync` | $1.50 / 1k | Last-resort unlock |
+
+### LinkedIn (specialized — never starts with `requests`)
+
+LinkedIn ladders skip plain HTTP and lead with a paid race over vendor-specialized endpoints. Example for `linkedin_profile`:
+
+```python
+(
+    RaceStep(engines=("apify_linkedin", "anysite", "scrapingdog"),
+             budget_accounting="sum_all"),
+    SequentialStep(engine="brightdata_unlocker_sync", cost=0.0015),
+)
+```
+
+`test_linkedin_never_starts_with_requests` enforces the no-plain-HTTP rule across all five LinkedIn classes.
+
+### Difficulty classes
+
+`cloudflare_protected` / `datadome_protected` / `akamai_protected` / `perimeterx_protected` are reached via response-signature reclassification (counter `WalkBudget.reclassifications`, capped at 3). They lead with stealth-browser races (`cloakbrowser`, `obscura`, `scrapling_stealth`) — never plain `requests`.
+
+### Multi-mode engines = distinct registry names
+
+Bright Data Unlocker has two modes; Scrapling has two modes. Rather than carry a mode toggle on each call, the registry treats them as distinct engines:
+
+- `brightdata_unlocker_sync` / `brightdata_unlocker_async`
+- `scrapling_stealth` / `scrapling_fast`
+
+User-facing aliases live in `ENGINE_ALIASES` (e.g. `opts.engines=["scrapling"]` resolves to `scrapling_stealth`). The benefit: `WalkBudget.engines_tried` is a set of unambiguous names — no engine instance gets retried in a different mode without an explicit alias.
+
+### Walk-time contracts (pure functions)
+
+The router consumes three pure functions from `ladders.py`:
+
+```python
+is_step_allowed(step, policy) -> tuple[bool, str | None]
+check_budget(step, walk, *, timeout_s, max_engines, max_cost_usd) -> None
+                                                                # raises BudgetExceeded
+_estimate_step_cost(step, avg_response_mb=2.0) -> float
+```
+
+`is_step_allowed` enforces `Policy(paid_allowed, legal_constraints_blocked, geography_required)`. `check_budget` accounts for **race fan-out** in the engine-count ceiling so a 3-engine race cannot start with only 1 engine slot remaining. `_estimate_step_cost` converts `(estimated_cost_usd, billing_unit)` into a per-call USD figure — `gb` billing scales with `avg_response_mb`.
+
+### Default policies
+
+`DEFAULT_POLICY: dict[SiteClass, Policy]` holds class-level overrides. `government` ships with `paid_allowed=False` so commercial scraping APIs are skipped unless the caller explicitly opts in.
+
+### "Suspicious content" detection
+
+`scrapefold/detection.py` (S2) owns the heuristics (text length < `min_text_chars`, anti-bot phrases, `<noscript>`-dominant body, mostly-`<script>` body). The router calls `detection.is_suspicious(result)` and, on `True`, advances to the next step or reclassifies via `SIGNATURES`.
 
 ### Stopping rules — preventing overkill
 
-Escalation **stops** when any of:
+The walk stops when any of:
 
-| Rule | Default | Override |
+| Rule | Default ceiling | Override |
 |---|---|---|
-| First tier returns a "good" response (not suspicious) | — | `opts.extra["accept_first_success"]=False` to keep trying |
-| Total elapsed time exceeds `opts.timeout_s` | 60 s | per call |
-| Cumulative cost would exceed `opts.extra["max_cost_usd"]` | 0.05 USD | per call |
-| Engines tried reaches `opts.extra["max_engines"]` | 4 | per call |
-| Explicit `opts.engines=[…]` was passed | — | router uses only that list, no auto-escalation |
+| Step returns a non-suspicious response | — | `opts.extra["accept_first_success"]=False` to keep trying |
+| `walk.elapsed_ms / 1000 >= opts.timeout_s` | 60 s | `opts.timeout_s=N` |
+| `walk.cost_usd + step_cost > max_cost_usd` | 0.05 USD | `opts.extra["max_cost_usd"]=N` |
+| `len(walk.engines_tried) + step_fanout > max_engines` | 4 | `opts.extra["max_engines"]=N` |
+| `walk.reclassifications >= MAX_RECLASSIFICATIONS` | 3 | (class invariant) |
+| Explicit `opts.engines=[…]` was passed | — | router uses only that list |
 
-This means a typical successful scrape of a friendly site costs **one `requests` call (~200 ms, $0)**. The full ladder runs only for hostile sites and stops at the first tier that works — preventing the "always run all 5 engines in parallel" overkill pattern.
+A typical scrape of a friendly site costs one `requests` call (~200 ms, $0). The full ladder runs only for hostile sites.
 
 ### Parallel mode — only when explicitly requested
 
