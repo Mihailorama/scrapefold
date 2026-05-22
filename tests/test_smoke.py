@@ -7,7 +7,7 @@ import pytest
 
 import scrapefold
 from scrapefold import EngineCapabilities, ScrapeEngine, ScrapeOptions, ScrapeResult
-from scrapefold.engines import list_engine_names
+from scrapefold.engines import list_engine_names, resolve_alias
 
 
 def test_version_string() -> None:
@@ -115,6 +115,24 @@ def test_engine_registry_contains_pack_2b_engines() -> None:
     """Pack 2B registers the three LinkedIn-focused engines."""
     names = set(list_engine_names())
     assert {"apify_linkedin", "anysite", "outscraper"}.issubset(names)
+
+
+def test_engine_registry_contains_pack_2c_scrapling() -> None:
+    """Pack 2C registers both scrapling modes and the alias resolves correctly."""
+    names = set(list_engine_names())
+    assert "scrapling_stealth" in names, "scrapling_stealth missing from registry"
+    assert "scrapling_fast" in names, "scrapling_fast missing from registry"
+    # Alias must resolve scrapling → scrapling_stealth
+    assert resolve_alias("scrapling") == "scrapling_stealth"
+    # Canonical names must NOT be aliases (they resolve to themselves)
+    assert resolve_alias("scrapling_stealth") == "scrapling_stealth"
+    assert resolve_alias("scrapling_fast") == "scrapling_fast"
+
+
+def test_engine_registry_contains_pack_2c_browser_engines() -> None:
+    """Pack 2C also registers crawl4ai, cloakbrowser, and selenium."""
+    names = set(list_engine_names())
+    assert {"crawl4ai", "cloakbrowser", "selenium"}.issubset(names)
 
 
 async def test_public_scrape_is_not_implemented() -> None:

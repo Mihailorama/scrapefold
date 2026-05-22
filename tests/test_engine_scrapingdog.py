@@ -224,7 +224,8 @@ def test_is_available_true_with_key() -> None:
     assert _engine(api_key="key-abc").is_available() is True
 
 
-def test_is_available_false_without_key() -> None:
+def test_is_available_false_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SCRAPINGDOG_API_KEY", raising=False)
     eng = ScrapingdogEngine(api_key=None)
     assert eng.is_available() is False
 

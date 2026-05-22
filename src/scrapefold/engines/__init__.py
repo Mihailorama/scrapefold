@@ -45,6 +45,27 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "outscraper": lambda: (
         __import__("scrapefold.engines.outscraper", fromlist=["OutscraperEngine"]).OutscraperEngine
     ),
+    "scrapling_stealth": lambda: (
+        __import__(
+            "scrapefold.engines.scrapling_stealth", fromlist=["ScraplingStealthEngine"]
+        ).ScraplingStealthEngine
+    ),
+    "scrapling_fast": lambda: (
+        __import__(
+            "scrapefold.engines.scrapling_fast", fromlist=["ScraplingFastEngine"]
+        ).ScraplingFastEngine
+    ),
+    "crawl4ai": lambda: (
+        __import__("scrapefold.engines.crawl4ai", fromlist=["Crawl4AIEngine"]).Crawl4AIEngine
+    ),
+    "cloakbrowser": lambda: (
+        __import__(
+            "scrapefold.engines.cloakbrowser", fromlist=["CloakBrowserEngine"]
+        ).CloakBrowserEngine
+    ),
+    "selenium": lambda: (
+        __import__("scrapefold.engines.selenium", fromlist=["SeleniumEngine"]).SeleniumEngine
+    ),
 }
 
 
@@ -82,6 +103,11 @@ def get_engine(name: str) -> type[ScrapeEngine]:
 
 def list_engine_names() -> list[str]:
     return sorted(_REGISTRY)
+
+
+# Register user-facing aliases for multi-mode engines.
+# "scrapling" resolves to "scrapling_stealth" (default / most capable mode).
+register_alias("scrapling", "scrapling_stealth")
 
 
 __all__ = [

@@ -344,12 +344,23 @@ def test_engine_aliases_dict_exists_and_is_mutable() -> None:
 
 
 def test_resolve_alias_round_trip() -> None:
-    register_alias("scrapling", "scrapling_stealth")
+    # The "scrapling" alias is registered at module import time in
+    # scrapefold/engines/__init__.py — popping it would leak into other tests.
+    assert resolve_alias("scrapling") == "scrapling_stealth"
+    assert resolve_alias("not_an_engine") == "not_an_engine"
+
+
+def test_register_alias_can_be_overridden_temporarily() -> None:
+    """register_alias is idempotent; saving + restoring keeps suite-wide state clean."""
+    original = ENGINE_ALIASES.get("scrapling")
     try:
-        assert resolve_alias("scrapling") == "scrapling_stealth"
-        assert resolve_alias("not_an_engine") == "not_an_engine"
+        register_alias("scrapling", "scrapling_fast")
+        assert resolve_alias("scrapling") == "scrapling_fast"
     finally:
-        ENGINE_ALIASES.pop("scrapling", None)
+        if original is None:
+            ENGINE_ALIASES.pop("scrapling", None)
+        else:
+            ENGINE_ALIASES["scrapling"] = original
 
 
 # ---------------------------------------------------------------------------
