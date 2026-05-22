@@ -8,16 +8,14 @@ source after JavaScript execution.  It requires the ``selenium`` extra:
 This also installs ``webdriver-manager`` which auto-downloads the matching
 ``chromedriver`` binary on first use.
 
-Cookie handling (v1):
-    Selenium requires a page to be loaded before ``add_cookie()`` can be
-    called (domain restriction).  v1 defers cookie support: if ``opts.cookies``
-    is supplied the engine logs a DEBUG warning and proceeds without setting
-    cookies.  Full cookie support is tracked in the project TODO.
+Unsupported options (stripped at the base-class boundary, never reach ``_fetch``):
 
-Proxy (v1):
-    Selenium proxy configuration requires vendor-specific ``--proxy-server``
-    Chrome flags which are complex to generalise.  v1 skips proxy; if a proxy
-    is needed use an engine that supports it natively (e.g. ScrapingBee).
+- ``custom_headers``: Selenium has no native API for arbitrary request headers.
+- ``cookies``: ``driver.add_cookie()`` requires a prior same-domain navigation,
+  which would need a generic-purpose router scaffold beyond this v1's scope.
+- ``premium_proxy`` / proxy routing: requires vendor-specific
+  ``--proxy-server`` Chrome flags. Use an engine with native proxy support
+  (e.g. ScrapingBee) when proxy routing is needed.
 """
 
 from __future__ import annotations
@@ -165,15 +163,6 @@ class SeleniumEngine(ScrapeEngine):
             driver = webdriver.Chrome(service=service, options=chrome_options)
             try:
                 driver.set_page_load_timeout(opts.timeout_s)
-
-                if opts.cookies:
-                    # v1: Cookie injection requires navigating to the domain first
-                    # (Selenium enforces same-domain restriction for add_cookie).
-                    # Deferred to v2; log so callers are aware.
-                    logger.debug(
-                        "selenium: cookie injection is deferred (v1 limitation); "
-                        "cookies will NOT be set for this request"
-                    )
 
                 driver.get(url)
 

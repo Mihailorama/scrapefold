@@ -220,6 +220,22 @@ async def test_wait_ms_forwarded() -> None:
     assert call_kwargs.get("wait") == 3000
 
 
+@pytest.mark.anyio
+async def test_timeout_forwarded_even_at_default() -> None:
+    """Regression: scrapling's 30s default must not silently override scrapefold's
+    60s when the caller uses ``ScrapeOptions()`` defaults — timeout is ALWAYS
+    forwarded as ms.
+    """
+    resp = _make_response()
+    mock_cls = MagicMock()
+    mock_cls.fetch = MagicMock(return_value=resp)
+
+    with patch("scrapefold.engines.scrapling_stealth.StealthyFetcher", mock_cls):
+        await _engine().scrape("https://example.com/", ScrapeOptions())
+
+    assert mock_cls.fetch.call_args[1].get("timeout") == ScrapeOptions().timeout_s * 1000
+
+
 # ---------------------------------------------------------------------------
 # 10. wait_for_selector forwarded as `wait_selector`
 # ---------------------------------------------------------------------------

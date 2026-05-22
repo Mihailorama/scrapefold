@@ -229,6 +229,25 @@ async def test_wait_ms_forwarded() -> None:
     assert run_cfg_cls._instances[0].delay_before_return_html == pytest.approx(3.0)
 
 
+async def test_timeout_forwarded_even_at_default() -> None:
+    """Regression: page_timeout is always set so crawl4ai's internal default
+    cannot win silently when ``timeout_s`` matches scrapefold's default.
+    """
+    crawler_class = _make_crawler_mock()
+    run_cfg_cls = _make_run_config_mock()
+    browse_cfg_cls = _make_browser_config_mock()
+
+    with (
+        patch("scrapefold.engines.crawl4ai.AsyncWebCrawler", crawler_class),
+        patch("scrapefold.engines.crawl4ai.CrawlerRunConfig", run_cfg_cls),
+        patch("scrapefold.engines.crawl4ai.BrowserConfig", browse_cfg_cls),
+    ):
+        engine = Crawl4AIEngine()
+        await engine.scrape(_TEST_URL, ScrapeOptions())
+
+    assert run_cfg_cls._instances[0].page_timeout == ScrapeOptions().timeout_s * 1000
+
+
 # ---------------------------------------------------------------------------
 # 6. wait_for_selector forwarded as wait_for in CrawlerRunConfig
 # ---------------------------------------------------------------------------

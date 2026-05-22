@@ -221,3 +221,18 @@ def test_fast_default_timeout_lower_than_stealth() -> None:
         ScraplingFastEngine.CAPABILITIES.default_timeout_s
         < ScraplingStealthEngine.CAPABILITIES.default_timeout_s
     )
+
+
+@pytest.mark.anyio
+async def test_timeout_forwarded_even_at_default() -> None:
+    """Regression: timeout is always forwarded (seconds) so the AsyncFetcher
+    internal default cannot win silently when ``timeout_s`` matches scrapefold's.
+    """
+    resp = _make_response()
+    mock_cls = MagicMock()
+    mock_cls.get = AsyncMock(return_value=resp)
+
+    with patch("scrapefold.engines.scrapling_fast.AsyncFetcher", mock_cls):
+        await _engine().scrape("https://example.com/", ScrapeOptions())
+
+    assert mock_cls.get.call_args[1].get("timeout") == ScrapeOptions().timeout_s

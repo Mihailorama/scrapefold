@@ -209,7 +209,7 @@ class CloakBrowserEngine(ScrapeEngine):
                     opts.wait_for_selector,
                     timeout=timeout_ms,
                 )
-            elif opts.wait_ms != ScrapeOptions().wait_ms:
+            elif opts.wait_ms != _DEFAULT_OPTS.wait_ms:
                 await asyncio.sleep(opts.wait_ms / 1000)
 
             html: str = await page.content()

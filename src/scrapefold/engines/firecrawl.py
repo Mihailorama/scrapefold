@@ -23,6 +23,8 @@ from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_OPTS = ScrapeOptions()
+
 # Module-level reference to the SDK class, populated lazily on first use.
 # Exposed at module scope so tests can monkeypatch it:
 #   patch("scrapefold.engines.firecrawl.AsyncFirecrawlApp", ...)
@@ -70,7 +72,7 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     # ``wait_for`` is int-only. wait_ms maps to ``wait_for`` directly.
     if opts.wait_for_selector:
         kwargs["actions"] = [{"type": "wait", "selector": opts.wait_for_selector}]
-    elif opts.wait_ms != ScrapeOptions().wait_ms:
+    elif opts.wait_ms != _DEFAULT_OPTS.wait_ms:
         kwargs["wait_for"] = opts.wait_ms
 
     # SDK proxy Literal: 'basic' | 'stealth' | 'enhanced' | 'auto'.

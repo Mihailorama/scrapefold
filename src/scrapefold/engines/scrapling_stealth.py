@@ -23,7 +23,12 @@ from typing import Any
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import html_to_both
-from scrapefold.options import ScrapeOptions, build_target_headers, strip_extra_prefix
+from scrapefold.options import (
+    ScrapeOptions,
+    build_target_headers,
+    cookies_to_playwright_list,
+    strip_extra_prefix,
+)
 from scrapefold.result import ScrapeResult
 
 _DEFAULT_OPTS = ScrapeOptions()
@@ -77,10 +82,7 @@ def _adapt(opts: ScrapeOptions, url: str) -> dict[str, Any]:
         kwargs["useragent"] = opts.user_agent
 
     if opts.cookies:
-        # Scrapling forwards cookies to Playwright context.add_cookies, which
-        # expects a sequence of cookie objects scoped to a real URL or domain.
-        # Passing the raw dict made auth-cookie scrapes silently no-op.
-        kwargs["cookies"] = [{"name": k, "value": v, "url": url} for k, v in opts.cookies.items()]
+        kwargs["cookies"] = cookies_to_playwright_list(opts.cookies, url)
 
     if opts.wait_ms != _DEFAULT_OPTS.wait_ms:
         kwargs["wait"] = opts.wait_ms

@@ -22,7 +22,12 @@ from typing import Any
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import html_to_both, markdown_to_text
-from scrapefold.options import ScrapeOptions, build_target_headers, strip_extra_prefix
+from scrapefold.options import (
+    ScrapeOptions,
+    build_target_headers,
+    cookies_to_playwright_list,
+    strip_extra_prefix,
+)
 from scrapefold.result import ScrapeResult
 
 _DEFAULT_OPTS = ScrapeOptions()
@@ -80,11 +85,8 @@ def _adapt_browser_config(opts: ScrapeOptions, browser_config_cls: Any, url: str
     if headers:
         kwargs["headers"] = headers
 
-    # BrowserConfig.cookies is a list of Playwright cookie dicts. Playwright
-    # requires the cookie's ``url`` to match the navigation target's scheme +
-    # host; ``about:blank`` made cookie-auth scrapes silently no-op.
     if opts.cookies:
-        kwargs["cookies"] = [{"name": k, "value": v, "url": url} for k, v in opts.cookies.items()]
+        kwargs["cookies"] = cookies_to_playwright_list(opts.cookies, url)
 
     if not kwargs:
         return None

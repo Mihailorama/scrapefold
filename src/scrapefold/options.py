@@ -104,6 +104,19 @@ def cookies_to_header(cookies: Mapping[str, str] | None) -> str | None:
     return "; ".join(f"{name}={value}" for name, value in cookies.items())
 
 
+def cookies_to_playwright_list(cookies: Mapping[str, str] | None, url: str) -> list[dict[str, str]]:
+    """Convert a cookies dict to the Playwright cookie-object list, scoped to ``url``.
+
+    Playwright's ``context.add_cookies`` (used by scrapling_stealth and crawl4ai's
+    BrowserConfig) rejects raw dicts and silently drops cookies whose ``url`` does
+    not match the navigation target's scheme + host. Both engines now route cookies
+    through this helper so a placeholder URL can never make auth scrapes a no-op.
+    """
+    if not cookies:
+        return []
+    return [{"name": k, "value": v, "url": url} for k, v in cookies.items()]
+
+
 def build_target_headers(
     opts: ScrapeOptions,
     *,
@@ -145,5 +158,6 @@ __all__ = [
     "ScrapeOptions",
     "build_target_headers",
     "cookies_to_header",
+    "cookies_to_playwright_list",
     "strip_extra_prefix",
 ]
