@@ -105,9 +105,10 @@ def test_scrape_engine_is_abstract() -> None:
         ScrapeEngine()  # type: ignore[abstract]
 
 
-def test_engine_registry_is_empty_in_scaffold() -> None:
-    """S1 scaffold registers no engines. Real engines land in S2-S6, S11."""
-    assert list_engine_names() == []
+def test_engine_registry_contains_pack_2a_engines() -> None:
+    """Pack 2A registers the five baseline HTTP engines."""
+    names = set(list_engine_names())
+    assert {"requests", "firecrawl", "scrapingbee", "scrapingdog", "jina"}.issubset(names)
 
 
 async def test_public_scrape_is_not_implemented() -> None:

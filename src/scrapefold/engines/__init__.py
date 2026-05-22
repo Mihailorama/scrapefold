@@ -16,7 +16,25 @@ if TYPE_CHECKING:
 # Lazy registry: name -> import-and-return-class function.
 # Each lambda imports the engine module on first call so missing extras
 # only error out when that engine is actually requested.
-_REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {}
+_REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
+    "requests": lambda: (
+        __import__("scrapefold.engines.requests", fromlist=["RequestsEngine"]).RequestsEngine
+    ),
+    "firecrawl": lambda: (
+        __import__("scrapefold.engines.firecrawl", fromlist=["FirecrawlEngine"]).FirecrawlEngine
+    ),
+    "scrapingbee": lambda: (
+        __import__(
+            "scrapefold.engines.scrapingbee", fromlist=["ScrapingbeeEngine"]
+        ).ScrapingbeeEngine
+    ),
+    "scrapingdog": lambda: (
+        __import__(
+            "scrapefold.engines.scrapingdog", fromlist=["ScrapingdogEngine"]
+        ).ScrapingdogEngine
+    ),
+    "jina": lambda: __import__("scrapefold.engines.jina", fromlist=["JinaEngine"]).JinaEngine,
+}
 
 
 # User-facing aliases for multi-mode engines so ``opts.engines=["scrapling"]``
