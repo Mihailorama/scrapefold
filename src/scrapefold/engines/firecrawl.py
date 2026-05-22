@@ -49,37 +49,41 @@ def _load_sdk() -> Any:
 
 
 def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
-    """Map unified ScrapeOptions to Firecrawl /scrape params.
+    """Map unified ScrapeOptions to Firecrawl v2 SDK kwargs.
 
-    Returns a dict suitable for passing as ``params=`` to
-    ``AsyncFirecrawlApp.scrape()``.
+    Returns a dict spread as ``**kwargs`` into ``AsyncFirecrawlApp.scrape()``
+    — the v2 SDK reads top-level snake_case kwargs and silently ignores any
+    ``params={}`` wrapper.
     """
-    params: dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     headers = build_target_headers(opts)
 
     if opts.country:
-        params["location"] = {"country": opts.country}
+        kwargs["location"] = {"country": opts.country}
 
     # Firecrawl always renders JS; render_js=False is a best-effort hint
     # that we pass through by limiting formats to markdown.
     if not opts.render_js:
-        params["formats"] = ["markdown"]
+        kwargs["formats"] = ["markdown"]
 
-    # wait_for_selector (str) takes priority over wait_ms; both map to waitFor.
+    # wait_for_selector is routed via a wait-action because the v2 SDK's
+    # ``wait_for`` is int-only. wait_ms maps to ``wait_for`` directly.
     if opts.wait_for_selector:
-        params["waitFor"] = opts.wait_for_selector
+        kwargs["actions"] = [{"type": "wait", "selector": opts.wait_for_selector}]
     elif opts.wait_ms != ScrapeOptions().wait_ms:
-        params["waitFor"] = opts.wait_ms
+        kwargs["wait_for"] = opts.wait_ms
 
+    # SDK proxy Literal: 'basic' | 'stealth' | 'enhanced' | 'auto'.
+    # premium_proxy → "enhanced" (closest semantic match).
     if opts.stealth:
-        params["proxy"] = "stealth"
+        kwargs["proxy"] = "stealth"
     elif opts.premium_proxy:
-        params["proxy"] = "premium"
+        kwargs["proxy"] = "enhanced"
 
     if headers:
-        params["headers"] = headers
+        kwargs["headers"] = headers
 
-    formats: set[str] = set(params.get("formats", []))
+    formats: set[str] = set(kwargs.get("formats", []))
     if not formats:
         if opts.output_format in ("markdown", "auto"):
             formats = {"markdown", "html"}
@@ -92,13 +96,13 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if opts.take_screenshot:
         formats.update({"markdown", "html", "screenshot"} if not formats else {"screenshot"})
     if formats:
-        params["formats"] = sorted(formats)
+        kwargs["formats"] = sorted(formats)
 
     if opts.timeout_s != ScrapeOptions().timeout_s:
-        params["timeout"] = opts.timeout_s * 1000  # Firecrawl uses ms
+        kwargs["timeout"] = opts.timeout_s * 1000  # Firecrawl uses ms
 
-    params.update(strip_extra_prefix(opts.extra, "firecrawl_"))
-    return params
+    kwargs.update(strip_extra_prefix(opts.extra, "firecrawl_"))
+    return kwargs
 
 
 class FirecrawlEngine(ScrapeEngine):
@@ -179,10 +183,10 @@ class FirecrawlEngine(ScrapeEngine):
         opts: ScrapeOptions,
     ) -> ScrapeResult:
         """Call /scrape and map Document → ScrapeResult."""
-        params = _adapt(opts)
-        logger.debug("firecrawl /scrape url=%s params=%s", url, params)
+        sdk_kwargs = _adapt(opts)
+        logger.debug("firecrawl /scrape url=%s kwargs=%s", url, sdk_kwargs)
 
-        doc = await app.scrape(url, params=params)
+        doc = await app.scrape(url, **sdk_kwargs)
 
         # --- Text / markdown ---
         markdown = doc.markdown or ""
