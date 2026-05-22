@@ -111,6 +111,12 @@ def test_engine_registry_contains_pack_2a_engines() -> None:
     assert {"requests", "firecrawl", "scrapingbee", "scrapingdog", "jina"}.issubset(names)
 
 
+def test_engine_registry_contains_pack_2b_engines() -> None:
+    """Pack 2B registers the three LinkedIn-focused engines."""
+    names = set(list_engine_names())
+    assert {"apify_linkedin", "anysite", "outscraper"}.issubset(names)
+
+
 async def test_public_scrape_is_not_implemented() -> None:
     with pytest.raises(NotImplementedError):
         await scrapefold.scrape("https://example.com")
