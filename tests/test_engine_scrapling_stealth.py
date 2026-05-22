@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from conftest import make_scrapling_response
 from scrapefold.engines.base import EngineCapabilities, EngineError
 from scrapefold.engines.scrapling_stealth import ScraplingStealthEngine
 from scrapefold.options import ScrapeOptions
@@ -30,16 +31,8 @@ _HTML = (
 )
 
 
-def _make_response(
-    html: str = _HTML,
-    status: int = 200,
-) -> MagicMock:
-    """Build a fake scrapling Response-like mock."""
-    resp = MagicMock()
-    resp.status = status
-    resp.html_content = MagicMock()
-    resp.html_content.__str__ = lambda self: html
-    return resp
+def _make_response(html: str = _HTML, status: int = 200) -> MagicMock:
+    return make_scrapling_response(html, status=status)
 
 
 def _engine() -> ScraplingStealthEngine:

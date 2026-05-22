@@ -104,16 +104,25 @@ def cookies_to_header(cookies: Mapping[str, str] | None) -> str | None:
     return "; ".join(f"{name}={value}" for name, value in cookies.items())
 
 
-def build_target_headers(opts: ScrapeOptions, *, include_cookies: bool = True) -> dict[str, str]:
+def build_target_headers(
+    opts: ScrapeOptions,
+    *,
+    include_cookies: bool = True,
+    include_user_agent: bool = True,
+) -> dict[str, str]:
     """Project shared header fields from ``ScrapeOptions`` to a dict.
 
     Engines layer vendor-specific keys on top of the result. Caller-provided
     ``opts.custom_headers`` always win (applied last).
+
+    ``include_user_agent=False`` is for engines whose SDK has a dedicated
+    user-agent kwarg (scrapling, crawl4ai, cloakbrowser, selenium) — putting
+    UA in the headers dict would conflict with the vendor's own UA handling.
     """
     headers: dict[str, str] = {}
     if opts.language:
         headers["Accept-Language"] = opts.language
-    if opts.user_agent:
+    if include_user_agent and opts.user_agent:
         headers["User-Agent"] = opts.user_agent
     if include_cookies:
         cookie_value = cookies_to_header(opts.cookies)

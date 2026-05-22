@@ -22,8 +22,10 @@ from typing import Any
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import html_to_both, markdown_to_text
-from scrapefold.options import ScrapeOptions, strip_extra_prefix
+from scrapefold.options import ScrapeOptions, build_target_headers, strip_extra_prefix
 from scrapefold.result import ScrapeResult
+
+_DEFAULT_OPTS = ScrapeOptions()
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +74,9 @@ def _adapt_browser_config(opts: ScrapeOptions, browser_config_cls: Any) -> Any |
     if opts.user_agent:
         kwargs["user_agent"] = opts.user_agent
 
-    # Build headers: language + custom_headers (no cookies — handled separately)
-    headers: dict[str, str] = {}
-    if opts.language:
-        headers["Accept-Language"] = opts.language
-    if opts.custom_headers:
-        headers.update(opts.custom_headers)
+    # user_agent and cookies are dedicated BrowserConfig kwargs — keep them
+    # out of the headers dict so the SDK manages them natively.
+    headers = build_target_headers(opts, include_cookies=False, include_user_agent=False)
     if headers:
         kwargs["headers"] = headers
 
@@ -107,8 +106,7 @@ def _adapt_run_config(opts: ScrapeOptions, run_config_cls: Any) -> Any:
     kwargs: dict[str, Any] = {}
 
     # wait_ms → delay_before_return_html (seconds, float)
-    default_wait_ms = ScrapeOptions().wait_ms
-    if opts.wait_ms != default_wait_ms:
+    if opts.wait_ms != _DEFAULT_OPTS.wait_ms:
         kwargs["delay_before_return_html"] = opts.wait_ms / 1000.0
 
     # wait_for_selector → wait_for (CrawlerRunConfig accepts a CSS selector string)
@@ -120,8 +118,7 @@ def _adapt_run_config(opts: ScrapeOptions, run_config_cls: Any) -> Any:
         kwargs["screenshot"] = True
 
     # --- Timeout ---
-    default_timeout_s = ScrapeOptions().timeout_s
-    if opts.timeout_s != default_timeout_s:
+    if opts.timeout_s != _DEFAULT_OPTS.timeout_s:
         # CrawlerRunConfig.page_timeout is in milliseconds
         kwargs["page_timeout"] = opts.timeout_s * 1000
 
@@ -192,12 +189,9 @@ class Crawl4AIEngine(ScrapeEngine):
         run_cfg = _adapt_run_config(opts, run_config_cls)
         logger.debug("crawl4ai arun url=%s run_config=%s", url, run_cfg)
 
-        if browser_cfg is not None:
-            async with awc_cls(config=browser_cfg) as crawler:
-                container = await crawler.arun(url, config=run_cfg)
-        else:
-            async with awc_cls() as crawler:
-                container = await crawler.arun(url, config=run_cfg)
+        crawler_kwargs = {"config": browser_cfg} if browser_cfg is not None else {}
+        async with awc_cls(**crawler_kwargs) as crawler:
+            container = await crawler.arun(url, config=run_cfg)
 
         # crawl4ai returns a CrawlResultContainer; unwrap to the first result.
         # For a single URL, result is accessible via container[0] in 0.8.x.
@@ -225,9 +219,7 @@ class Crawl4AIEngine(ScrapeEngine):
             text = ""
             markdown = ""
 
-        # Ensure both slots are populated.
-        if not text and markdown:
-            text = markdown_to_text(markdown)
+        # Last-ditch fallback so both slots are non-empty when achievable.
         if not markdown and text:
             markdown = text
 

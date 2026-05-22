@@ -37,18 +37,24 @@ from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
 
-# Module-level reference populated lazily on first use.
-# Exposed at module scope so tests can monkeypatch it:
+_DEFAULT_OPTS = ScrapeOptions()
+
+# Module-level references populated lazily on first use.
+# Exposed at module scope so tests can monkeypatch them:
 #   patch("scrapefold.engines.cloakbrowser.launch_context_async", ...)
 launch_context_async: Any = None
+ProxySettings: Any = None
 
 
 def _load_sdk() -> Any:
     """Return cloakbrowser.launch_context_async, importing on first call.
 
+    Also caches ``ProxySettings`` at module scope so ``_build_proxy`` can
+    reach it through one path with consistent install-hint error handling.
+
     Raises ImportError with an installation hint if cloakbrowser is missing.
     """
-    global launch_context_async
+    global launch_context_async, ProxySettings
     if launch_context_async is not None:
         return launch_context_async
     try:
@@ -59,6 +65,7 @@ def _load_sdk() -> Any:
             "Install it with: pip install 'cloakbrowser>=0.3'"
         ) from exc
     launch_context_async = _cb.launch_context_async
+    ProxySettings = _cb.ProxySettings
     return launch_context_async
 
 
@@ -88,12 +95,10 @@ def _build_proxy(opts: ScrapeOptions) -> Any | None:
     # This tells the engine there is *some* proxy intent; real deployments
     # override via extra["cloakbrowser_proxy"].
     server = f"socks5://residential-proxy/{opts.country or 'any'}"
-    try:
-        import cloakbrowser as _cb
-
-        return _cb.ProxySettings(server=server)
-    except ImportError:
+    if ProxySettings is None:
+        # _load_sdk() not called yet (some test paths) — fall back to the URL string.
         return server
+    return ProxySettings(server=server)
 
 
 def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
@@ -114,8 +119,10 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if proxy is not None:
         kwargs["proxy"] = proxy
 
-    # Merge headers: Accept-Language, Cookie, custom_headers
-    headers = build_target_headers(opts)
+    # user_agent has a dedicated kwarg above — keep it out of the headers dict
+    # so the SDK manages the UA natively. Cookies stay in (Playwright forwards
+    # them via extra_http_headers, since launch_context_async has no cookies kwarg).
+    headers = build_target_headers(opts, include_user_agent=False)
     if headers:
         kwargs["extra_http_headers"] = headers
 

@@ -129,6 +129,12 @@ class SeleniumEngine(ScrapeEngine):
         }
     )
 
+    def __init__(self, api_key: str | None = None) -> None:
+        super().__init__(api_key)
+        # Cached after first _fetch — webdriver-manager hits the filesystem
+        # (and sometimes the network) every call, so resolve once per engine.
+        self._driver_path: str | None = None
+
     async def _fetch(self, url: str, opts: ScrapeOptions) -> ScrapeResult:
         """Drive a headless Chrome browser and return the rendered page.
 
@@ -136,6 +142,9 @@ class SeleniumEngine(ScrapeEngine):
         to avoid blocking the event loop.
         """
         _load_webdriver()
+        if self._driver_path is None:
+            self._driver_path = ChromeDriverManager().install()
+        driver_path = self._driver_path
 
         def _sync_fetch() -> tuple[str, str | None]:
             """Run the full Selenium session.  Returns (html, screenshot_b64 | None)."""
@@ -150,7 +159,7 @@ class SeleniumEngine(ScrapeEngine):
             if opts.language:
                 chrome_options.add_argument(f"--lang={opts.language}")
 
-            service = ChromeService(ChromeDriverManager().install())
+            service = ChromeService(driver_path)
             driver = webdriver.Chrome(service=service, options=chrome_options)
             try:
                 driver.set_page_load_timeout(opts.timeout_s)

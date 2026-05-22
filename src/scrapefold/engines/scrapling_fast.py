@@ -24,6 +24,8 @@ from scrapefold.html_to_text import html_to_both
 from scrapefold.options import ScrapeOptions, build_target_headers, strip_extra_prefix
 from scrapefold.result import ScrapeResult
 
+_DEFAULT_OPTS = ScrapeOptions()
+
 logger = logging.getLogger(__name__)
 
 # Module-level reference populated lazily on first use.
@@ -67,7 +69,7 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if opts.cookies:
         kwargs["cookies"] = opts.cookies
 
-    if opts.timeout_s != ScrapeOptions().timeout_s:
+    if opts.timeout_s != _DEFAULT_OPTS.timeout_s:
         kwargs["timeout"] = opts.timeout_s
 
     kwargs.update(strip_extra_prefix(opts.extra, "scrapling_fast_"))

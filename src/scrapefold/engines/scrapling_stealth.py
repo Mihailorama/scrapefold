@@ -23,8 +23,10 @@ from typing import Any
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import html_to_both
-from scrapefold.options import ScrapeOptions, strip_extra_prefix
+from scrapefold.options import ScrapeOptions, build_target_headers, strip_extra_prefix
 from scrapefold.result import ScrapeResult
+
+_DEFAULT_OPTS = ScrapeOptions()
 
 logger = logging.getLogger(__name__)
 
@@ -65,13 +67,9 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     """
     kwargs: dict[str, Any] = {}
 
-    # Build headers for Accept-Language (user_agent goes to useragent, not headers)
-    headers: dict[str, str] = {}
-    if opts.language:
-        headers["Accept-Language"] = opts.language
-    # custom_headers merged in
-    if opts.custom_headers:
-        headers.update(opts.custom_headers)
+    # user_agent and cookies go to dedicated SDK kwargs, not into the
+    # headers dict — opt out of include_user_agent/include_cookies here.
+    headers = build_target_headers(opts, include_cookies=False, include_user_agent=False)
     if headers:
         kwargs["extra_headers"] = headers
 
@@ -81,13 +79,13 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if opts.cookies:
         kwargs["cookies"] = opts.cookies
 
-    if opts.wait_ms != ScrapeOptions().wait_ms:
+    if opts.wait_ms != _DEFAULT_OPTS.wait_ms:
         kwargs["wait"] = opts.wait_ms
 
     if opts.wait_for_selector:
         kwargs["wait_selector"] = opts.wait_for_selector
 
-    if opts.timeout_s != ScrapeOptions().timeout_s:
+    if opts.timeout_s != _DEFAULT_OPTS.timeout_s:
         # StealthSession timeout is in milliseconds
         kwargs["timeout"] = opts.timeout_s * 1000
 

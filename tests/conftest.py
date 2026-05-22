@@ -2,7 +2,23 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
+
+
+def make_scrapling_response(html: str, status: int = 200) -> MagicMock:
+    """Factory for a fake scrapling Response object used by both scrapling engines.
+
+    Each scrapling fetcher returns a Response whose ``html_content`` stringifies
+    to the raw HTML. The same shape is needed by ``test_engine_scrapling_stealth``
+    and ``test_engine_scrapling_fast``, hence the shared factory.
+    """
+    resp = MagicMock()
+    resp.status = status
+    resp.html_content = MagicMock()
+    resp.html_content.__str__ = lambda self: html
+    return resp
 
 
 @pytest.fixture
