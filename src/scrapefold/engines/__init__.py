@@ -19,18 +19,9 @@ if TYPE_CHECKING:
 _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {}
 
 
-# Backward-compat aliases for multi-mode engines.
-#
-# Some engines have multiple operating modes that need distinct registered
-# names so ``WalkBudget.engines_tried`` dedup is unambiguous (Codex round-2
-# review, finding R2-NEW-2). But users still want to write
-# ``opts.engines=["scrapling"]`` and get the sensible default mode.
-#
-# ``resolve_alias("scrapling")`` returns ``"scrapling_stealth"``.
-# ``resolve_alias("scrapling_stealth")`` is a no-op.
-#
-# Engines populating these aliases lands alongside the engine ports in
-# S2-S11. See ``docs/TECH_DEBT.md`` P1 item #6.
+# User-facing aliases for multi-mode engines so ``opts.engines=["scrapling"]``
+# resolves to the canonical ``scrapling_stealth``, while
+# ``WalkBudget.engines_tried`` stays keyed by unambiguous canonical names.
 ENGINE_ALIASES: dict[str, str] = {}
 
 

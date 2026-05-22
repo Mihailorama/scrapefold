@@ -1,11 +1,11 @@
-"""Per-site-class escalation ladders — v3 design (Codex-reviewed).
+"""Per-site-class escalation ladders.
 
 Three concerns share this module:
 
-1. **Site classification** — `URL_PATTERNS` is a data table; ``classify_url``
+1. **Site classification** — ``URL_PATTERNS`` is a data table; ``classify_url``
    walks it and returns a ``SiteClass``. For sites detectable only after a
    probe response (Cloudflare, Datadome, …), ``SIGNATURES`` lists the
-   response-pattern matchers consumed by ``detection.py`` (S2) for
+   response-pattern matchers consumed by ``detection.py`` for
    re-classification mid-walk.
 
 2. **Ladder declaration** — ``LADDERS: dict[SiteClass, Ladder]`` maps each
@@ -14,15 +14,11 @@ Three concerns share this module:
    the step, not router convention.
 
 3. **Walk-time contracts** — ``is_step_allowed`` enforces ``Policy``;
-   ``_check_budget`` enforces the per-walk ``WalkBudget`` (cost, elapsed,
+   ``check_budget`` enforces the per-walk ``WalkBudget`` (cost, elapsed,
    engines_tried, visited_site_classes, reclassifications) so the router
    never invokes a step it cannot afford.
 
-This module is data + pure functions. It does **not** import any engine
-module. The router (S7) consumes everything here.
-
-See ``docs/TECH_DEBT.md`` for the seven follow-up items Codex round-3
-flagged for the matching implementation PR.
+Pure module: data + functions, no I/O, no engine imports.
 """
 
 from __future__ import annotations
@@ -31,6 +27,8 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import ClassVar, Literal
+
+from scrapefold.engines.base import BillingUnit
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +80,7 @@ SiteClass = Literal[
 # ---------------------------------------------------------------------------
 
 BudgetMode = Literal["inherit", "reset_user_fast_track", "reset_fresh_session"]
-BillingUnit = Literal["call", "page", "minute", "gb"]
+BudgetReason = Literal["cost", "elapsed", "engines_count", "reclassifications"]
 
 
 @dataclass(frozen=True)
@@ -93,7 +91,7 @@ class _StepBase:
     billing_unit: BillingUnit = "call"
     geography: tuple[str, ...] = ()
     requires: tuple[str, ...] = ()
-    legal_constraints: tuple[str, ...] = ()
+    legal_constraints: frozenset[str] = frozenset()
     budget_mode: BudgetMode = "inherit"
     max_extra_cost_usd: float | None = None
 
@@ -143,26 +141,18 @@ class WalkBudget:
     elapsed_ms: int = 0
     cost_usd: float = 0.0
     engines_tried: set[str] = field(default_factory=set)
-    visited_site_classes: set[str] = field(default_factory=set)
+    visited_site_classes: set[SiteClass] = field(default_factory=set)
     reclassifications: int = 0
 
     MAX_RECLASSIFICATIONS: ClassVar[int] = 3
 
 
 class BudgetExceeded(Exception):  # noqa: N818
-    """Raised when continuing the walk would breach a budget ceiling.
+    """Raised when continuing the walk would breach a budget ceiling."""
 
-    The ``reason`` attribute is one of:
-    ``"cost"``, ``"elapsed"``, ``"engines_count"``, ``"reclassifications"``.
-
-    Named without the ``Error`` suffix because Codex round-2 review and the
-    approved v3 plan both reference this symbol by ``BudgetExceeded`` —
-    renaming would diverge from review history without semantic gain.
-    """
-
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: BudgetReason) -> None:
         super().__init__(reason)
-        self.reason = reason
+        self.reason: BudgetReason = reason
 
 
 class AllEnginesFailed(Exception):  # noqa: N818
@@ -183,14 +173,14 @@ class Policy:
     geography_required: str | None = None
 
 
-DEFAULT_POLICY: dict[str, Policy] = {
+DEFAULT_POLICY: dict[SiteClass, Policy] = {
     # Government sites: commercial scraping APIs often have ToS friction
     # plus user-confirmation needs. Default to free-only; user may override.
     "government": Policy(paid_allowed=False),
 }
 
 
-def get_default_policy(site_class: str) -> Policy:
+def get_default_policy(site_class: SiteClass) -> Policy:
     return DEFAULT_POLICY.get(site_class, Policy())
 
 
@@ -201,7 +191,7 @@ def get_default_policy(site_class: str) -> Policy:
 # Ordered specific-first. The first regex that matches wins.
 # Adding a new entry: ALSO add a row to GOLDEN_CORPUS in tests so the
 # parametrized classification test enforces correctness.
-URL_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+URL_PATTERNS: tuple[tuple[re.Pattern[str], SiteClass], ...] = (
     (re.compile(r"linkedin\.com/sales/"), "linkedin_sales_navigator"),
     (re.compile(r"linkedin\.com/in/"), "linkedin_profile"),
     (re.compile(r"linkedin\.com/company/"), "linkedin_company"),
@@ -222,7 +212,7 @@ URL_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
-def classify_url(url: str) -> str:
+def classify_url(url: str) -> SiteClass:
     """Return a ``SiteClass`` for the URL, or ``"static_general"`` as fallback."""
     for pattern, cls in URL_PATTERNS:
         if pattern.search(url):
@@ -236,7 +226,7 @@ def classify_url(url: str) -> str:
 # tests read from one source of truth.
 # ---------------------------------------------------------------------------
 
-GOLDEN_CORPUS: tuple[tuple[str, str], ...] = (
+GOLDEN_CORPUS: tuple[tuple[str, SiteClass], ...] = (
     ("https://www.linkedin.com/sales/people/foo", "linkedin_sales_navigator"),
     ("https://www.linkedin.com/in/john-doe/", "linkedin_profile"),
     ("https://www.linkedin.com/company/acme/", "linkedin_company"),
@@ -263,20 +253,21 @@ GOLDEN_CORPUS: tuple[tuple[str, str], ...] = (
 
 
 # ---------------------------------------------------------------------------
-# Signatures — for response-content reclassification (consumed by detection.py
-# in S2). min_matches=2 prevents single-phrase false-positive reclassification.
+# Signatures — for response-content reclassification.
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class Signature:
-    target: str  # SiteClass
+    target: SiteClass
     body_phrases_all: tuple[str, ...] = ()
     body_phrases_any: tuple[str, ...] = ()
     cookie_names: tuple[str, ...] = ()
     header_names: tuple[str, ...] = ()
     status_codes: tuple[int, ...] = ()
     min_matches: int = 2
+    """Threshold to prevent single-phrase false positives reclassifying
+    unrelated 5xx pages."""
 
 
 # Vendor-anti-bot first (Datadome / PerimeterX / Akamai before Cloudflare —
@@ -317,8 +308,7 @@ SIGNATURES: tuple[Signature, ...] = (
 # Per-class ladders
 # ---------------------------------------------------------------------------
 
-# Helper aliases for readability. Numeric cost estimates per call are
-# coarse but defensible v0.1 values. See TECH_DEBT P1 #5 (gb estimate).
+# Coarse per-call USD estimates used by the ladders below.
 _FREE = 0.0
 _LOW = 0.0005  # $0.50 per 1k
 _MED = 0.001  # $1.00 per 1k
@@ -349,7 +339,7 @@ _GENERAL_LADDER: Ladder = (
 )
 
 
-LADDERS: dict[str, Ladder] = {
+LADDERS: dict[SiteClass, Ladder] = {
     # LinkedIn — vendor-specialized endpoints first, never plain HTTP.
     "linkedin_profile": (
         _race(
@@ -480,23 +470,12 @@ LADDERS: dict[str, Ladder] = {
 }
 
 
-def get_ladder(site_class: str) -> Ladder:
+def get_ladder(site_class: SiteClass | str) -> Ladder:
     """Return the escalation ladder for a given site class.
 
     Falls back to the general ladder for unknown classes.
     """
-    return LADDERS.get(site_class, _GENERAL_LADDER)
-
-
-def flatten_ladder(ladder: Ladder) -> tuple[str, ...]:
-    """Flatten a ladder into the ordered tuple of engine names — for docs/CLI."""
-    out: list[str] = []
-    for step in ladder:
-        if isinstance(step, SequentialStep):
-            out.append(step.engine)
-        else:
-            out.extend(step.engines)
-    return tuple(out)
+    return LADDERS.get(site_class, _GENERAL_LADDER)  # type: ignore[arg-type]
 
 
 def step_engines(step: LadderStep) -> tuple[str, ...]:
@@ -506,60 +485,53 @@ def step_engines(step: LadderStep) -> tuple[str, ...]:
     return step.engines
 
 
+def flatten_ladder(ladder: Ladder) -> tuple[str, ...]:
+    """Flatten a ladder into the ordered tuple of engine names — for docs/CLI."""
+    out: list[str] = []
+    for step in ladder:
+        out.extend(step_engines(step))
+    return tuple(out)
+
+
 # ---------------------------------------------------------------------------
-# Walk-time contracts — pure functions, consumed by the router (S7)
+# Walk-time contracts — pure functions, consumed by the router.
 # ---------------------------------------------------------------------------
 
 
 def is_step_allowed(step: LadderStep, policy: Policy) -> tuple[bool, str | None]:
     """Return ``(allowed, reason_or_None)``.
 
-    The router calls this BEFORE ``_check_budget`` for every step. When
-    ``False`` is returned, the router logs the reason at DEBUG and advances
-    to the next step.
+    Called BEFORE ``check_budget`` for every step. On ``False`` the router
+    logs the reason at DEBUG and advances to the next step.
     """
-    # Cost policy
     if not policy.paid_allowed and step.estimated_cost_usd > 0.0:
         return False, "paid_not_allowed"
-    # Legal constraint tags — any intersection rejects
-    blocked = set(step.legal_constraints) & policy.legal_constraints_blocked
-    if blocked:
-        return False, f"legal_blocked:{','.join(sorted(blocked))}"
-    # Geography filter
+    if step.legal_constraints:
+        blocked = step.legal_constraints & policy.legal_constraints_blocked
+        if blocked:
+            return False, f"legal_blocked:{','.join(sorted(blocked))}"
     if (
         policy.geography_required
         and step.geography
         and policy.geography_required not in step.geography
     ):
-        return False, (f"geography:{policy.geography_required}_not_in_{step.geography}")
+        return False, f"geography:{policy.geography_required}_not_in_{step.geography}"
     return True, None
 
 
-def _estimate_step_cost(
+def estimate_step_cost(
     step: LadderStep,
     avg_response_mb: float = 2.0,
 ) -> float:
     """Convert ``estimated_cost_usd`` (per ``billing_unit``) to a per-call USD estimate.
 
-    ``avg_response_mb`` only applies when ``billing_unit == "gb"``. Default
-    2 MB is a conservative v0.1 estimate; engines that download large
-    payloads (browser sessions, video transcripts) should pass a higher
-    override via ``opts.extra["avg_response_mb"]`` and the router forwards
-    it here. (See TECH_DEBT P1 #5 — per-engine override slot to land in S7.)
+    ``avg_response_mb`` only applies for ``billing_unit == "gb"``. Default
+    2 MB is conservative; engines with large payloads override via
+    ``opts.extra["avg_response_mb"]``.
     """
-    base = step.estimated_cost_usd
-    unit = step.billing_unit
-    if unit == "call":
-        return base
-    if unit == "page":
-        # Conservative: one call ≈ one page for ScrapeOptions purposes.
-        return base
-    if unit == "minute":
-        # Conservative: 1 minute per call (browser sessions).
-        return base
-    if unit == "gb":
-        return base * (avg_response_mb / 1024)
-    return base
+    if step.billing_unit == "gb":
+        return step.estimated_cost_usd * (avg_response_mb / 1024)
+    return step.estimated_cost_usd
 
 
 def check_budget(
@@ -571,27 +543,20 @@ def check_budget(
     max_cost_usd: float,
     avg_response_mb: float = 2.0,
 ) -> None:
-    """Raise ``BudgetExceeded`` BEFORE the step is invoked if any ceiling
-    would be breached.
+    """Raise ``BudgetExceeded`` if invoking ``step`` would breach any ceiling.
 
-    Called once per step, after ``is_step_allowed`` returns True. For a
-    ``RaceStep``, the engine-count ceiling considers the entire fan-out so
+    For a ``RaceStep``, the engine-count ceiling counts the entire fan-out so
     a 3-engine race cannot start with only 1 engine slot remaining.
     """
-    # Time ceiling
     if walk.elapsed_ms / 1000 >= timeout_s:
         raise BudgetExceeded("elapsed")
-    # Engine-count ceiling — account for race fan-out
-    incoming = len(step_engines(step))
-    if len(walk.engines_tried) + incoming > max_engines:
+    if len(walk.engines_tried) + len(step_engines(step)) > max_engines:
         raise BudgetExceeded("engines_count")
-    # Cost ceiling
-    step_cost = _estimate_step_cost(step, avg_response_mb=avg_response_mb)
+    step_cost = estimate_step_cost(step, avg_response_mb=avg_response_mb)
     if step.max_extra_cost_usd is not None and step_cost > step.max_extra_cost_usd:
         raise BudgetExceeded("cost")
     if walk.cost_usd + step_cost > max_cost_usd:
         raise BudgetExceeded("cost")
-    # Reclassification ceiling
     if walk.reclassifications >= WalkBudget.MAX_RECLASSIFICATIONS:
         raise BudgetExceeded("reclassifications")
 
@@ -603,9 +568,9 @@ __all__ = [
     "SIGNATURES",
     "URL_PATTERNS",
     "AllEnginesFailed",
-    "BillingUnit",
     "BudgetExceeded",
     "BudgetMode",
+    "BudgetReason",
     "Ladder",
     "LadderStep",
     "Policy",
@@ -616,6 +581,7 @@ __all__ = [
     "WalkBudget",
     "check_budget",
     "classify_url",
+    "estimate_step_cost",
     "flatten_ladder",
     "get_default_policy",
     "get_ladder",

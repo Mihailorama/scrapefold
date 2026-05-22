@@ -1,4 +1,4 @@
-"""Structural + semantic tests for per-site-class escalation ladders (v3)."""
+"""Structural + semantic tests for per-site-class escalation ladders."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from scrapefold.ladders import (
     SequentialStep,
     SiteClass,
     WalkBudget,
-    _estimate_step_cost,
     check_budget,
     classify_url,
+    estimate_step_cost,
     flatten_ladder,
     get_default_policy,
     get_ladder,
@@ -28,11 +28,8 @@ from scrapefold.ladders import (
     step_engines,
 )
 
-# Engine names referenced by ladders. Multi-mode engines (Codex R2-NEW-2)
-# are registered as DISTINCT names — `scrapling_stealth`/`scrapling_fast`,
-# `brightdata_unlocker_sync`/`brightdata_unlocker_async` — so name-based
-# dedup in WalkBudget.engines_tried is unambiguous. User-facing aliases
-# (`scrapling` → `scrapling_stealth`) land in engines/__init__.py.
+# Engine names referenced by ladders. Multi-mode engines are registered as
+# distinct canonical names; user-facing aliases live in ENGINE_ALIASES.
 _VALID_ENGINES = frozenset(
     {
         # ported (10)
@@ -126,7 +123,7 @@ def test_difficulty_classes_skip_requests() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Golden corpus — URL classification regression net (R2-H3)
+# Golden corpus — URL classification regression net
 # ---------------------------------------------------------------------------
 
 
@@ -154,7 +151,7 @@ def test_every_classifiable_class_has_corpus_row() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Policy enforcement (R2-C3)
+# Policy enforcement
 # ---------------------------------------------------------------------------
 
 
@@ -176,7 +173,7 @@ def test_is_step_allowed_permits_free_step_even_when_paid_blocked() -> None:
 def test_is_step_allowed_legal_constraint_matches() -> None:
     step = SequentialStep(
         engine="apify_linkedin",
-        legal_constraints=("consent_required_linkedin",),
+        legal_constraints=frozenset({"consent_required_linkedin"}),
     )
     policy = Policy(legal_constraints_blocked=frozenset({"consent_required_linkedin"}))
     allowed, reason = is_step_allowed(step, policy)
@@ -186,7 +183,10 @@ def test_is_step_allowed_legal_constraint_matches() -> None:
 
 
 def test_is_step_allowed_legal_constraint_no_match() -> None:
-    step = SequentialStep(engine="firecrawl", legal_constraints=("some_other_tag",))
+    step = SequentialStep(
+        engine="firecrawl",
+        legal_constraints=frozenset({"some_other_tag"}),
+    )
     policy = Policy(legal_constraints_blocked=frozenset({"different_tag"}))
     allowed, reason = is_step_allowed(step, policy)
     assert allowed
@@ -221,7 +221,7 @@ def test_get_default_policy_returns_permissive_for_unknown_class() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Budget contract (R2-C2)
+# Budget contract
 # ---------------------------------------------------------------------------
 
 
@@ -268,11 +268,7 @@ def test_check_budget_aborts_on_reclassification_cap() -> None:
 
 
 def test_check_budget_race_fanout_counts_all_engines() -> None:
-    """A 3-engine RaceStep must not start with only 1 engine slot remaining.
-
-    This is Codex round-3 finding R3-C2: ``_check_budget`` previously only
-    counted per-call engine count, missing the race fan-out.
-    """
+    """A 3-engine RaceStep must not start with only 1 engine slot remaining."""
     step = RaceStep(engines=("firecrawl", "scrapingbee", "scrapingdog"))
     walk = WalkBudget(engines_tried={"requests", "crawl4ai", "scrapling_stealth"})
     with pytest.raises(BudgetExceeded) as exc:
@@ -287,7 +283,7 @@ def test_check_budget_race_fanout_passes_when_room() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Sum-type semantics (R2-C1) — RaceStep / SequentialStep
+# Sum-type semantics — RaceStep / SequentialStep
 # ---------------------------------------------------------------------------
 
 
@@ -308,12 +304,12 @@ def test_race_step_default_budget_accounting_is_winner_only() -> None:
 
 
 def test_paid_linkedin_race_steps_use_sum_all_billing() -> None:
-    """Linkedin race steps fan out 2-3 paid vendors — each call is billed."""
+    """LinkedIn race steps fan out 2-3 paid vendors — each call is billed."""
     for cls in ("linkedin_profile", "linkedin_company", "linkedin_job"):
         first = get_ladder(cls)[0]
         assert isinstance(first, RaceStep), f"{cls} first step is not a race"
         assert first.budget_accounting == "sum_all", (
-            f"{cls} race must bill all engines, not winner_only — see Codex round-3 finding R3-H1"
+            f"{cls} race must bill all engines, not winner_only"
         )
 
 
@@ -325,19 +321,16 @@ def test_step_engines_returns_correct_names() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Multi-mode engine separation (R2-NEW-2)
+# Multi-mode engine separation
 # ---------------------------------------------------------------------------
 
 
 def test_multi_mode_engines_appear_as_distinct_ladder_entries() -> None:
-    """Ladders should reference the canonical distinct names so WalkBudget
-    name-based dedup is unambiguous."""
+    """Ladders must use canonical distinct names so WalkBudget dedup is unambiguous."""
     all_engines: set[str] = set()
     for ladder in LADDERS.values():
         for step in ladder:
             all_engines.update(step_engines(step))
-    # The "scrapling" generic name must NOT appear in ladders — only the
-    # disambiguated forms. Same for brightdata_unlocker.
     assert "scrapling" not in all_engines, (
         "ladders must use 'scrapling_stealth'/'scrapling_fast', not bare 'scrapling'"
     )
@@ -347,25 +340,20 @@ def test_multi_mode_engines_appear_as_distinct_ladder_entries() -> None:
 
 
 def test_engine_aliases_dict_exists_and_is_mutable() -> None:
-    """User-facing aliases (e.g. opts.engines=['scrapling']) live in
-    ENGINE_ALIASES. Engines populate it at registration time (S2-S11);
-    the scaffold ships the dict empty."""
     assert isinstance(ENGINE_ALIASES, dict)
 
 
 def test_resolve_alias_round_trip() -> None:
-    """register_alias + resolve_alias work end-to-end."""
     register_alias("scrapling", "scrapling_stealth")
     try:
         assert resolve_alias("scrapling") == "scrapling_stealth"
-        # Unknown name passes through unchanged.
         assert resolve_alias("not_an_engine") == "not_an_engine"
     finally:
         ENGINE_ALIASES.pop("scrapling", None)
 
 
 # ---------------------------------------------------------------------------
-# Visited-class loop guard (R2-NEW-3)
+# Visited-class loop guard
 # ---------------------------------------------------------------------------
 
 
@@ -379,13 +367,12 @@ def test_walk_budget_visited_site_classes_can_track_reclassification_chain() -> 
     walk.visited_site_classes.add("static_general")
     walk.visited_site_classes.add("cloudflare_protected")
     assert len(walk.visited_site_classes) == 2
-    # An A->B->A loop would re-add A; set semantics naturally prevent that.
     walk.visited_site_classes.add("static_general")
     assert len(walk.visited_site_classes) == 2
 
 
 # ---------------------------------------------------------------------------
-# Cost estimation (_estimate_step_cost) — TECH_DEBT P1 #3, #5
+# Cost estimation
 # ---------------------------------------------------------------------------
 
 
@@ -395,17 +382,16 @@ def test_estimate_step_cost_call_unit_returns_base() -> None:
         estimated_cost_usd=0.005,
         billing_unit="call",
     )
-    assert _estimate_step_cost(step) == pytest.approx(0.005)
+    assert estimate_step_cost(step) == pytest.approx(0.005)
 
 
 def test_estimate_step_cost_gb_unit_scales_with_response_size() -> None:
     step = SequentialStep(
         engine="brightdata_browser",
-        estimated_cost_usd=1.0,  # $1 per GB
+        estimated_cost_usd=1.0,
         billing_unit="gb",
     )
-    # 10 MB response → 10/1024 GB → ~$0.00977
-    actual = _estimate_step_cost(step, avg_response_mb=10.0)
+    actual = estimate_step_cost(step, avg_response_mb=10.0)
     assert actual == pytest.approx(10.0 / 1024, rel=1e-3)
 
 
@@ -415,5 +401,4 @@ def test_estimate_step_cost_gb_default_response_mb() -> None:
         estimated_cost_usd=1.0,
         billing_unit="gb",
     )
-    # Default 2 MB → 2/1024 GB
-    assert _estimate_step_cost(step) == pytest.approx(2.0 / 1024, rel=1e-3)
+    assert estimate_step_cost(step) == pytest.approx(2.0 / 1024, rel=1e-3)

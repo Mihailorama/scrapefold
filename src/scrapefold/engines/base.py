@@ -31,6 +31,12 @@ from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
 
+BillingUnit = Literal["call", "page", "minute", "gb"]
+"""Pricing dimension shared by ``EngineCapabilities`` and ladder ``_StepBase``."""
+
+ProxyType = Literal["none", "datacenter", "residential", "mobile"]
+ProbeScope = Literal["none", "per_url", "per_domain", "per_session"]
+
 
 @dataclass(frozen=True)
 class EngineCapabilities:
@@ -50,8 +56,8 @@ class EngineCapabilities:
     estimated_cost_usd: float = 0.0
     """Per-call USD estimate (or per-unit cost when ``billing_unit != 'call'``)."""
 
-    billing_unit: Literal["call", "page", "minute", "gb"] = "call"
-    """Pricing dimension. ``router._estimate_step_cost`` reads this together
+    billing_unit: BillingUnit = "call"
+    """Pricing dimension. ``router.estimate_step_cost`` reads this together
     with ``estimated_cost_usd`` and (for ``"gb"``) the engine's
     ``avg_response_mb_estimate``."""
 
@@ -65,7 +71,7 @@ class EngineCapabilities:
     """Country codes where this engine's proxies / endpoints are useful.
     Empty tuple = global / no preference."""
 
-    proxy_type: Literal["none", "datacenter", "residential", "mobile"] = "none"
+    proxy_type: ProxyType = "none"
     legal_constraints: tuple[str, ...] = ()
     """Tags the router cross-checks against ``Policy.legal_constraints_blocked``
     (e.g. ``"consent_required_linkedin"``, ``"no_paid_government"``)."""
@@ -91,7 +97,7 @@ class ScrapeEngine(ABC):
     """Names of ``ScrapeOptions`` fields the engine honors. Other fields
     are stripped (with a DEBUG log) before ``_fetch`` is called."""
 
-    PROBE_SCOPE: ClassVar[Literal["none", "per_url", "per_domain", "per_session"]] = "none"
+    PROBE_SCOPE: ClassVar[ProbeScope] = "none"
     """How often ``probe()`` must succeed before the engine is considered usable.
 
     - ``none``: no probe (default).
@@ -189,4 +195,11 @@ class EngineError(Exception):
         return f"[{self.engine}] {self.message}"
 
 
-__all__ = ["EngineCapabilities", "EngineError", "ScrapeEngine"]
+__all__ = [
+    "BillingUnit",
+    "EngineCapabilities",
+    "EngineError",
+    "ProbeScope",
+    "ProxyType",
+    "ScrapeEngine",
+]
