@@ -1,0 +1,118 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scrapefold"
+version = "0.1.0a0"
+description = "Unified interface for web scraping engines — site to markdown with stealth, JS rendering, and LLM-ready output."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Mihailorama", email = "mihailorama@gmail.com" },
+]
+keywords = [
+    "web-scraping",
+    "crawler",
+    "markdown",
+    "playwright",
+    "firecrawl",
+    "stealth",
+    "llm",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Text Processing :: Markup :: Markdown",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "httpx>=0.27",
+    "tldextract>=5.0",
+    "urlextract>=1.8",
+    "html2text>=2024.2.26",
+    "beautifulsoup4>=4.12",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# --- ported engines (10) ---
+firecrawl    = ["firecrawl-py>=4.0"]
+scrapingbee  = ["scrapingbee>=2.0"]
+scrapingdog  = []
+selenium     = ["selenium>=4.25", "webdriver-manager>=4.0"]
+jina         = []
+cloudflare   = []
+scrapling    = ["scrapling[fetchers]>=0.4"]
+crawl4ai     = ["crawl4ai>=0.8"]
+outscraper   = ["outscraper>=6.0"]
+apify        = ["apify-client>=2.2"]
+# --- new engines (5) ---
+obscura      = []
+cloakbrowser = ["cloakbrowser>=0.3"]
+anysite      = []
+brightdata   = ["brightdata>=1.0"]
+# --- interfaces ---
+mcp          = ["mcp>=1.0"]
+# --- meta ---
+all = [
+    "scrapefold[firecrawl,scrapingbee,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,brightdata,mcp]",
+]
+test = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-httpx>=0.30",
+    "ruff>=0.4",
+    "mypy>=1.8",
+]
+dev = ["scrapefold[test]"]
+
+[project.urls]
+Homepage      = "https://github.com/mihailorama/scrapefold"
+Documentation = "https://github.com/mihailorama/scrapefold/tree/main/docs"
+Repository    = "https://github.com/mihailorama/scrapefold"
+Issues        = "https://github.com/mihailorama/scrapefold/issues"
+Changelog     = "https://github.com/mihailorama/scrapefold/blob/main/CHANGELOG.md"
+
+[project.scripts]
+scrapefold     = "scrapefold.cli:main"
+scrapefold-mcp = "scrapefold.mcp_server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scrapefold"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires engine SDK installed and network access",
+    "paid: requires a paid vendor API key in env",
+    "slow: takes more than 30 seconds",
+    "network: requires live internet (not a local fixture server)",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]  # line-too-long handled by formatter
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
+warn_unused_configs = true
+disable_error_code = ["import-untyped"]
+files = ["src"]

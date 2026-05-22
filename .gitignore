@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+.installed.cfg
+MANIFEST
+
+# Environments
+.venv/
+venv/
+env/
+.env
+.env.local
+.env.*.local
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Project-specific
+.scrapefold/
+~/.scrapefold/
+*.cache
+Data/
+
+# Secrets
+*.pem
+*.key
+secrets.json

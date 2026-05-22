@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_paid:
+        description: 'Also run tests marked "paid" (uses real vendor API keys)'
+        type: boolean
+        default: false
+      run_network:
+        description: 'Also run tests marked "network" (hits live internet)'
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    name: Test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Ruff lint
+        run: ruff check src tests
+
+      - name: Ruff format
+        run: ruff format --check src tests
+
+      - name: Mypy
+        run: mypy src
+
+      - name: Pytest — offline default
+        run: pytest -m "not paid and not network" --maxfail=3
+
+      - name: Pytest — network (manual dispatch only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_network == true }}
+        run: pytest -m network --maxfail=3
+
+      - name: Pytest — paid (manual dispatch only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_paid == true }}
+        env:
+          FIRECRAWL_API_KEY:    ${{ secrets.FIRECRAWL_API_KEY }}
+          SCRAPINGBEE_API_KEY:  ${{ secrets.SCRAPINGBEE_API_KEY }}
+          SCRAPINGDOG_API_KEY:  ${{ secrets.SCRAPINGDOG_API_KEY }}
+          JINA_API_KEY:         ${{ secrets.JINA_API_KEY }}
+          OUTSCRAPER_API_KEY:   ${{ secrets.OUTSCRAPER_API_KEY }}
+          APIFY_API_TOKEN:      ${{ secrets.APIFY_API_TOKEN }}
+          BRIGHTDATA_API_KEY:   ${{ secrets.BRIGHTDATA_API_KEY }}
+          ANYSITE_API_KEY:      ${{ secrets.ANYSITE_API_KEY }}
+        run: pytest -m paid --maxfail=3
+
+  publish:
+    name: Publish to PyPI
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
