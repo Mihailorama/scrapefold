@@ -16,7 +16,7 @@ import httpx
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import html_to_both
-from scrapefold.options import ScrapeOptions
+from scrapefold.options import ScrapeOptions, build_target_headers, strip_extra_prefix
 from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _ENDPOINT = "https://api.scrapingdog.com/scrape"
 
 
-def _adapt(opts: ScrapeOptions, api_key: str, url: str) -> dict:
+def _adapt(opts: ScrapeOptions, api_key: str, url: str) -> dict[str, str]:
     """Map unified ScrapeOptions to Scrapingdog query params.
 
     Boolean parameters are serialized as ``"true"``/``"false"`` strings —
@@ -34,22 +34,14 @@ def _adapt(opts: ScrapeOptions, api_key: str, url: str) -> dict:
         "api_key": api_key,
         "url": url,
         "dynamic": "true" if opts.render_js else "false",
+        "wait": str(opts.wait_ms),
     }
-
     if opts.country:
         params["country"] = opts.country
-
-    params["wait"] = str(opts.wait_ms)
-
     if opts.premium_proxy:
         params["premium"] = "true"
-
-    # Forward extra keys with "scrapingdog_" prefix, stripping the prefix.
-    for key, value in (opts.extra or {}).items():
-        if key.startswith("scrapingdog_"):
-            param_name = key[len("scrapingdog_") :]
-            params[param_name] = str(value)
-
+    for key, value in strip_extra_prefix(opts.extra, "scrapingdog_").items():
+        params[key] = str(value)
     return params
 
 
@@ -92,29 +84,9 @@ class ScrapingdogEngine(ScrapeEngine):
     async def _fetch(self, url: str, opts: ScrapeOptions) -> ScrapeResult:
         """Fetch *url* via Scrapingdog and return a ``ScrapeResult``."""
         params = _adapt(opts, self.api_key or "", url)
+        headers = build_target_headers(opts)
 
-        # Build request headers from options.
-        # Order of precedence (lowest → highest): derived headers, custom_headers.
-        headers: dict[str, str] = {}
-
-        if opts.language:
-            headers["Accept-Language"] = opts.language
-
-        if opts.user_agent:
-            headers["User-Agent"] = opts.user_agent
-
-        # Cookies → Cookie header
-        if opts.cookies:
-            cookie_str = "; ".join(f"{k}={v}" for k, v in opts.cookies.items())
-            headers["Cookie"] = cookie_str
-
-        # custom_headers override everything derived above
-        if opts.custom_headers:
-            headers.update(opts.custom_headers)
-
-        timeout = float(opts.timeout_s)
-
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=float(opts.timeout_s)) as client:
             response = await client.get(_ENDPOINT, params=params, headers=headers)
 
         raw_html = response.text

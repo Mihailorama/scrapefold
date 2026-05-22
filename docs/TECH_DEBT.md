@@ -70,7 +70,20 @@ in the ladders.py file alone.
 
 ## P2 — backlog (no current blocker)
 
-None at the time of writing — re-evaluate after S7 lands.
+### 8. Per-instance httpx client in HTTP-tier engines
+
+- **Where:** `engines/requests.py`, `engines/jina.py`, `engines/scrapingdog.py`.
+- **Status:** Each `_fetch` opens a fresh `httpx.AsyncClient`. For a 50-URL crawl that's 50 TLS handshakes + connection-pool teardowns. Flagged by Wave 2 Pack 2A efficiency review.
+- **Fix sketch:** instantiate `self._client: httpx.AsyncClient` once in `__init__`, and add an `async def aclose(self)` method the router (S7) calls at walk shutdown.
+- **Why deferred:** router doesn't exist yet, so there's no consumer to call `aclose()`. Adding a per-call `client.aclose()` would defeat the optimization. Land alongside S7.
+- **Test:** `test_engine_reuses_client_across_calls` — instantiate engine, scrape twice, assert the same `httpx.AsyncClient` instance was used.
+
+### 9. Firecrawl SDK client reuse
+
+- **Where:** `engines/firecrawl.py:_fetch_scrape`.
+- **Status:** `app_cls(api_key=...)` rebuilds the SDK app object per call.
+- **Fix sketch:** cache the SDK app instance on `self` after first `_fetch`. Skip on instance state if the SDK warns against long-lived clients.
+- **Land:** S7 router work or sooner if it shows up in benchmarks.
 
 ## How to add an item
 

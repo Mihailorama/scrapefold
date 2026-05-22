@@ -14,7 +14,10 @@ is dropped for Jina.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclass(frozen=True)
@@ -94,4 +97,44 @@ class ScrapeOptions:
         return replace(self, **changes)
 
 
-__all__ = ["ScrapeOptions"]
+def cookies_to_header(cookies: Mapping[str, str] | None) -> str | None:
+    """Serialize a cookies dict to a single ``Cookie`` header value, or ``None``."""
+    if not cookies:
+        return None
+    return "; ".join(f"{name}={value}" for name, value in cookies.items())
+
+
+def build_target_headers(opts: ScrapeOptions, *, include_cookies: bool = True) -> dict[str, str]:
+    """Project shared header fields from ``ScrapeOptions`` to a dict.
+
+    Engines layer vendor-specific keys on top of the result. Caller-provided
+    ``opts.custom_headers`` always win (applied last).
+    """
+    headers: dict[str, str] = {}
+    if opts.language:
+        headers["Accept-Language"] = opts.language
+    if opts.user_agent:
+        headers["User-Agent"] = opts.user_agent
+    if include_cookies:
+        cookie_value = cookies_to_header(opts.cookies)
+        if cookie_value:
+            headers["Cookie"] = cookie_value
+    if opts.custom_headers:
+        headers.update(opts.custom_headers)
+    return headers
+
+
+def strip_extra_prefix(extra: Mapping[str, Any] | None, prefix: str) -> dict[str, Any]:
+    """Return ``{k[len(prefix):]: v}`` for every key in ``extra`` starting with ``prefix``."""
+    if not extra:
+        return {}
+    plen = len(prefix)
+    return {k[plen:]: v for k, v in extra.items() if k.startswith(prefix)}
+
+
+__all__ = [
+    "ScrapeOptions",
+    "build_target_headers",
+    "cookies_to_header",
+    "strip_extra_prefix",
+]

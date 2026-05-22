@@ -7,7 +7,6 @@ calls are made. Follows the offline-by-default golden rule.
 from __future__ import annotations
 
 import json
-import logging
 
 import pytest
 from pytest_httpx import HTTPXMock
@@ -280,23 +279,17 @@ def test_is_available_requires_no_api_key() -> None:
 
 
 @pytest.mark.anyio
-async def test_unsupported_options_are_dropped_silently(
-    httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
-) -> None:
+async def test_unsupported_options_do_not_break_the_call(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
         url="https://example.com/",
         status_code=200,
         headers={"content-type": "text/plain"},
         text="ok",
     )
-    # stealth is not in SUPPORTED_OPTIONS — should be dropped with DEBUG log
-    opts = ScrapeOptions(stealth=True, render_js=True)
-    with caplog.at_level(logging.DEBUG):
-        result = await _engine().scrape("https://example.com/", opts)
-
+    # `stealth` is not in SUPPORTED_OPTIONS; the base class strips it. The
+    # logging behavior itself is verified by tests/test_engine_base.py.
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(stealth=True))
     assert result.meta["status_code"] == 200
-    dropped = [r.message for r in caplog.records if "dropping unsupported" in r.message]
-    assert any("stealth" in m for m in dropped)
 
 
 # ---------------------------------------------------------------------------

@@ -17,8 +17,8 @@ import os
 from typing import Any
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
-from scrapefold.html_to_text import html_to_both
-from scrapefold.options import ScrapeOptions
+from scrapefold.html_to_text import html_to_both, html_to_text
+from scrapefold.options import ScrapeOptions, build_target_headers, strip_extra_prefix
 from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def _load_sdk() -> Any:
 
     Raises ImportError with an installation hint if firecrawl-py is missing.
     """
-    global AsyncFirecrawlApp  # pylint: disable=global-statement
+    global AsyncFirecrawlApp
     if AsyncFirecrawlApp is not None:
         return AsyncFirecrawlApp
     try:
@@ -55,79 +55,49 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     ``AsyncFirecrawlApp.scrape()``.
     """
     params: dict[str, Any] = {}
-    headers: dict[str, str] = {}
-
-    # --- Localization ---
-    if opts.language:
-        headers["Accept-Language"] = opts.language
+    headers = build_target_headers(opts)
 
     if opts.country:
         params["location"] = {"country": opts.country}
 
-    # --- JS rendering ---
-    # Firecrawl always renders JS; render_js=False is a best-effort hint.
-    # We pass formats=["markdown"] to skip the HTML output path when possible.
+    # Firecrawl always renders JS; render_js=False is a best-effort hint
+    # that we pass through by limiting formats to markdown.
     if not opts.render_js:
         params["formats"] = ["markdown"]
 
-    # --- Timing ---
-    # wait_for_selector (str) takes priority over wait_ms (int); they map to
-    # the same Firecrawl ``waitFor`` key which accepts both types.
+    # wait_for_selector (str) takes priority over wait_ms; both map to waitFor.
     if opts.wait_for_selector:
         params["waitFor"] = opts.wait_for_selector
     elif opts.wait_ms != ScrapeOptions().wait_ms:
-        # Only forward when the caller explicitly changed the default.
         params["waitFor"] = opts.wait_ms
 
-    # --- Proxy / stealth ---
     if opts.stealth:
         params["proxy"] = "stealth"
     elif opts.premium_proxy:
         params["proxy"] = "premium"
 
-    # --- User-agent and custom headers ---
-    if opts.user_agent:
-        headers["User-Agent"] = opts.user_agent
-
-    if opts.custom_headers:
-        headers.update(opts.custom_headers)
-
-    # Cookies serialised into Cookie header (Firecrawl accepts via headers)
-    if opts.cookies:
-        cookie_str = "; ".join(f"{k}={v}" for k, v in opts.cookies.items())
-        headers["Cookie"] = cookie_str
-
     if headers:
-        params.setdefault("headers", {})
-        params["headers"].update(headers)
+        params["headers"] = headers
 
-    # --- Output formats ---
-    # Only set if not already set by render_js=False branch.
-    if "formats" not in params:
+    formats: set[str] = set(params.get("formats", []))
+    if not formats:
         if opts.output_format in ("markdown", "auto"):
-            params["formats"] = ["markdown", "html"]
+            formats = {"markdown", "html"}
         elif opts.output_format == "html":
-            params["formats"] = ["html"]
+            formats = {"html"}
         elif opts.output_format == "text":
-            params["formats"] = ["markdown"]
-        # "json" is handled separately via /extract; don't set formats here.
+            formats = {"markdown"}
+        # "json" is handled separately via /extract; leave formats empty.
 
-    # --- Screenshot ---
     if opts.take_screenshot:
-        params.setdefault("formats", ["markdown", "html"])
-        if "screenshot" not in params["formats"]:
-            params["formats"] = [*params["formats"], "screenshot"]
+        formats.update({"markdown", "html", "screenshot"} if not formats else {"screenshot"})
+    if formats:
+        params["formats"] = sorted(formats)
 
-    # --- Timeout ---
     if opts.timeout_s != ScrapeOptions().timeout_s:
         params["timeout"] = opts.timeout_s * 1000  # Firecrawl uses ms
 
-    # --- Passthrough for firecrawl_* extra keys ---
-    for key, value in (opts.extra or {}).items():
-        if key.startswith("firecrawl_"):
-            stripped = key[len("firecrawl_") :]
-            params[stripped] = value
-
+    params.update(strip_extra_prefix(opts.extra, "firecrawl_"))
     return params
 
 
@@ -223,9 +193,6 @@ class FirecrawlEngine(ScrapeEngine):
         elif html:
             text, markdown = html_to_both(html, base_url=url)
         else:
-            # Fall back: strip markdown markers for plain text
-            from scrapefold.html_to_text import html_to_text  # lazy relative
-
             text = html_to_text(markdown) if markdown else ""
 
         # Ensure text is always populated

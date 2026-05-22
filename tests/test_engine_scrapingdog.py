@@ -6,8 +6,6 @@ Follows the offline-by-default golden rule.
 
 from __future__ import annotations
 
-import logging
-
 import pytest
 from pytest_httpx import HTTPXMock
 
@@ -292,18 +290,13 @@ def test_adapt_ignores_non_scrapingdog_extra_keys() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 18. Unsupported options silently dropped (no error), verified via caplog
+# 18. Unsupported options silently dropped (no error)
 # ---------------------------------------------------------------------------
 
 
-async def test_unsupported_options_dropped_silently(
-    httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
-) -> None:
+async def test_unsupported_options_do_not_break_the_call(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(status_code=200, text=_HTML)
-    opts = ScrapeOptions(stealth=True)
-    with caplog.at_level(logging.DEBUG):
-        result = await _engine().scrape("https://example.com/", opts)
-
+    # `stealth` is not in SUPPORTED_OPTIONS; base class drops it.
+    # Log behavior is covered by tests/test_engine_base.py.
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(stealth=True))
     assert result.engine == "scrapingdog"
-    dropped = [r.message for r in caplog.records if "dropping unsupported" in r.message]
-    assert any("stealth" in m for m in dropped)

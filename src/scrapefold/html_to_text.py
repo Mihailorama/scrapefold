@@ -82,7 +82,7 @@ def _rewrite_links(soup: BeautifulSoup, base_url: str) -> None:
         tag["src"] = _resolve_url(str(src), base_url)
 
 
-def _markdown_to_plain_text(md: str) -> str:
+def markdown_to_text(md: str) -> str:
     """Strip markdown syntax from a markdown string to produce plain text.
 
     Handles:
@@ -166,7 +166,7 @@ def _markdown_to_text(md: str, *, base_url: str | None) -> str:
     if not base_url:
         md = _MARKDOWN_IMAGE_RE.sub("", md)
         md = _MARKDOWN_LINK_RE.sub(lambda m: m.group(1), md)
-    return _markdown_to_plain_text(md)
+    return markdown_to_text(md)
 
 
 def html_to_text(html: str, *, base_url: str | None = None) -> str:
@@ -202,4 +202,4 @@ def html_to_both(html: str, *, base_url: str | None = None) -> tuple[str, str]:
     return _markdown_to_text(md, base_url=base_url), md
 
 
-__all__ = ["html_to_both", "html_to_markdown", "html_to_text"]
+__all__ = ["html_to_both", "html_to_markdown", "html_to_text", "markdown_to_text"]

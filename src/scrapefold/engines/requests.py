@@ -13,7 +13,7 @@ import httpx
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import html_to_both
-from scrapefold.options import ScrapeOptions
+from scrapefold.options import ScrapeOptions, build_target_headers
 from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
@@ -55,23 +55,14 @@ class RequestsEngine(ScrapeEngine):
 
     async def _fetch(self, url: str, opts: ScrapeOptions) -> ScrapeResult:
         """Fetch *url* with the given options and return a ``ScrapeResult``."""
-        headers: dict[str, str] = {
-            "User-Agent": opts.user_agent or _DEFAULT_USER_AGENT,
-        }
-        if opts.language:
-            headers["Accept-Language"] = opts.language
-
-        # Caller-provided headers override defaults (including User-Agent)
-        if opts.custom_headers:
-            headers.update(opts.custom_headers)
-
-        cookies = opts.cookies or {}
-        timeout = float(opts.timeout_s)
+        # Cookies travel via the httpx client; the rest go as headers.
+        headers = build_target_headers(opts, include_cookies=False)
+        headers.setdefault("User-Agent", _DEFAULT_USER_AGENT)
 
         async with httpx.AsyncClient(
-            timeout=timeout,
+            timeout=float(opts.timeout_s),
             follow_redirects=True,
-            cookies=cookies,
+            cookies=opts.cookies or {},
         ) as client:
             response = await client.get(url, headers=headers)
 
@@ -83,17 +74,15 @@ class RequestsEngine(ScrapeEngine):
         html_out: str | None = None
         json_out: dict | list | None = None  # type: ignore[type-arg]
 
-        body_snippet = response.text[:512].lower()
-
         if ct_base == "application/json":
-            # JSON response: populate json field; text/markdown = pretty-printed JSON
             json_out = response.json()
             text_out = json.dumps(json_out, ensure_ascii=False, indent=2)
             markdown_out = text_out
 
-        elif ct_base == "text/html" or (ct_base in ("text/plain", "") and "<html" in body_snippet):
-            # HTML — explicit content-type, or body-sniffed when content-type is
-            # missing / generic (some servers send text/plain for HTML responses)
+        elif ct_base == "text/html" or (
+            ct_base in ("text/plain", "") and "<html" in response.text[:512].lower()
+        ):
+            # Body-sniffed HTML covers servers that send text/plain or no content-type.
             raw_html = response.text
             html_out = raw_html
             text_out, markdown_out = html_to_both(raw_html, base_url=str(response.url))

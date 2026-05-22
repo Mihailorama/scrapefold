@@ -36,10 +36,10 @@ These are the non-negotiable invariants of scrapefold. Read before touching code
 - **Don't:** `from selenium import webdriver` at module top-level of `engines/selenium.py` — it should be inside the class or function.
 
 ### Rule: One file per engine
-- **What:** Each engine lives in exactly one `src/scrapefold/engines/<name>.py`. No shared "scraping_helpers" file.
-- **Why:** Engines are independent units of porting / review / blame. Sharing inhibits this.
-- **Do:** Duplicate a 3-line URL-normalization helper inside two engines if needed.
-- **Don't:** Create `engines/_shared.py` that several engines import.
+- **What:** Each engine lives in exactly one `src/scrapefold/engines/<name>.py`. No shared `engines/_shared.py` or `scraping_helpers.py`.
+- **Why:** Engines are independent units of porting / review / blame. A shared file in the engines tree becomes a god-module of half-engine code.
+- **Do:** Put **option-projection helpers** — functions that consume `ScrapeOptions` and return neutral dicts/strings with no HTTP or SDK code (e.g. `build_target_headers`, `cookies_to_header`, `strip_extra_prefix`) — in `options.py` alongside `ScrapeOptions`. Engines import them.
+- **Don't:** Create `engines/_shared.py`. Don't put HTTP or vendor-SDK code in `options.py` either — option projections only.
 
 ### Rule: ScrapeResult is the only return type
 - **What:** Engines return `ScrapeResult`. Not dict, not tuple, not raw HTML.

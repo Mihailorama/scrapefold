@@ -19,7 +19,12 @@ import os
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import html_to_both
-from scrapefold.options import ScrapeOptions
+from scrapefold.options import (
+    ScrapeOptions,
+    build_target_headers,
+    cookies_to_header,
+    strip_extra_prefix,
+)
 from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
@@ -46,70 +51,41 @@ def _adapt(opts: ScrapeOptions) -> tuple[dict, dict]:
             When non-empty, ``params["forward_headers"] = True`` is also set so
             ScrapingBee actually passes them to the target site.
     """
-    params: dict = {}
-    headers: dict = {}
+    params: dict = {"render_js": opts.render_js}
 
-    # --- JS rendering ---
-    params["render_js"] = opts.render_js  # True by default per ScrapeOptions
-
-    # --- Geography ---
     if opts.country:
         params["country_code"] = opts.country
 
-    # --- Wait / timing ---
-    if opts.wait_ms != ScrapeOptions().wait_ms or opts.wait_ms:
-        # Always forward wait_ms so callers can explicitly set 0 to skip
+    if opts.wait_ms:
         params["wait"] = opts.wait_ms
 
     if opts.wait_for_selector:
         params["wait_for"] = opts.wait_for_selector
 
-    # --- Anti-bot / proxy mode ---
-    # stealth_proxy and premium_proxy are mutually exclusive.
-    # Stealth wins; emit a warning when both are requested.
+    # stealth_proxy and premium_proxy are mutually exclusive; stealth wins.
     if opts.stealth and opts.premium_proxy:
         logger.warning(
-            "scrapingbee: both stealth=True and premium_proxy=True requested; "
-            "stealth_proxy takes priority, premium_proxy will be ignored"
+            "scrapingbee: stealth=True wins over premium_proxy=True; "
+            "the premium_proxy flag is ignored"
         )
-        params["stealth_proxy"] = True
-    elif opts.stealth:
+    if opts.stealth:
         params["stealth_proxy"] = True
     elif opts.premium_proxy:
         params["premium_proxy"] = True
 
-    # --- Headers forwarded to target site ---
-    if opts.language:
-        headers["Accept-Language"] = opts.language
-
-    if opts.user_agent:
-        headers["User-Agent"] = opts.user_agent
-
-    if opts.custom_headers:
-        headers.update(opts.custom_headers)
-
+    # Cookies travel as a query param on ScrapingBee, not as a header.
+    headers = build_target_headers(opts, include_cookies=False)
     if headers:
         params["forward_headers"] = True
+    cookie_str = cookies_to_header(opts.cookies)
+    if cookie_str:
+        params["cookies"] = cookie_str
 
-    # --- Cookies ---
-    if opts.cookies:
-        # ScrapingBee expects a semicolon-delimited "key=value" cookie string
-        params["cookies"] = "; ".join(f"{k}={v}" for k, v in opts.cookies.items())
-
-    # --- Screenshot ---
     if opts.take_screenshot:
         full_page = bool(opts.extra.get("full_page")) if opts.extra else False
-        if full_page:
-            params["screenshot_full_page"] = True
-        else:
-            params["screenshot"] = True
+        params["screenshot_full_page" if full_page else "screenshot"] = True
 
-    # --- Extra ScrapingBee-specific params (scrapingbee_* prefix stripped) ---
-    for key, value in (opts.extra or {}).items():
-        if key.startswith("scrapingbee_"):
-            spb_key = key[len("scrapingbee_") :]
-            params[spb_key] = value
-
+    params.update(strip_extra_prefix(opts.extra, "scrapingbee_"))
     return params, headers
 
 
