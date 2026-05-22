@@ -70,35 +70,25 @@ def _load_sdk() -> Any:
 
 
 def _build_proxy(opts: ScrapeOptions) -> Any | None:
-    """Build a cloakbrowser ProxySettings or proxy URL, or None.
+    """Return a cloakbrowser-friendly proxy value, or ``None`` when the engine
+    cannot honor the request.
 
-    When ``premium_proxy=True`` is set alongside a ``country`` hint, we
-    construct a ProxySettings object that targets a residential proxy matching
-    that country. Without a country hint, a generic residential proxy flag is
-    set by returning a sentinel string that operators can intercept via
-    ``extra["cloakbrowser_proxy"]``.
-
-    In practice, callers that run their own proxy service should pass the
-    proxy URL via ``extra["cloakbrowser_proxy"]`` and this function is only
-    the fallback.
+    cloakbrowser runs locally and has no built-in residential pool, so
+    ``premium_proxy=True`` by itself is unenforceable. Callers that want a
+    real proxy must supply a concrete URL via ``extra["cloakbrowser_proxy"]``;
+    anything else is dropped with a debug log (per the drop-not-raise rule).
     """
-    # Explicit proxy URL wins over everything
     if opts.extra:
         explicit = opts.extra.get("cloakbrowser_proxy")
         if explicit:
             return explicit
 
-    if not opts.premium_proxy:
-        return None
-
-    # premium_proxy=True but no concrete server — return a sentinel.
-    # This tells the engine there is *some* proxy intent; real deployments
-    # override via extra["cloakbrowser_proxy"].
-    server = f"socks5://residential-proxy/{opts.country or 'any'}"
-    if ProxySettings is None:
-        # _load_sdk() not called yet (some test paths) — fall back to the URL string.
-        return server
-    return ProxySettings(server=server)
+    if opts.premium_proxy:
+        logger.debug(
+            "cloakbrowser: premium_proxy=True without extra['cloakbrowser_proxy'] — "
+            "dropped (no built-in residential pool)"
+        )
+    return None
 
 
 def _adapt(opts: ScrapeOptions) -> dict[str, Any]:

@@ -161,7 +161,10 @@ async def test_user_agent_forwarded() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_cookies_forwarded() -> None:
+async def test_cookies_scoped_to_target_url() -> None:
+    """Playwright requires cookie ``url`` to match the navigation target; using
+    a placeholder like ``about:blank`` makes Playwright drop the cookie before
+    arun() loads the real page."""
     crawler_class = _make_crawler_mock()
     run_cfg_cls = _make_run_config_mock()
     browse_cfg_cls = _make_browser_config_mock()
@@ -177,9 +180,7 @@ async def test_cookies_forwarded() -> None:
     assert len(browse_cfg_cls._instances) == 1
     cookies = browse_cfg_cls._instances[0].cookies
     assert isinstance(cookies, list)
-    assert any(c.get("name") == "session" and c.get("value") == "abc123" for c in cookies), (
-        f"expected session cookie in Playwright format, got: {cookies!r}"
-    )
+    assert {"name": "session", "value": "abc123", "url": _TEST_URL} in cookies
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +396,7 @@ def test_regression_kwargs_match_sdk_signature() -> None:
 
     # Drive both adapters with recording stubs.
     engine_mod._adapt_run_config(opts, RecordingCRC)
-    engine_mod._adapt_browser_config(opts, RecordingBC)
+    engine_mod._adapt_browser_config(opts, RecordingBC, _TEST_URL)
 
     invalid_run = set(captured_run.keys()) - crc_params
     assert not invalid_run, (

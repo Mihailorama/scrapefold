@@ -187,12 +187,10 @@ async def test_stealth_flag_forwarded() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_premium_proxy_forwarded() -> None:
-    """opts.premium_proxy=True AND opts.country passes a ProxySettings/str proxy.
-
-    When no country is given and premium_proxy=True, the engine should set a
-    proxy flag or leave proxy as None — exact behaviour depends on implementation.
-    This test checks that with country specified, a proxy is wired up.
+async def test_premium_proxy_alone_is_dropped() -> None:
+    """``premium_proxy=True`` alone has nothing to point at — cloakbrowser runs
+    locally and has no built-in residential pool. The engine drops the flag
+    silently and lets callers supply a real URL via ``extra["cloakbrowser_proxy"]``.
     """
     launch = _make_launch_mock()
 
@@ -201,8 +199,22 @@ async def test_premium_proxy_forwarded() -> None:
         await engine.scrape(_TEST_URL, ScrapeOptions(premium_proxy=True, country="us"))
 
     kwargs = _launch_kwargs(launch)
-    # proxy must be non-None when premium_proxy=True + country set
-    assert kwargs.get("proxy") is not None
+    assert "proxy" not in kwargs, "premium_proxy alone should not synthesize a fake URL"
+
+
+async def test_explicit_cloakbrowser_proxy_extra_forwarded() -> None:
+    """When callers supply a concrete proxy URL via ``extra``, it reaches the SDK."""
+    launch = _make_launch_mock()
+
+    with patch("scrapefold.engines.cloakbrowser.launch_context_async", launch):
+        engine = CloakBrowserEngine()
+        await engine.scrape(
+            _TEST_URL,
+            ScrapeOptions(extra={"cloakbrowser_proxy": "http://proxy.example.com:8080"}),
+        )
+
+    kwargs = _launch_kwargs(launch)
+    assert kwargs.get("proxy") == "http://proxy.example.com:8080"
 
 
 # ---------------------------------------------------------------------------

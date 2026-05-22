@@ -98,8 +98,9 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if formats:
         kwargs["formats"] = sorted(formats)
 
-    if opts.timeout_s != ScrapeOptions().timeout_s:
-        kwargs["timeout"] = opts.timeout_s * 1000  # Firecrawl uses ms
+    # Always forward so Firecrawl's internal default cannot win silently when
+    # timeout_s matches scrapefold's default. Firecrawl expects milliseconds.
+    kwargs["timeout"] = opts.timeout_s * 1000
 
     kwargs.update(strip_extra_prefix(opts.extra, "firecrawl_"))
     return kwargs

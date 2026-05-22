@@ -69,8 +69,9 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if opts.cookies:
         kwargs["cookies"] = opts.cookies
 
-    if opts.timeout_s != _DEFAULT_OPTS.timeout_s:
-        kwargs["timeout"] = opts.timeout_s
+    # Always forward the scrapefold timeout (seconds) so scrapling's internal
+    # default cannot win silently when timeout_s matches our default.
+    kwargs["timeout"] = opts.timeout_s
 
     kwargs.update(strip_extra_prefix(opts.extra, "scrapling_fast_"))
     kwargs.update(strip_extra_prefix(opts.extra, "scrapling_"))

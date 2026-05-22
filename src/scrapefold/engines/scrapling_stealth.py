@@ -54,13 +54,13 @@ def _load_stealth_fetcher() -> Any:
     return StealthyFetcher
 
 
-def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
+def _adapt(opts: ScrapeOptions, url: str) -> dict[str, Any]:
     """Map unified ScrapeOptions to StealthyFetcher.fetch kwargs.
 
     Supported StealthSession kwargs used:
       useragent    — from opts.user_agent
       extra_headers — from opts.custom_headers + Accept-Language
-      cookies       — from opts.cookies (passed as dict)
+      cookies       — Playwright cookie list scoped to ``url``
       timeout       — from opts.timeout_s (converted to ms)
       wait          — from opts.wait_ms
       wait_selector — from opts.wait_for_selector
@@ -77,7 +77,10 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
         kwargs["useragent"] = opts.user_agent
 
     if opts.cookies:
-        kwargs["cookies"] = opts.cookies
+        # Scrapling forwards cookies to Playwright context.add_cookies, which
+        # expects a sequence of cookie objects scoped to a real URL or domain.
+        # Passing the raw dict made auth-cookie scrapes silently no-op.
+        kwargs["cookies"] = [{"name": k, "value": v, "url": url} for k, v in opts.cookies.items()]
 
     if opts.wait_ms != _DEFAULT_OPTS.wait_ms:
         kwargs["wait"] = opts.wait_ms
@@ -85,9 +88,9 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if opts.wait_for_selector:
         kwargs["wait_selector"] = opts.wait_for_selector
 
-    if opts.timeout_s != _DEFAULT_OPTS.timeout_s:
-        # StealthSession timeout is in milliseconds
-        kwargs["timeout"] = opts.timeout_s * 1000
+    # Always forward the scrapefold timeout so scrapling's internal 30s
+    # default cannot win silently — even when timeout_s matches our default.
+    kwargs["timeout"] = opts.timeout_s * 1000  # StealthSession expects ms
 
     kwargs.update(strip_extra_prefix(opts.extra, "scrapling_stealth_"))
     kwargs.update(strip_extra_prefix(opts.extra, "scrapling_"))
@@ -138,7 +141,7 @@ class ScraplingStealthEngine(ScrapeEngine):
     async def _fetch(self, url: str, opts: ScrapeOptions) -> ScrapeResult:
         """Call StealthyFetcher.fetch (sync) in a thread, map response to ScrapeResult."""
         fetcher_cls = _load_stealth_fetcher()
-        kwargs = _adapt(opts)
+        kwargs = _adapt(opts, url)
 
         logger.debug("scrapling_stealth fetch url=%s kwargs=%s", url, list(kwargs))
 

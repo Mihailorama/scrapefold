@@ -113,6 +113,10 @@ class SeleniumEngine(ScrapeEngine):
         output_native_markdown=False,
         default_timeout_s=60,
     )
+    # custom_headers and cookies are NOT honored by this v1 (selenium can't set
+    # arbitrary request headers, and add_cookie requires a prior same-domain
+    # navigation). Drop them at the base-class strip stage so callers don't get
+    # logged-out content when they thought they were passing a session cookie.
     SUPPORTED_OPTIONS = frozenset(
         {
             "language",
@@ -120,8 +124,6 @@ class SeleniumEngine(ScrapeEngine):
             "wait_ms",
             "wait_for_selector",
             "user_agent",
-            "custom_headers",  # limited: only User-Agent header; arbitrary headers not supported
-            "cookies",  # accepted but deferred in v1 (see module docstring)
             "output_format",
             "take_screenshot",
             "timeout_s",

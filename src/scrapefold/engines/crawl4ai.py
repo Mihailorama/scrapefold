@@ -60,7 +60,7 @@ def _load_sdk() -> tuple[Any, Any, Any]:
     return AsyncWebCrawler, CrawlerRunConfig, BrowserConfig
 
 
-def _adapt_browser_config(opts: ScrapeOptions, browser_config_cls: Any) -> Any | None:
+def _adapt_browser_config(opts: ScrapeOptions, browser_config_cls: Any, url: str) -> Any | None:
     """Build a BrowserConfig from browser-level options.
 
     BrowserConfig handles: user_agent, headers (including Accept-Language,
@@ -80,12 +80,11 @@ def _adapt_browser_config(opts: ScrapeOptions, browser_config_cls: Any) -> Any |
     if headers:
         kwargs["headers"] = headers
 
-    # BrowserConfig.cookies is a list of Playwright cookie dicts:
-    # [{"name": k, "value": v, "url": <required_or_domain>}]
+    # BrowserConfig.cookies is a list of Playwright cookie dicts. Playwright
+    # requires the cookie's ``url`` to match the navigation target's scheme +
+    # host; ``about:blank`` made cookie-auth scrapes silently no-op.
     if opts.cookies:
-        kwargs["cookies"] = [
-            {"name": k, "value": v, "url": "about:blank"} for k, v in opts.cookies.items()
-        ]
+        kwargs["cookies"] = [{"name": k, "value": v, "url": url} for k, v in opts.cookies.items()]
 
     if not kwargs:
         return None
@@ -118,9 +117,10 @@ def _adapt_run_config(opts: ScrapeOptions, run_config_cls: Any) -> Any:
         kwargs["screenshot"] = True
 
     # --- Timeout ---
-    if opts.timeout_s != _DEFAULT_OPTS.timeout_s:
-        # CrawlerRunConfig.page_timeout is in milliseconds
-        kwargs["page_timeout"] = opts.timeout_s * 1000
+    # Always forward so crawl4ai's internal default cannot win silently when
+    # timeout_s matches scrapefold's default. CrawlerRunConfig.page_timeout
+    # is in milliseconds.
+    kwargs["page_timeout"] = opts.timeout_s * 1000
 
     # --- Extra: crawl4ai_* prefix passthrough ---
     extra_kwargs = strip_extra_prefix(opts.extra, "crawl4ai_")
@@ -185,7 +185,7 @@ class Crawl4AIEngine(ScrapeEngine):
         """Call crawl4ai and map the response to ScrapeResult."""
         awc_cls, run_config_cls, browser_config_cls = _load_sdk()
 
-        browser_cfg = _adapt_browser_config(opts, browser_config_cls)
+        browser_cfg = _adapt_browser_config(opts, browser_config_cls, url)
         run_cfg = _adapt_run_config(opts, run_config_cls)
         logger.debug("crawl4ai arun url=%s run_config=%s", url, run_cfg)
 

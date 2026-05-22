@@ -89,18 +89,22 @@ async def test_user_agent_forwarded() -> None:
 
 
 @pytest.mark.anyio
-async def test_cookies_forwarded() -> None:
+async def test_cookies_converted_to_playwright_format() -> None:
+    """Cookies must reach Playwright as a list of objects scoped to the URL,
+    not as a raw dict (Playwright's add_cookies rejects raw dicts)."""
     resp = _make_response()
     mock_cls = MagicMock()
     mock_cls.fetch = MagicMock(return_value=resp)
+    target = "https://example.com/dashboard"
 
     with patch("scrapefold.engines.scrapling_stealth.StealthyFetcher", mock_cls):
         opts = ScrapeOptions(cookies={"session": "abc", "lang": "en"})
-        await _engine().scrape("https://example.com/", opts)
+        await _engine().scrape(target, opts)
 
-    call_kwargs = mock_cls.fetch.call_args[1]
-    # cookies may arrive as a dict or cookie header string — engine decides shape
-    assert "cookies" in call_kwargs or "extra_headers" in call_kwargs
+    cookies = mock_cls.fetch.call_args[1].get("cookies")
+    assert isinstance(cookies, list)
+    assert {"name": "session", "value": "abc", "url": target} in cookies
+    assert {"name": "lang", "value": "en", "url": target} in cookies
 
 
 # ---------------------------------------------------------------------------
