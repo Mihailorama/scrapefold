@@ -18,6 +18,7 @@ Design decisions
 
 from __future__ import annotations
 
+import json as _json
 import logging
 import re
 from urllib.parse import urljoin, urlparse
@@ -202,4 +203,20 @@ def html_to_both(html: str, *, base_url: str | None = None) -> tuple[str, str]:
     return _markdown_to_text(md, base_url=base_url), md
 
 
-__all__ = ["html_to_both", "html_to_markdown", "html_to_text", "markdown_to_text"]
+def json_to_scrape_text(data: object) -> tuple[str, str]:
+    """Pretty-serialise structured JSON data for engines whose native form is
+    already JSON (Apify, Outscraper). Returns ``(text, markdown)`` — text is
+    raw indented JSON, markdown wraps it in a ``json`` fenced code block so
+    downstream renderers don't try to interpret the braces.
+    """
+    pretty = _json.dumps(data, ensure_ascii=False, indent=2)
+    return pretty, f"```json\n{pretty}\n```"
+
+
+__all__ = [
+    "html_to_both",
+    "html_to_markdown",
+    "html_to_text",
+    "json_to_scrape_text",
+    "markdown_to_text",
+]

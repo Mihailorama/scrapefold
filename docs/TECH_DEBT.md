@@ -72,18 +72,18 @@ in the ladders.py file alone.
 
 ### 8. Per-instance httpx client in HTTP-tier engines
 
-- **Where:** `engines/requests.py`, `engines/jina.py`, `engines/scrapingdog.py`.
-- **Status:** Each `_fetch` opens a fresh `httpx.AsyncClient`. For a 50-URL crawl that's 50 TLS handshakes + connection-pool teardowns. Flagged by Wave 2 Pack 2A efficiency review.
+- **Where:** `engines/requests.py`, `engines/jina.py`, `engines/scrapingdog.py`, `engines/anysite.py`.
+- **Status:** Each `_fetch` opens a fresh `httpx.AsyncClient`. For a 50-URL crawl that's 50 TLS handshakes + connection-pool teardowns. Flagged by Wave 2 Pack 2A efficiency review; anysite added in Pack 2B.
 - **Fix sketch:** instantiate `self._client: httpx.AsyncClient` once in `__init__`, and add an `async def aclose(self)` method the router (S7) calls at walk shutdown.
 - **Why deferred:** router doesn't exist yet, so there's no consumer to call `aclose()`. Adding a per-call `client.aclose()` would defeat the optimization. Land alongside S7.
 - **Test:** `test_engine_reuses_client_across_calls` — instantiate engine, scrape twice, assert the same `httpx.AsyncClient` instance was used.
 
-### 9. Firecrawl SDK client reuse
+### 9. SDK client reuse across calls (Firecrawl, Apify, Outscraper)
 
-- **Where:** `engines/firecrawl.py:_fetch_scrape`.
-- **Status:** `app_cls(api_key=...)` rebuilds the SDK app object per call.
-- **Fix sketch:** cache the SDK app instance on `self` after first `_fetch`. Skip on instance state if the SDK warns against long-lived clients.
-- **Land:** S7 router work or sooner if it shows up in benchmarks.
+- **Where:** `engines/firecrawl.py:_fetch_scrape`, `engines/apify_linkedin.py:_fetch`, `engines/outscraper.py:_fetch`.
+- **Status:** Each `_fetch` rebuilds the vendor SDK client. Firecrawl's `AsyncFirecrawlApp` opens an httpx pool per instance; Apify's `ApifyClientAsync` opens an aiohttp `ClientSession`; Outscraper's `ApiClient` constructs a `requests.Session`. Per-call teardown wastes the pool.
+- **Fix sketch:** cache the SDK instance on `self` after first `_fetch`. Outscraper's `requests.Session` is also a candidate for `aclose()`-style cleanup at walk shutdown.
+- **Land:** S7 router work or sooner if benchmarks show it.
 
 ## How to add an item
 

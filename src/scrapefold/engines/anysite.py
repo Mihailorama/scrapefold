@@ -143,6 +143,11 @@ class AnySiteEngine(ScrapeEngine):
         async with httpx.AsyncClient(timeout=float(opts.timeout_s)) as client:
             response = await client.post(_ENDPOINT, json=body, headers=headers)
 
+        # Surface upstream failures (401 bad key, 429 throttle, 5xx) — without
+        # this, the engine returned an empty ScrapeResult for any error and
+        # the router could not distinguish "blank page" from "API down".
+        response.raise_for_status()
+
         payload = response.json()
         data = payload.get("data", {})
         meta_block = payload.get("meta", {})
@@ -177,7 +182,7 @@ class AnySiteEngine(ScrapeEngine):
             html=html_out,
             engine=self.NAME,
             elapsed_ms=0,  # base class fills this in
-            cost_usd=0.002,
+            cost_usd=self.CAPABILITIES.estimated_cost_usd,
             screenshot_b64=screenshot_b64,
             meta={"status_code": upstream_status},
         )

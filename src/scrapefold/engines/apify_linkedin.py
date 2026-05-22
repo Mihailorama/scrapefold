@@ -13,12 +13,12 @@ NOT require apify-client to be installed.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from typing import Any
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
+from scrapefold.html_to_text import json_to_scrape_text
 from scrapefold.options import ScrapeOptions, strip_extra_prefix
 from scrapefold.result import ScrapeResult
 
@@ -33,7 +33,6 @@ ApifyClientAsync: Any = None
 # Override per-call via opts.extra["apify_actor_id"].
 DEFAULT_ACTOR_ID = "apimaestro/linkedin-profile-detail"
 
-# Cost per call in USD (~$1.5 / 1000 calls on Apify platform)
 _COST_PER_CALL = 0.0015
 
 
@@ -139,18 +138,16 @@ class ApifyLinkedInEngine(ScrapeEngine):
             raise RuntimeError(f"Actor run {run_id} produced no dataset items for URL: {url}")
 
         profile: dict[str, Any] = items[0]
-
-        # Serialize to text / markdown (pretty-printed JSON — no native markdown)
-        serialized = json.dumps(profile, indent=2, ensure_ascii=False)
+        text_out, markdown_out = json_to_scrape_text(profile)
 
         return ScrapeResult(
             url=url,
-            text=serialized,
-            markdown=f"```json\n{serialized}\n```",
+            text=text_out,
+            markdown=markdown_out,
             html=None,
             engine=self.NAME,
             elapsed_ms=0,  # base class patches this
-            cost_usd=_COST_PER_CALL,
+            cost_usd=self.CAPABILITIES.estimated_cost_usd,
             json=profile,
             meta={
                 "actor_run_id": run_id,

@@ -295,6 +295,15 @@ async def test_network_error_raises_engine_error(httpx_mock: HTTPXMock) -> None:
     assert exc_info.value.engine == "anysite"
 
 
+async def test_anysite_http_error_raises_engine_error(httpx_mock: HTTPXMock) -> None:
+    """AnySite-level 4xx/5xx must surface as EngineError, not silent empty result."""
+    httpx_mock.add_response(method="POST", url=_ENDPOINT, status_code=401, json={})
+    with pytest.raises(EngineError) as exc_info:
+        await _engine().scrape("https://example.com/")
+
+    assert exc_info.value.engine == "anysite"
+
+
 # ---------------------------------------------------------------------------
 # 16. take_screenshot → screenshot_b64 populated on result
 # ---------------------------------------------------------------------------

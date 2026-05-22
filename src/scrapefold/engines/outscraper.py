@@ -24,12 +24,12 @@ Routing decision:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 from typing import Any
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
+from scrapefold.html_to_text import json_to_scrape_text
 from scrapefold.options import ScrapeOptions, strip_extra_prefix
 from scrapefold.result import ScrapeResult
 
@@ -130,27 +130,22 @@ class OutscraperEngine(ScrapeEngine):
         )
 
         # Normalise: company_insights returns list[dict] for sync single-URL calls.
-        if isinstance(raw, dict):
-            items: list[dict[str, Any]] = [raw]
-        else:
-            items = list(raw)
+        items: list[dict[str, Any]] = [raw] if isinstance(raw, dict) else raw
 
         if not items:
             raise ValueError(f"outscraper returned empty result for URL: {url}")
 
         data: dict[str, Any] = items[0]
-
-        # Serialize the dict to pretty JSON for text/markdown slots.
-        pretty = json.dumps(data, ensure_ascii=False, indent=2)
+        text_out, markdown_out = json_to_scrape_text(data)
 
         return ScrapeResult(
             url=url,
-            text=pretty,
-            markdown=f"```json\n{pretty}\n```",
+            text=text_out,
+            markdown=markdown_out,
             html=None,
             engine=self.NAME,
             elapsed_ms=0,  # base class patches this
-            cost_usd=0.003,
+            cost_usd=self.CAPABILITIES.estimated_cost_usd,
             json=data,
         )
 
