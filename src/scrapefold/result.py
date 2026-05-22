@@ -62,6 +62,12 @@ class ScrapeResult:
     failures: list[str] = field(default_factory=list)
     """Names of engines tried before this one succeeded, with reason."""
 
+    @property
+    def status_code(self) -> int | None:
+        """HTTP status code stored under ``meta["status_code"]`` by the engine."""
+        code = self.meta.get("status_code")
+        return code if isinstance(code, int) else None
+
     def is_empty(self) -> bool:
         return (
             not self.text.strip()

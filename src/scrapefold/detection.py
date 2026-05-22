@@ -67,44 +67,34 @@ def is_suspicious(
     text: str = result.text or ""
     html: str | None = result.html
 
-    # Heuristic 1 — short text.
     if len(text) < min_text_chars:
         logger.debug("is_suspicious: short text (%d < %d chars)", len(text), min_text_chars)
         return True
 
-    # Heuristic 2 — antibot phrases in text or HTML.
     text_lower = text.lower()
     html_lower = (html or "").lower()
-    for phrase in antibot_phrases:
-        phrase_lower = phrase.lower()
+    phrases_lower = tuple(p.lower() for p in antibot_phrases)
+    for phrase, phrase_lower in zip(antibot_phrases, phrases_lower, strict=True):
         if phrase_lower in text_lower or phrase_lower in html_lower:
             logger.debug("is_suspicious: antibot phrase %r found", phrase)
             return True
 
     if html:
         html_len = len(html)
+        # finditer over findall to avoid allocating the matched block strings —
+        # noscript/script blocks can be MB on script-heavy SPAs.
+        noscript_total = sum(m.end() - m.start() for m in _RE_NOSCRIPT.finditer(html))
+        if noscript_total and html_len - noscript_total < html_len * 0.5:
+            logger.debug(
+                "is_suspicious: noscript domination (noscript=%d, total=%d)",
+                noscript_total,
+                html_len,
+            )
+            return True
 
-        # Heuristic 3 — noscript domination.
-        # Compare total noscript content length to full HTML length.
-        noscript_matches = _RE_NOSCRIPT.findall(html)
-        if noscript_matches:
-            noscript_total = sum(len(m) for m in noscript_matches)
-            stripped_len = html_len - noscript_total
-            if html_len > 0 and stripped_len < html_len * 0.5:
-                logger.debug(
-                    "is_suspicious: noscript domination (noscript=%d, total=%d)",
-                    noscript_total,
-                    html_len,
-                )
-                return True
-
-        # Heuristic 4 — script domination.
-        # Strip all <script>…</script> blocks and compare remaining length.
         if html_len > 0:
-            script_matches = _RE_SCRIPT.findall(html)
-            script_total = sum(len(m) for m in script_matches)
-            non_script_len = html_len - script_total
-            ratio = non_script_len / html_len
+            script_total = sum(m.end() - m.start() for m in _RE_SCRIPT.finditer(html))
+            ratio = (html_len - script_total) / html_len
             if ratio < 0.1:
                 logger.debug(
                     "is_suspicious: script domination (ratio=%.3f, script=%d, total=%d)",
@@ -114,8 +104,7 @@ def is_suspicious(
                 )
                 return True
 
-    # Heuristic 5 — HTTP error status with empty body.
-    status_code: int | None = result.meta.get("status_code")
+    status_code = result.status_code
     if status_code in (403, 503) and not text.strip():
         logger.debug("is_suspicious: status_code=%d with empty text", status_code)
         return True
@@ -164,29 +153,22 @@ def reclassify_from_response(
         if sig.status_codes and status_code not in sig.status_codes:
             continue
 
-        score = 0
+        # status_codes match (or absent) counts as 1 contribution toward score.
+        score = 1 if sig.status_codes else 0
 
-        # Score: status_code present in sig.status_codes (already passed filter).
-        if sig.status_codes and status_code in sig.status_codes:
-            score += 1
-
-        # Score: cookie name matches.
         for name in sig.cookie_names:
             if name in cookies_norm:
                 score += 1
 
-        # Score: header name matches (lower-case comparison).
         for name in sig.header_names:
             if name.lower() in headers_lower:
                 score += 1
 
-        # Score: body_phrases_all — all phrases must match; counts as 1 if so.
         if sig.body_phrases_all and all(
             phrase.lower() in body_lower for phrase in sig.body_phrases_all
         ):
             score += 1
 
-        # Score: body_phrases_any — at least one phrase matches; counts as 1.
         if sig.body_phrases_any and any(
             phrase.lower() in body_lower for phrase in sig.body_phrases_any
         ):

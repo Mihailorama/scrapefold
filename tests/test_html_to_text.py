@@ -131,7 +131,7 @@ def test_list_items_in_text_mode() -> None:
 def test_inline_code_in_markdown() -> None:
     html = "<p>Use <code>print()</code> to output.</p>"
     result = html_to_markdown(html)
-    assert "`print()`" in result or "`print()`" in result
+    assert "`print()`" in result
     assert "print()" in result
 
 

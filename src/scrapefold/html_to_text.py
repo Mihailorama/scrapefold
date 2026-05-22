@@ -143,6 +143,32 @@ def _markdown_to_plain_text(md: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _render_markdown(html: str, *, base_url: str | None) -> str:
+    """Single shared parse + markdownify pass; returns normalized markdown."""
+    if not html or not html.strip():
+        return ""
+    soup = _clean_soup(_parse_html(html))
+    if base_url:
+        _rewrite_links(soup, base_url)
+    md = _markdownify(
+        str(soup),
+        heading_style="ATX",
+        bullets="-",
+        code_language="",
+    )
+    return _MULTI_BLANK_RE.sub("\n\n", md).strip()
+
+
+def _markdown_to_text(md: str, *, base_url: str | None) -> str:
+    """Flatten markdown into plain text. Without ``base_url`` link URLs are dropped."""
+    if not md:
+        return ""
+    if not base_url:
+        md = _MARKDOWN_IMAGE_RE.sub("", md)
+        md = _MARKDOWN_LINK_RE.sub(lambda m: m.group(1), md)
+    return _markdown_to_plain_text(md)
+
+
 def html_to_text(html: str, *, base_url: str | None = None) -> str:
     """Strip tags, collapse whitespace, preserve link URLs inline when base_url is set.
 
@@ -151,33 +177,7 @@ def html_to_text(html: str, *, base_url: str | None = None) -> str:
 
     Returns plain text. Empty or whitespace-only input returns ``""``.
     """
-    if not html or not html.strip():
-        return ""
-
-    soup = _parse_html(html)
-    _clean_soup(soup)
-
-    if base_url:
-        _rewrite_links(soup, base_url)
-
-    # Convert to markdown first (gives us structure to strip), then flatten.
-    # strip_links=False preserves href values so we can inline them.
-    md = _markdownify(
-        str(soup),
-        heading_style="ATX",
-        strip=["script", "style"] if not base_url else [],
-    )
-
-    # When no base_url, drop URLs from links (keep anchor text only)
-    if not base_url:
-        # Replace [text](url) with just "text"
-        md = _MARKDOWN_IMAGE_RE.sub("", md)
-        md = _MARKDOWN_LINK_RE.sub(lambda m: m.group(1), md)
-        text = _markdown_to_plain_text(md)
-    else:
-        text = _markdown_to_plain_text(md)
-
-    return text
+    return _markdown_to_text(_render_markdown(html, base_url=base_url), base_url=base_url)
 
 
 def html_to_markdown(html: str, *, base_url: str | None = None) -> str:
@@ -188,36 +188,18 @@ def html_to_markdown(html: str, *, base_url: str | None = None) -> str:
 
     Returns markdown text. Empty or whitespace-only input returns ``""``.
     """
-    if not html or not html.strip():
-        return ""
-
-    soup = _parse_html(html)
-    _clean_soup(soup)
-
-    if base_url:
-        _rewrite_links(soup, base_url)
-
-    md = _markdownify(
-        str(soup),
-        heading_style="ATX",
-        bullets="-",
-        code_language="",
-    )
-
-    # Normalise: collapse 3+ blank lines to 2
-    md = _MULTI_BLANK_RE.sub("\n\n", md)
-    return md.strip()
+    return _render_markdown(html, base_url=base_url)
 
 
 def html_to_both(html: str, *, base_url: str | None = None) -> tuple[str, str]:
-    """Convenience wrapper: returns ``(text, markdown)`` from a single HTML string.
+    """Convenience: returns ``(text, markdown)`` from a single HTML string,
+    sharing a single parse + markdownify pass.
 
     Engines use this to fill both ``ScrapeResult.text`` and
     ``ScrapeResult.markdown`` in one call.
     """
-    text = html_to_text(html, base_url=base_url)
-    markdown = html_to_markdown(html, base_url=base_url)
-    return text, markdown
+    md = _render_markdown(html, base_url=base_url)
+    return _markdown_to_text(md, base_url=base_url), md
 
 
 __all__ = ["html_to_both", "html_to_markdown", "html_to_text"]

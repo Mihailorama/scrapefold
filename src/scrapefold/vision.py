@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 LLMCallable = Callable[[str, bytes, str], Awaitable[str]]
 """Async callable with signature ``(prompt, image_bytes, mime_type) -> str``."""
 
+MimeType = Literal["image/png", "image/jpeg", "image/webp"]
+"""Supported screenshot MIME types."""
+
 _VALID_MIME_TYPES: frozenset[str] = frozenset({"image/png", "image/jpeg", "image/webp"})
 
 DEFAULT_PROMPT = (
@@ -62,7 +65,7 @@ async def analyze_screenshot_with_llm(
     llm_callable: LLMCallable,
     *,
     prompt: str = DEFAULT_PROMPT,
-    mime_type: Literal["image/png", "image/jpeg", "image/webp"] = "image/png",
+    mime_type: MimeType = "image/png",
 ) -> str:
     """Analyze a screenshot via a user-provided async LLM callable.
 
@@ -99,47 +102,34 @@ async def detect_antibot_in_screenshot(
     image_bytes: bytes,
     llm_callable: LLMCallable,
     *,
-    mime_type: Literal["image/png", "image/jpeg", "image/webp"] = "image/png",
+    mime_type: MimeType = "image/png",
 ) -> bool:
     """Detect whether a screenshot shows an anti-bot challenge page.
 
-    Asks the LLM to respond with ``BLOCKED`` or ``OK`` as the first word.
-    Returns ``True`` if the first word of the response is ``BLOCKED``
-    (case-insensitive). Returns ``False`` for empty, whitespace-only, or any
-    other first word.
+    Delegates to :func:`analyze_screenshot_with_llm` with a prompt that asks
+    the LLM to respond with ``BLOCKED`` or ``OK`` as the first word. Returns
+    ``True`` if the first word is ``BLOCKED`` (case-insensitive), ``False`` for
+    empty, whitespace-only, or any other first word.
 
-    Args:
-        image_bytes: Raw image data. Must not be empty.
-        llm_callable: Async callable with signature
-            ``(prompt: str, image_bytes: bytes, mime_type: str) -> str``.
-        mime_type: MIME type of the image.
-
-    Returns:
-        ``True`` if the screenshot shows an anti-bot challenge, else ``False``.
-
-    Raises:
-        ValueError: If ``image_bytes`` is empty or ``mime_type`` is not supported.
+    Raises ``ValueError`` for empty bytes or unsupported MIME type; propagates
+    the callable's own exceptions unchanged.
     """
-    _validate_inputs(image_bytes, mime_type)
-    logger.debug(
-        "detect_antibot_in_screenshot: sending %d bytes (%s) to LLM callable",
-        len(image_bytes),
-        mime_type,
+    response = await analyze_screenshot_with_llm(
+        image_bytes,
+        llm_callable,
+        prompt=_ANTIBOT_PROMPT,
+        mime_type=mime_type,
     )
-    response = await llm_callable(_ANTIBOT_PROMPT, image_bytes, mime_type)
-    logger.debug("detect_antibot_in_screenshot: received response (%d chars)", len(response))
-
     stripped = response.strip()
     if not stripped:
         return False
-
-    first_word = stripped.split()[0].lower()
-    return first_word == "blocked"
+    return stripped.split()[0].lower() == "blocked"
 
 
 __all__ = [
     "DEFAULT_PROMPT",
     "LLMCallable",
+    "MimeType",
     "analyze_screenshot_with_llm",
     "detect_antibot_in_screenshot",
 ]
