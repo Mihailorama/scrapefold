@@ -174,12 +174,16 @@ async def test_5xx_on_markdown_does_not_call_content(httpx_mock: HTTPXMock) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_is_available_false_when_token_missing() -> None:
+def test_is_available_false_when_token_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
+    monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
     engine = _engine(token=None)
     assert engine.is_available() is False
 
 
-def test_is_available_false_when_account_missing() -> None:
+def test_is_available_false_when_account_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
+    monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
     engine = _engine(account=None)
     assert engine.is_available() is False
 
