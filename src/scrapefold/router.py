@@ -96,6 +96,8 @@ async def _attempt_engine(
     1. Registry lookup — unknown name → skip (keep walking).
     2. Dedup by canonical NAME — already tried → skip (keep walking).
     3. Policy gate — paid_not_allowed → skip (keep walking).
+    3b. Policy gate — legal_constraints_blocked → skip (keep walking).
+    3c. Policy gate — geography_required → skip (keep walking).
     4. Max-engines budget — ceiling reached → stop walk.
     5. Cost budget — would exceed max_cost_usd → stop walk.
     6. Availability — engine.is_available() → skip (keep walking).
@@ -122,6 +124,27 @@ async def _attempt_engine(
     if not policy.paid_allowed and engine_cls.CAPABILITIES.requires_api_key:
         logger.debug("router: skip engine=%s reason=paid_not_allowed", canonical)
         failures.append(f"{canonical}:skipped:paid_not_allowed")
+        return _AttemptResult(result=None, keep_walking=True)
+
+    # 3b. Policy gate — legal_constraints
+    if policy.legal_constraints_blocked:
+        blocked = set(engine_cls.CAPABILITIES.legal_constraints) & set(
+            policy.legal_constraints_blocked
+        )
+        if blocked:
+            logger.debug("router: skip engine=%s reason=legal:%s", canonical, sorted(blocked))
+            failures.append(f"{canonical}:skipped:legal:{sorted(blocked)}")
+            return _AttemptResult(result=None, keep_walking=True)
+
+    # 3c. Policy gate — geography_required
+    if (
+        policy.geography_required
+        and policy.geography_required not in engine_cls.CAPABILITIES.geography
+    ):
+        logger.debug(
+            "router: skip engine=%s reason=geography:%s", canonical, policy.geography_required
+        )
+        failures.append(f"{canonical}:skipped:geography:{policy.geography_required}")
         return _AttemptResult(result=None, keep_walking=True)
 
     # 4. Max-engines budget

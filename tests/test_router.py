@@ -1107,6 +1107,123 @@ async def test_walk_default_ladder_dedup_across_steps(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# 34. Policy gate — legal_constraints_blocked blocks matching engine
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_helper_respects_legal_constraints_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Engine with legal_constraints=('eu_gdpr',) must be skipped when
+    Policy(legal_constraints_blocked={'eu_gdpr'}) is set.
+
+    A subsequent unconstrained engine should succeed.
+    """
+    from scrapefold.router import walk
+
+    constrained_engine = type(
+        "_StubLegalConstrained",
+        (ScrapeEngine,),
+        {
+            "NAME": "lc_constrained",
+            "CAPABILITIES": EngineCapabilities(
+                requires_api_key=False,
+                legal_constraints=("eu_gdpr",),
+            ),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": lambda self, url, opts: (_ for _ in ()).throw(
+                AssertionError("constrained engine must not be called")
+            ),
+        },
+    )
+    free_engine = _stub_engine("lc_free", "good")
+
+    monkeypatch.setitem(_REGISTRY, "lc_constrained", lambda: constrained_engine)
+    monkeypatch.setitem(_REGISTRY, "lc_free", lambda: free_engine)
+
+    opts = ScrapeOptions(
+        engines=("lc_constrained", "lc_free"),
+        extra={"policy": Policy(legal_constraints_blocked=frozenset({"eu_gdpr"}))},
+    )
+    result = await walk("https://example.com/", opts)
+
+    assert result.engine == "lc_free"
+    # The failure record must contain the skip reason with the constraint name.
+    assert any(
+        "lc_constrained" in f and "skipped:legal" in f and "eu_gdpr" in f for f in result.failures
+    ), f"expected legal skip failure; got {result.failures}"
+
+
+# ---------------------------------------------------------------------------
+# 35. Policy gate — geography_required blocks engine without matching geo
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_helper_respects_geography_required(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Engine with geography=('us',) must be skipped when
+    Policy(geography_required='eu') is set (geo mismatch).
+
+    An engine with geography=('eu',) should pass.
+    """
+    from scrapefold.router import walk
+
+    us_engine = type(
+        "_StubGeoUS",
+        (ScrapeEngine,),
+        {
+            "NAME": "geo_us",
+            "CAPABILITIES": EngineCapabilities(
+                requires_api_key=False,
+                geography=("us",),
+            ),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": lambda self, url, opts: (_ for _ in ()).throw(
+                AssertionError("us engine must not be called when eu is required")
+            ),
+        },
+    )
+
+    async def _fetch_eu(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        return _make_result("geo_eu", url=url)
+
+    eu_engine = type(
+        "_StubGeoEU",
+        (ScrapeEngine,),
+        {
+            "NAME": "geo_eu",
+            "CAPABILITIES": EngineCapabilities(
+                requires_api_key=False,
+                geography=("eu",),
+            ),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_eu,
+        },
+    )
+
+    monkeypatch.setitem(_REGISTRY, "geo_us", lambda: us_engine)
+    monkeypatch.setitem(_REGISTRY, "geo_eu", lambda: eu_engine)
+
+    opts = ScrapeOptions(
+        engines=("geo_us", "geo_eu"),
+        extra={"policy": Policy(geography_required="eu")},
+    )
+    result = await walk("https://example.com/", opts)
+
+    assert result.engine == "geo_eu"
+    # The us engine must appear in failures with the geography skip reason.
+    assert any("geo_us" in f and "skipped:geography:eu" in f for f in result.failures), (
+        f"expected geography skip failure; got {result.failures}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 33 (budget). _attempt_engine credits cost on EngineError (budget tracking)
+# ---------------------------------------------------------------------------
+
+
 async def test_walk_helper_increments_budget_on_engine_error(
     stub_ladder: Any,
     monkeypatch: pytest.MonkeyPatch,
