@@ -113,6 +113,13 @@ class CloudflareEngine(ScrapeEngine):
             endpoint_calls.append("markdown")
             cost_usd += self._PER_REQUEST_USD
 
+            if md_resp.status_code >= 500:
+                raise EngineError(
+                    self.NAME,
+                    f"/markdown {md_resp.status_code} for {url} (transient — fallback skipped)",
+                    0,  # elapsed_ms filled by base class
+                )
+
             markdown_out = ""
             if md_resp.status_code == 200:
                 try:

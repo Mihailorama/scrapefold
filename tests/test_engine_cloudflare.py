@@ -146,8 +146,27 @@ async def test_both_endpoints_empty_raises_engine_error(httpx_mock: HTTPXMock) -
     httpx_mock.add_response(url=_MD_URL, method="POST", json={"result": ""})
     httpx_mock.add_response(url=_CONTENT_URL, method="POST", json={"result": ""})
 
+    with pytest.raises(EngineError) as excinfo:
+        await _engine().scrape(_TARGET_URL)
+
+    # Issue 1 guard: prefix must appear exactly once — no double-wrap.
+    assert str(excinfo.value).count("[cloudflare]") == 1
+
+
+# ---------------------------------------------------------------------------
+# 6b. 5xx on /markdown → EngineError immediately, /content NOT called
+# ---------------------------------------------------------------------------
+
+
+async def test_5xx_on_markdown_does_not_call_content(httpx_mock: HTTPXMock) -> None:
+    """5xx is transient — engine MUST NOT burn a second paid /content call."""
+    httpx_mock.add_response(url=_MD_URL, method="POST", status_code=503, json={"errors": []})
+
     with pytest.raises(EngineError):
         await _engine().scrape(_TARGET_URL)
+
+    # Only /markdown was hit; /content was skipped (cost-honesty contract).
+    assert len(httpx_mock.get_requests()) == 1
 
 
 # ---------------------------------------------------------------------------
