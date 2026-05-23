@@ -675,6 +675,122 @@ async def test_walk_opts_engines_respects_max_cost_usd_zero(
     assert any("budget:cost" in f for f in exc_info.value.failures)
 
 
+# ---------------------------------------------------------------------------
+# 22. opts.engines override — max_engines cap halts the walk
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_opts_engines_respects_max_engines(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """opts.engines + max_engines=1 MUST stop after the first attempt."""
+    from scrapefold.router import walk
+
+    call_log: list[str] = []
+
+    def _call1() -> None:
+        call_log.append("empty1")
+
+    def _call2() -> None:
+        call_log.append("empty2")
+
+    monkeypatch.setitem(
+        _REGISTRY, "me_empty1", lambda: _stub_engine("me_empty1", "empty", on_call=_call1)
+    )
+    monkeypatch.setitem(
+        _REGISTRY, "me_empty2", lambda: _stub_engine("me_empty2", "empty", on_call=_call2)
+    )
+
+    opts = ScrapeOptions(engines=("me_empty1", "me_empty2"), extra={"max_engines": 1})
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/", opts)
+
+    # Only the first engine must have been invoked.
+    assert call_log == ["empty1"], "second engine must not be called when max_engines=1"
+    failures = exc_info.value.failures
+    assert any("me_empty1" in f for f in failures), "first engine failure must be recorded"
+    assert any("budget:max_engines" in f for f in failures), (
+        "budget:max_engines must appear in failures"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 23. opts.engines override — elapsed-time budget halts the walk
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_opts_engines_respects_timeout_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """opts.engines + accumulated elapsed_ms > timeout_s*1000 MUST halt the walk."""
+    from scrapefold.router import walk
+
+    call_log: list[str] = []
+
+    async def _fetch_slow(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        call_log.append(self.NAME)
+        # Return a result whose elapsed_ms far exceeds the per-walk timeout budget.
+        return ScrapeResult(
+            url=url,
+            text="",
+            markdown="",
+            html=None,
+            engine=self.NAME,
+            elapsed_ms=200_000,  # 200 s on a 60 s timeout → blows budget
+        )
+
+    slow_engine = type(
+        "_StubSlow",
+        (ScrapeEngine,),
+        {
+            "NAME": "tb_slow",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_slow,
+        },
+    )
+
+    async def _fetch_fast(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        call_log.append(self.NAME)
+        return ScrapeResult(
+            url=url,
+            text=_GOOD_TEXT,
+            markdown=f"# {_GOOD_TEXT}",
+            html=None,
+            engine=self.NAME,
+            elapsed_ms=1,
+        )
+
+    fast_engine = type(
+        "_StubFast",
+        (ScrapeEngine,),
+        {
+            "NAME": "tb_fast",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_fast,
+        },
+    )
+
+    monkeypatch.setitem(_REGISTRY, "tb_slow", lambda: slow_engine)
+    monkeypatch.setitem(_REGISTRY, "tb_fast", lambda: fast_engine)
+
+    # timeout_s=60 → budget = 60 000 ms; slow engine burns 200 000 ms.
+    opts = ScrapeOptions(engines=("tb_slow", "tb_fast"), timeout_s=60)
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/", opts)
+
+    # Slow engine was called (empty result), fast engine must NOT be called.
+    assert "tb_slow" in call_log
+    assert "tb_fast" not in call_log, (
+        "second engine must not be called after timeout budget exceeded"
+    )
+    failures = exc_info.value.failures
+    assert any("budget:timeout" in f for f in failures), "budget:timeout must appear in failures"
+
+
 async def test_walk_opts_engines_policy_blocks_paid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

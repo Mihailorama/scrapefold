@@ -105,9 +105,24 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
         site_class_override = classify_url(url)
         policy_override = _resolve_policy(opts, site_class_override)
         max_cost_usd_override = float(opts.extra.get("max_cost_usd", _DEFAULT_MAX_COST_USD))
+        max_engines_override = int(opts.extra.get("max_engines", _DEFAULT_MAX_ENGINES))
         cost_accum: float = 0.0
+        engines_called: int = 0
+        elapsed_accum_ms: float = 0.0
 
         for name in opts.engines:
+            # Budget gate: max_engines ceiling (checked before any engine work).
+            if engines_called >= max_engines_override:
+                logger.info("router: walk halted budget=max_engines (override path)")
+                failures.append("budget:max_engines")
+                break
+
+            # Budget gate: elapsed-time ceiling (checked before any engine work).
+            if elapsed_accum_ms > opts.timeout_s * 1000:
+                logger.info("router: walk halted budget=timeout (override path)")
+                failures.append("budget:timeout")
+                break
+
             try:
                 engine_cls = get_engine(name)
             except KeyError:
@@ -144,10 +159,14 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
                 result = await engine.scrape(url, opts)
             except EngineError as exc:
                 cost_accum += next_cost
+                engines_called += 1
+                elapsed_accum_ms += exc.elapsed_ms
                 failures.append(f"{canonical}:error:{exc.message}")
                 continue
 
             cost_accum += next_cost
+            engines_called += 1
+            elapsed_accum_ms += result.elapsed_ms
 
             if result.is_empty():
                 failures.append(f"{canonical}:empty")
