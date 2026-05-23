@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Fixed — golden-rule violation: router now consults detection.is_suspicious
+
+- The sequential router shell originally only checked `result.is_empty()`
+  for advancement — a captcha page with non-empty text would have been
+  returned as success. Per `docs/conventions/golden-rules.md` ("Suspicious-
+  content detection lives in one place"), the router now calls
+  `scrapefold.detection.is_suspicious(result)` after the empty check and
+  advances on True with a `"<engine>:suspicious"` failure entry.
+- Internal: `_resolve_policy` site_class arg typed as `SiteClass` instead
+  of `str`; load-bearing `type: ignore[arg-type]` removed.
+
 ### Added — Pack 3 router shell (sequential)
 
 - `src/scrapefold/router.py` — `async walk(url, opts) -> ScrapeResult` walks the per-site-class ladder. Honors `Policy` (paid_allowed / legal_constraints_blocked / geography_required), `WalkBudget` ceilings (`max_engines`, `max_cost_usd`, `timeout_s`), and the `engines_tried` dedup set. `RaceStep` entries are skipped with a DEBUG log until Pack 9.

@@ -28,8 +28,13 @@ from scrapefold.ladders import LADDERS, RaceStep
 # ---------------------------------------------------------------------------
 
 
+_GOOD_TEXT = (
+    "This is a well-formed scraped page. " * 10
+)  # 360 chars — well above is_suspicious threshold
+
+
 def _make_result(
-    engine_name: str, url: str = "https://example.com/", text: str = "hello"
+    engine_name: str, url: str = "https://example.com/", text: str = _GOOD_TEXT
 ) -> ScrapeResult:
     return ScrapeResult(
         url=url,
@@ -66,7 +71,7 @@ def _stub_engine(
             raise RuntimeError("boom")
         if behavior == "empty":
             return _empty_result(name, url)
-        return _make_result(name, url=url, text="hello good")
+        return _make_result(name, url=url)
 
     return type(
         f"_Stub_{name}",
@@ -129,7 +134,7 @@ async def test_router_returns_first_good_result(
     result = await walk("https://example.com/")
 
     assert result.engine == "stub_good"
-    assert result.text == "hello good"
+    assert result.text == _GOOD_TEXT
     assert result.url == "https://example.com/"
 
 
@@ -455,3 +460,58 @@ async def test_all_engines_failed_carries_url_and_failures(
     assert isinstance(exc_info.value.failures, list)
     assert any("stub_empty" in f for f in exc_info.value.failures)
     assert any("stub_raise" in f for f in exc_info.value.failures)
+
+
+# ---------------------------------------------------------------------------
+# 15. Suspicious responses are not returned — router escalates past them
+# ---------------------------------------------------------------------------
+
+
+async def test_router_treats_suspicious_response_as_failure(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A scrape that returns short text containing antibot phrases is suspicious;
+    the router must advance to the next step rather than returning it."""
+    from scrapefold import EngineCapabilities, SequentialStep
+    from scrapefold.engines import _REGISTRY
+    from scrapefold.engines.base import ScrapeEngine
+    from scrapefold.result import ScrapeResult
+    from scrapefold.router import walk
+
+    async def _fetch_captcha(self, url, opts):
+        # Short text containing a known antibot phrase
+        return ScrapeResult(
+            url=url,
+            text="Just a moment...",
+            markdown="Just a moment...",
+            html=None,
+            engine=self.NAME,
+            elapsed_ms=1,
+        )
+
+    captcha_engine = type(
+        "_StubCaptcha",
+        (ScrapeEngine,),
+        {
+            "NAME": "stub_captcha",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_captcha,
+        },
+    )
+    monkeypatch.setitem(_REGISTRY, "stub_captcha", lambda: captcha_engine)
+
+    stub_ladder(
+        (
+            SequentialStep(engine="stub_captcha"),
+            SequentialStep(engine="stub_good"),
+        )
+    )
+
+    result = await walk("https://example.com/")
+
+    # Suspicious captcha skipped → stub_good wins.
+    assert result.engine == "stub_good"
+    assert any("stub_captcha:suspicious" in f for f in result.failures)

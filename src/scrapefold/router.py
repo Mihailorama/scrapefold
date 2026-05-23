@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import replace
 
+from scrapefold.detection import is_suspicious
 from scrapefold.engines import get_engine
 from scrapefold.engines.base import EngineError
 from scrapefold.ladders import (
@@ -18,6 +19,7 @@ from scrapefold.ladders import (
     BudgetExceeded,
     Policy,
     SequentialStep,
+    SiteClass,
     WalkBudget,
     check_budget,
     classify_url,
@@ -36,11 +38,11 @@ _DEFAULT_MAX_COST_USD = 0.05
 _DEFAULT_AVG_RESPONSE_MB = 2.0
 
 
-def _resolve_policy(opts: ScrapeOptions, site_class: str) -> Policy:
+def _resolve_policy(opts: ScrapeOptions, site_class: SiteClass) -> Policy:
     override = opts.extra.get("policy")
     if isinstance(override, Policy):
         return override
-    return get_default_policy(site_class)  # type: ignore[arg-type]
+    return get_default_policy(site_class)
 
 
 async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
@@ -121,6 +123,9 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
 
         if result.is_empty():
             failures.append(f"{canonical}:empty")
+            continue
+        if is_suspicious(result):
+            failures.append(f"{canonical}:suspicious")
             continue
         return replace(result, failures=failures)
 
