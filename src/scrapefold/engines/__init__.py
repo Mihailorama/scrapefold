@@ -55,6 +55,9 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
             "scrapefold.engines.scrapling_fast", fromlist=["ScraplingFastEngine"]
         ).ScraplingFastEngine
     ),
+    "cloudflare": lambda: (
+        __import__("scrapefold.engines.cloudflare", fromlist=["CloudflareEngine"]).CloudflareEngine
+    ),
     "crawl4ai": lambda: (
         __import__("scrapefold.engines.crawl4ai", fromlist=["Crawl4AIEngine"]).Crawl4AIEngine
     ),

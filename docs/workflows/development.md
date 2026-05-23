@@ -84,7 +84,7 @@ See [../../CONTRIBUTING.md](../../CONTRIBUTING.md) § "Add an engine". Five-step
 | `SCRAPINGBEE_API_KEY` | scrapingbee |
 | `SCRAPINGDOG_API_KEY` | scrapingdog |
 | `JINA_API_KEY` | jina |
-| `CLOUDFLARE_API_KEY`, `CLOUDFLARE_ACCOUNT_ID` | cloudflare |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | cloudflare |
 | `OUTSCRAPER_API_KEY` | outscraper |
 | `APIFY_API_TOKEN` | apify |
 | `ANYSITE_API_KEY` | anysite |

@@ -34,6 +34,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 - Internal: `_resolve_policy` site_class arg typed as `SiteClass` instead
   of `str`; load-bearing `type: ignore[arg-type]` removed.
 
+### Added — Pack 3 cloudflare engine
+
+- `src/scrapefold/engines/cloudflare.py` — port of downstream-consumer
+  `get_content_cloudflare` to scrapefold's `ScrapeEngine` ABC. Calls
+  Cloudflare Browser Rendering `/markdown` first (native markdown), falls
+  back to `/content` (raw HTML → html_to_text). Env: `CLOUDFLARE_API_TOKEN`
+  + `CLOUDFLARE_ACCOUNT_ID`.
+- `tests/test_engine_cloudflare.py` — 13 tests covering both endpoints,
+  fallback paths, auth headers, body shape, is_available gating,
+  registry registration.
+- `docs/workflows/development.md` — env-var table fixed
+  (`CLOUDFLARE_API_KEY` → `CLOUDFLARE_API_TOKEN`, matching Cloudflare's
+  Bearer-token convention).
+
 ### Added — Pack 3 router shell (sequential)
 
 - `src/scrapefold/router.py` — `async walk(url, opts) -> ScrapeResult` walks the per-site-class ladder. Honors `Policy` (paid_allowed / legal_constraints_blocked / geography_required), `WalkBudget` ceilings (`max_engines`, `max_cost_usd`, `timeout_s`), and the `engines_tried` dedup set. `RaceStep` entries are skipped with a DEBUG log until Pack 9.
