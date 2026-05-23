@@ -6,6 +6,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Changed — dependency floors refreshed
+
+- Bumped lower-bound pins to current PyPI stable (pack-opening
+  freshness policy from spec §4.4). Affected pins:
+  - `tldextract` 5.0 → 5.3
+  - `beautifulsoup4` 4.12 → 4.14
+  - `typer` 0.12 → 0.25
+  - `firecrawl-py` 4.0 → 4.27
+  - `selenium` 4.25 → 4.44
+  - `apify-client` 2.2 → 3.0
+  - `mcp` 1.0 → 1.27
+  - `pytest` 7.0 → 9.0
+  - `pytest-asyncio` 0.21 → 1.3
+  - `pytest-httpx` 0.30 → 0.36
+  - `ruff` 0.4 → 0.15
+  - `mypy` 1.8 → 2.1
+
 ### Fixed — golden-rule violation: router now consults detection.is_suspicious
 
 - The sequential router shell originally only checked `result.is_empty()`
