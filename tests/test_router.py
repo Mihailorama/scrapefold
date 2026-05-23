@@ -612,3 +612,43 @@ async def test_walk_opts_engines_all_fail_raises(
     assert exc_info.value.url == "https://example.com/probe"
     assert any("stub_empty" in f for f in exc_info.value.failures)
     assert any("stub_raise" in f for f in exc_info.value.failures)
+
+
+# ---------------------------------------------------------------------------
+# 20. opts.engines override — policy gate blocks paid engines
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_opts_engines_policy_blocks_paid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """opts.engines with paid_allowed=False must NOT invoke a paid engine.
+
+    The paid engine (requires_api_key=True) should appear in failures with
+    a :skipped:paid_not_allowed tag; a subsequent free engine should succeed.
+    """
+    from scrapefold.router import walk
+
+    paid_called: list[bool] = []
+
+    def _paid_call() -> None:
+        paid_called.append(True)
+
+    paid_engine = _stub_engine("stub_paid", "good", requires_api_key=True, on_call=_paid_call)
+    free_engine = _stub_engine("stub_free", "good", requires_api_key=False)
+
+    monkeypatch.setitem(_REGISTRY, "stub_paid", lambda: paid_engine)
+    monkeypatch.setitem(_REGISTRY, "stub_free", lambda: free_engine)
+
+    opts = ScrapeOptions(
+        engines=("stub_paid", "stub_free"),
+        extra={"policy": Policy(paid_allowed=False)},
+    )
+    result = await walk("https://example.com/", opts)
+
+    # Paid engine must never have been invoked.
+    assert paid_called == [], "paid engine must not be called when paid_allowed=False"
+    # Free engine wins.
+    assert result.engine == "stub_free"
+    # Failures record the skip reason.
+    assert any("stub_paid" in f and "paid_not_allowed" in f for f in result.failures)
