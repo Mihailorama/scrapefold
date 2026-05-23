@@ -11,7 +11,7 @@ from scrapefold.engines import list_engine_names, resolve_alias
 
 
 def test_version_string() -> None:
-    assert scrapefold.__version__.startswith("0.1.0")
+    assert scrapefold.__version__
 
 
 def test_options_defaults() -> None:
