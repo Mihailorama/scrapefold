@@ -65,7 +65,8 @@ class CloudflareEngine(ScrapeEngine):
         stealth=False,
         screenshot=False,
         requires_api_key=True,
-        estimated_cost_usd=_PER_REQUEST_USD,
+        # worst case — /markdown empty triggers /content fallback = 2 paid requests
+        estimated_cost_usd=_PER_REQUEST_USD * 2,
         billing_unit="call",
         proxy_type="none",
         free_tier=False,

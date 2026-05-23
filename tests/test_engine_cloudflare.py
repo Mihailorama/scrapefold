@@ -256,6 +256,8 @@ def test_engine_metadata() -> None:
     assert caps.js_rendering is True
     assert caps.requires_api_key is True
     assert caps.output_native_markdown is True
+    # Worst-case budget: /markdown empty triggers /content fallback = 2 paid requests
+    assert caps.estimated_cost_usd == CloudflareEngine._PER_REQUEST_USD * 2
 
 
 # ---------------------------------------------------------------------------
