@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-python - <<'PY'
+python3 - <<'PY'
 import json
 import re
 import sys
@@ -37,6 +37,33 @@ for extra, specs in pyproject["project"].get("optional-dependencies", {}).items(
         if m and m.group(3):
             deps[m.group(1)] = m.group(3)
 
+
+def _parse_version(v: str) -> tuple[int, ...]:
+    """Parse a version string into a tuple of ints, ignoring non-integer segments.
+
+    Examples:
+        "1.2.3"    -> (1, 2, 3)
+        "1.2.3a1"  -> ()  — pre-release, caller should discard
+        "2.0"      -> (2, 0)
+    """
+    parts = v.split(".")
+    result = []
+    for part in parts:
+        if part.isdigit():
+            result.append(int(part))
+        else:
+            # Any non-pure-integer segment (rc1, a1, dev0, post1 …) stops parsing
+            # but we still return what we have so far only if nothing odd preceded.
+            # Simpler: return empty to signal "not a clean release".
+            return ()
+    return tuple(result)
+
+
+def _is_stable(v: str) -> bool:
+    """Return True if the version string contains no pre/dev/post markers."""
+    return not re.search(r"(a|b|rc|dev|alpha|beta|post)\d*", v, re.IGNORECASE)
+
+
 def latest_stable(pkg: str) -> str | None:
     """Return the latest non-pre-release version on PyPI, or None on failure."""
     try:
@@ -45,33 +72,43 @@ def latest_stable(pkg: str) -> str | None:
     except (urllib.error.URLError, json.JSONDecodeError):
         return None
     releases = data.get("releases", {})
-    stable = []
+    stable: list[tuple[tuple[int, ...], str]] = []
     for v, files in releases.items():
         if not files:
             continue
         if any(f.get("yanked") for f in files):
             continue
-        if re.search(r"(a|b|rc|dev|alpha|beta)\d*", v, re.IGNORECASE):
+        if not _is_stable(v):
             continue
-        stable.append(v)
+        parsed = _parse_version(v)
+        if not parsed:
+            continue
+        stable.append((parsed, v))
     if not stable:
         return None
-    from packaging.version import Version, InvalidVersion
-    try:
-        return str(max((Version(v) for v in stable)))
-    except InvalidVersion:
-        return None
+    # max() on (tuple, str) compares tuples lexicographically — correct for semver
+    return max(stable)[1]
+
 
 def minor_distance(pin: str, latest: str) -> int:
     """Approximate minor-version distance. Returns -1 on parse failure."""
-    from packaging.version import Version, InvalidVersion
-    try:
-        a, b = Version(pin), Version(latest)
-    except InvalidVersion:
+    a = _parse_version(pin)
+    b = _parse_version(latest)
+    if not a or not b:
         return -1
-    if a.major != b.major:
-        return (b.major - a.major) * 100 + (b.minor - a.minor)
-    return b.minor - a.minor
+    # Pad to equal length
+    length = max(len(a), len(b))
+    a = a + (0,) * (length - len(a))
+    b = b + (0,) * (length - len(b))
+    if a[0] != b[0]:
+        # Cross-major: express as 100*major_diff + minor_diff
+        minor_a = a[1] if len(a) > 1 else 0
+        minor_b = b[1] if len(b) > 1 else 0
+        return (b[0] - a[0]) * 100 + (minor_b - minor_a)
+    if len(a) < 2:
+        return 0
+    return b[1] - a[1]
+
 
 print(f"{'package':<25} {'pinned (>=)':<15} {'latest stable':<15} staleness")
 print(f"{'-'*25} {'-'*15} {'-'*15} ---------")
