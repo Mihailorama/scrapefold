@@ -82,6 +82,7 @@ async def _attempt_engine(
     policy: Policy,
     budget_cost_usd: float,
     budget_engines_tried: set[str],
+    dedup_seen: set[str],
     max_engines: int,
     max_cost_usd: float,
     failures: list[str],
@@ -92,9 +93,16 @@ async def _attempt_engine(
     add ``result.cost_delta`` and ``result.elapsed_delta`` to its running
     budget accumulators.
 
+    Two sets are maintained by the caller and mutated here:
+    - ``dedup_seen``: every canonical name ever encountered (prevents retrying
+      unavailable/skipped engines when the same name appears twice in the list).
+    - ``budget_engines_tried``: only engines that were actually invoked (passed
+      gates 1-6 and had ``engine.scrape()`` called). The ``max_engines`` ceiling
+      is checked against this set so unavailable engines don't consume slots.
+
     Gates checked in order (first failure wins):
     1. Registry lookup — unknown name → skip (keep walking).
-    2. Dedup by canonical NAME — already tried → skip (keep walking).
+    2. Dedup by canonical NAME — already seen → skip (keep walking).
     3. Policy gate — paid_not_allowed → skip (keep walking).
     3b. Policy gate — legal_constraints_blocked → skip (keep walking).
     3c. Policy gate — geography_required → skip (keep walking).
@@ -115,8 +123,8 @@ async def _attempt_engine(
 
     canonical = engine_cls.NAME
 
-    # 2. Dedup
-    if canonical in budget_engines_tried:
+    # 2. Dedup — use dedup_seen (covers unavailable + invoked engines alike)
+    if canonical in dedup_seen:
         logger.debug("router: skip already-tried engine=%s", canonical)
         return _AttemptResult(result=None, keep_walking=True)
 
@@ -160,15 +168,19 @@ async def _attempt_engine(
         failures.append(f"{canonical}:skipped:budget:cost")
         return _AttemptResult(result=None, keep_walking=False)
 
-    # 6. Availability
+    # 6. Availability — checked BEFORE crediting the budget counter.
+    # Unavailable engines are added to dedup_seen (so duplicates in the list
+    # are still collapsed), but NOT to budget_engines_tried — max_engines counts
+    # only engines that are actually invoked, not ones that never ran.
     engine = engine_cls()
     if not engine.is_available():
         logger.debug("router: skip engine=%s not available", canonical)
         failures.append(f"{canonical}:unavailable")
-        budget_engines_tried.add(canonical)
+        dedup_seen.add(canonical)
         return _AttemptResult(result=None, keep_walking=True)
 
-    # Mark as tried before the call so errors still count toward dedup.
+    # Mark as seen and as tried before the call so errors still count.
+    dedup_seen.add(canonical)
     budget_engines_tried.add(canonical)
 
     # 7. Invoke
@@ -243,7 +255,10 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
 
         cost_accum: float = 0.0
         elapsed_accum_ms: float = 0.0
-        seen_canonical: set[str] = set()
+        # budget_tried: engines actually invoked (counts toward max_engines).
+        # dedup_seen: all canonicals encountered (prevents re-attempting unavailable ones).
+        budget_tried: set[str] = set()
+        dedup_seen: set[str] = set()
 
         for name in opts.engines:
             # Elapsed-time budget (checked before any engine work).
@@ -260,7 +275,7 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
             except KeyError:
                 _canon = name  # unknown — helper will record :unknown
 
-            if _canon in seen_canonical:
+            if _canon in dedup_seen:
                 logger.debug("router: skip engine=%s reason=duplicate", _canon)
                 failures.append(f"{_canon}:duplicate")
                 continue
@@ -271,7 +286,8 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
                 opts=opts,
                 policy=policy_override,
                 budget_cost_usd=cost_accum,
-                budget_engines_tried=seen_canonical,
+                budget_engines_tried=budget_tried,
+                dedup_seen=dedup_seen,
                 max_engines=max_engines_override,
                 max_cost_usd=max_cost_usd_override,
                 failures=failures,
@@ -294,6 +310,9 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     policy = _resolve_policy(opts, site_class)
     ladder = get_ladder(site_class)
     budget = WalkBudget(visited_site_classes={site_class})
+    # Separate dedup set so unavailable engines don't consume budget slots.
+    # budget.engines_tried = actually invoked; ladder_dedup_seen = all encountered.
+    ladder_dedup_seen: set[str] = set()
 
     max_engines = int(opts.extra.get("max_engines", _DEFAULT_MAX_ENGINES))
     max_cost_usd = float(opts.extra.get("max_cost_usd", _DEFAULT_MAX_COST_USD))
@@ -325,6 +344,7 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
                 policy=policy,
                 budget_cost_usd=budget.cost_usd,
                 budget_engines_tried=budget.engines_tried,
+                dedup_seen=ladder_dedup_seen,
                 max_engines=max_engines,
                 max_cost_usd=max_cost_usd,
                 failures=failures,

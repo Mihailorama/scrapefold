@@ -1220,6 +1220,80 @@ async def test_walk_helper_respects_geography_required(
 
 
 # ---------------------------------------------------------------------------
+# 36. Unavailable engine does NOT consume max_engines slot
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_unavailable_engine_does_not_consume_max_engines_slot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When X is unavailable and Y is available, max_engines=1 still allows Y.
+
+    X is unavailable (requires_api_key=True, no api_key set), so it must not
+    consume a slot.  Y must be invoked and win.  The failures list must contain
+    X:unavailable but must NOT contain budget:max_engines.
+    """
+    from scrapefold.router import walk
+
+    unavail_engine = _stub_engine("slot_unavail", "good", requires_api_key=True)
+    avail_engine = _stub_engine("slot_avail", "good", requires_api_key=False)
+
+    monkeypatch.setitem(_REGISTRY, "slot_unavail", lambda: unavail_engine)
+    monkeypatch.setitem(_REGISTRY, "slot_avail", lambda: avail_engine)
+
+    opts = ScrapeOptions(
+        engines=("slot_unavail", "slot_avail"),
+        extra={"max_engines": 1},
+    )
+    result = await walk("https://example.com/", opts)
+
+    assert result.engine == "slot_avail", (
+        "available engine must win when unavailable engine precedes it with max_engines=1"
+    )
+    assert any("slot_unavail:unavailable" in f for f in result.failures), (
+        "unavailable engine must appear in failures"
+    )
+    assert not any("budget:max_engines" in f for f in result.failures), (
+        "budget:max_engines must NOT appear; unavailable engine did not consume a slot"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 37. Unavailable engine deduped but not counted against budget
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_unavailable_engine_deduped_but_not_counted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """opts.engines=('X','X') where X is unavailable — only one :unavailable
+    failure is recorded (dedup); no budget:max_engines appears since the engine
+    was never actually invoked.
+    """
+    from scrapefold.router import walk
+
+    unavail_engine = _stub_engine("dedup_unavail", "good", requires_api_key=True)
+    monkeypatch.setitem(_REGISTRY, "dedup_unavail", lambda: unavail_engine)
+
+    opts = ScrapeOptions(
+        engines=("dedup_unavail", "dedup_unavail"),
+        extra={"max_engines": 1},
+    )
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/", opts)
+
+    failures = exc_info.value.failures
+    unavail_count = sum(1 for f in failures if "dedup_unavail:unavailable" in f)
+    assert unavail_count == 1, (
+        f"unavailable engine must appear exactly once (dedup); got count={unavail_count} "
+        f"in {failures}"
+    )
+    assert not any("budget:max_engines" in f for f in failures), (
+        "budget:max_engines must NOT appear; unavailable engine does not consume a slot"
+    )
+
+
+# ---------------------------------------------------------------------------
 # 33 (budget). _attempt_engine credits cost on EngineError (budget tracking)
 # ---------------------------------------------------------------------------
 
