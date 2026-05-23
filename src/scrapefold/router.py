@@ -45,19 +45,73 @@ def _resolve_policy(opts: ScrapeOptions, site_class: SiteClass) -> Policy:
     return get_default_policy(site_class)
 
 
+async def _try_engine(
+    engine_name: str,
+    url: str,
+    opts: ScrapeOptions,
+    failures: list[str],
+) -> ScrapeResult | None:
+    """Attempt a single named engine and return its result, or None on skip/failure.
+
+    Side-effects: appends to *failures* when the engine is skipped or errors.
+    """
+    try:
+        engine_cls = get_engine(engine_name)
+    except KeyError:
+        logger.debug("router: unknown engine=%s", engine_name)
+        failures.append(f"{engine_name}:unknown")
+        return None
+
+    canonical = engine_cls.NAME
+    engine = engine_cls()
+    if not engine.is_available():
+        logger.debug("router: skip engine=%s not available", canonical)
+        failures.append(f"{canonical}:unavailable")
+        return None
+
+    try:
+        result = await engine.scrape(url, opts)
+    except EngineError as exc:
+        failures.append(f"{canonical}:error:{exc.message}")
+        return None
+
+    if result.is_empty():
+        failures.append(f"{canonical}:empty")
+        return None
+    if is_suspicious(result):
+        failures.append(f"{canonical}:suspicious")
+        return None
+
+    return result
+
+
 async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     """Walk the resolved ladder and return the first non-empty result.
+
+    If ``opts.engines`` is non-empty, those engine names are tried in order
+    instead of the default per-site-class ladder.
 
     Raises ``AllEnginesFailed`` if every step fails or is skipped.
     ``RaceStep`` entries are currently skipped — concurrent fan-out lands in
     a follow-up slice.
     """
     opts = opts or ScrapeOptions()
+    failures: list[str] = []
+
+    # --- opts.engines override path ---
+    # Empty tuple is coerced to None (use default ladder) for safety.
+    if opts.engines:
+        for name in opts.engines:
+            result = await _try_engine(name, url, opts, failures)
+            if result is not None:
+                return replace(result, failures=failures)
+        raise AllEnginesFailed(url=url, failures=failures)
+
+    # --- Default ladder path ---
     site_class = classify_url(url)
     policy = _resolve_policy(opts, site_class)
     ladder = get_ladder(site_class)
     budget = WalkBudget(visited_site_classes={site_class})
-    failures: list[str] = []
 
     max_engines = int(opts.extra.get("max_engines", _DEFAULT_MAX_ENGINES))
     max_cost_usd = float(opts.extra.get("max_cost_usd", _DEFAULT_MAX_COST_USD))

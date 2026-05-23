@@ -515,3 +515,100 @@ async def test_router_treats_suspicious_response_as_failure(
     # Suspicious captcha skipped → stub_good wins.
     assert result.engine == "stub_good"
     assert any("stub_captcha:suspicious" in f for f in result.failures)
+
+
+# ---------------------------------------------------------------------------
+# 16. opts.engines override — only named engines are tried, in order
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_honors_opts_engines_override(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """opts.engines=("X","Y") MUST drive the walk, ignoring the default ladder."""
+    from scrapefold.router import walk
+
+    call_log: list[str] = []
+
+    # Two engines that record when called; first is empty, second is good.
+    def _empty_call() -> None:
+        call_log.append("override_empty")
+
+    def _good_call() -> None:
+        call_log.append("override_good")
+
+    monkeypatch.setitem(
+        _REGISTRY,
+        "override_empty",
+        lambda: _stub_engine("override_empty", "empty", on_call=_empty_call),
+    )
+    monkeypatch.setitem(
+        _REGISTRY,
+        "override_good",
+        lambda: _stub_engine("override_good", "good", on_call=_good_call),
+    )
+
+    # The default ladder uses stub_good — but it must NOT be called.
+    stub_ladder((SequentialStep(engine="stub_good"),))
+
+    opts = ScrapeOptions(engines=("override_empty", "override_good"))
+    result = await walk("https://example.com/override", opts)
+
+    assert result.engine == "override_good"
+    assert result.url == "https://example.com/override"
+    # Both override engines were called in order; stub_good (ladder) was NOT.
+    assert call_log == ["override_empty", "override_good"]
+    # Empty engine appears in failures list.
+    assert any("override_empty" in f for f in result.failures)
+
+
+async def test_walk_opts_engines_empty_tuple_uses_ladder(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """Empty tuple in opts.engines falls back to the default ladder (None semantics)."""
+    from scrapefold.router import walk
+
+    stub_ladder((SequentialStep(engine="stub_good"),))
+
+    opts = ScrapeOptions(engines=())
+    result = await walk("https://example.com/", opts)
+
+    assert result.engine == "stub_good"
+
+
+async def test_walk_opts_engines_unknown_name_skipped(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unknown engine name in opts.engines records :unknown and continues to next."""
+    from scrapefold.router import walk
+
+    monkeypatch.setitem(
+        _REGISTRY,
+        "known_good",
+        lambda: _stub_engine("known_good", "good"),
+    )
+
+    opts = ScrapeOptions(engines=("does_not_exist_xyz", "known_good"))
+    result = await walk("https://example.com/", opts)
+
+    assert result.engine == "known_good"
+    assert any("does_not_exist_xyz:unknown" in f for f in result.failures)
+
+
+async def test_walk_opts_engines_all_fail_raises(
+    stub_registry: dict[str, type[ScrapeEngine]],
+) -> None:
+    """When all engines in opts.engines fail, AllEnginesFailed is raised."""
+    from scrapefold.router import walk
+
+    opts = ScrapeOptions(engines=("stub_empty", "stub_raise"))
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/probe", opts)
+
+    assert exc_info.value.url == "https://example.com/probe"
+    assert any("stub_empty" in f for f in exc_info.value.failures)
+    assert any("stub_raise" in f for f in exc_info.value.failures)
