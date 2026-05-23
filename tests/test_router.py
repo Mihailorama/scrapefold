@@ -427,3 +427,31 @@ async def test_router_does_not_propagate_engine_error(
     except EngineError:
         pytest.fail("router must not propagate EngineError; it should advance to next step")
     assert result.engine == "stub_good"
+
+
+# ---------------------------------------------------------------------------
+# 14. AllEnginesFailed carries .url and .failures for consumer introspection
+# ---------------------------------------------------------------------------
+
+
+async def test_all_engines_failed_carries_url_and_failures(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """AllEnginesFailed exposes .url and .failures for consumer introspection."""
+    from scrapefold.router import walk
+
+    stub_ladder(
+        (
+            SequentialStep(engine="stub_empty"),
+            SequentialStep(engine="stub_raise"),
+        )
+    )
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/probe")
+
+    assert exc_info.value.url == "https://example.com/probe"
+    assert isinstance(exc_info.value.failures, list)
+    assert any("stub_empty" in f for f in exc_info.value.failures)
+    assert any("stub_raise" in f for f in exc_info.value.failures)

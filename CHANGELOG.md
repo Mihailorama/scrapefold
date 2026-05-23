@@ -13,6 +13,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 - `scrapefold.scrape(url, opts)` now delegates to `router.walk` instead of raising `NotImplementedError`.
 - `tests/test_smoke.py` — the obsolete `NotImplementedError` smoke test is removed.
 
+### Changed — structured AllEnginesFailed (consumer error contract)
+
+- `AllEnginesFailed` now carries `.url: str` and `.failures: list[str]`.
+  Consumers no longer need to parse the exception message. The
+  `failures` list shape is `"<engine>:<reason>:<detail>"` (e.g.
+  `"firecrawl:error:404 Not Found"`, `"jina:empty"`,
+  `"scrapingbee:unavailable"`, `"budget:cost"`). Pack 7 consumer
+  migrations (downstream-consumer + downstream-consumer) target this contract directly.
+
 ## [0.1.0a1] — 2026-05-22
 
 ### Added — S1.5 per-site-class escalation ladders

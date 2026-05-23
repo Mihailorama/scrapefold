@@ -124,7 +124,7 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
             continue
         return replace(result, failures=failures)
 
-    raise AllEnginesFailed(f"all engines failed for {url}: {failures}")
+    raise AllEnginesFailed(url=url, failures=failures)
 
 
 __all__ = ["walk"]

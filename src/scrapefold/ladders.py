@@ -156,7 +156,16 @@ class BudgetExceeded(Exception):  # noqa: N818
 
 
 class AllEnginesFailed(Exception):  # noqa: N818
-    """Raised when every step in the ladder failed or was skipped."""
+    """Raised when every step in the ladder failed or was skipped.
+
+    Carries structured failure data so consumers can introspect what was
+    tried without parsing the exception's string form.
+    """
+
+    def __init__(self, url: str, failures: list[str]) -> None:
+        self.url = url
+        self.failures = list(failures)
+        super().__init__(f"all engines failed for {url}: {self.failures}")
 
 
 # ---------------------------------------------------------------------------
