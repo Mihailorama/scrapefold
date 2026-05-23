@@ -138,3 +138,15 @@ def test_engine_registry_contains_pack_2c_browser_engines() -> None:
 async def test_public_crawl_site_is_not_implemented() -> None:
     with pytest.raises(NotImplementedError):
         await scrapefold.crawl_site("https://example.com")
+
+
+def test_dist_metadata_version_matches_dunder_version() -> None:
+    """pyproject.toml dynamic version must equal scrapefold.__version__."""
+    from importlib.metadata import version
+
+    import scrapefold
+
+    assert scrapefold.__version__ == version("scrapefold"), (
+        f"drift: __init__.py={scrapefold.__version__!r} "
+        f"metadata={version('scrapefold')!r}"
+    )
