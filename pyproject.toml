@@ -57,15 +57,13 @@ crawl4ai     = ["crawl4ai>=0.8"]
 outscraper   = ["outscraper>=6.0"]
 apify        = ["apify-client>=2.2"]
 # --- new engines (5) ---
-obscura      = []
 cloakbrowser = ["cloakbrowser>=0.3"]
 anysite      = []
-brightdata   = ["brightdata>=1.0"]
 # --- interfaces ---
 mcp          = ["mcp>=1.0"]
 # --- meta ---
 all = [
-    "scrapefold[firecrawl,scrapingbee,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,brightdata,mcp]",
+    "scrapefold[firecrawl,scrapingbee,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,mcp]",
 ]
 test = [
     "pytest>=7.0",
