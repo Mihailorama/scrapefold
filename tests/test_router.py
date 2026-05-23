@@ -260,21 +260,44 @@ async def test_router_skips_unknown_engine(
 async def test_router_respects_paid_allowed_false(
     stub_registry: dict[str, type[ScrapeEngine]],
     stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """paid_allowed=False must block engines with requires_api_key=True.
+
+    NOTE: The gate checks engine CAPABILITIES.requires_api_key, not the step's
+    estimated_cost_usd.  A SequentialStep with estimated_cost_usd>0 but a free
+    engine (requires_api_key=False) is NOT blocked — the step metadata is not
+    the authority; only the engine capability is.
+    """
     from scrapefold.router import walk
+
+    called: list[str] = []
+
+    def _paid_call() -> None:
+        called.append("paid_engine")
+
+    paid_engine = _stub_engine("stub_paid_gate", "good", requires_api_key=True, on_call=_paid_call)
+    free_engine = _stub_engine("stub_free_gate", "good", requires_api_key=False)
+
+    monkeypatch.setitem(_REGISTRY, "stub_paid_gate", lambda: paid_engine)
+    monkeypatch.setitem(_REGISTRY, "stub_free_gate", lambda: free_engine)
 
     stub_ladder(
         (
-            SequentialStep(engine="stub_good", estimated_cost_usd=0.01),  # paid
-            SequentialStep(engine="stub_good", estimated_cost_usd=0.0),  # free
+            SequentialStep(engine="stub_paid_gate"),
+            SequentialStep(engine="stub_free_gate"),
         )
     )
 
     opts = ScrapeOptions(extra={"policy": Policy(paid_allowed=False)})
     result = await walk("https://example.com/", opts)
 
-    # Paid step skipped → falls through to free step.
-    assert result.engine == "stub_good"
+    # Paid engine (requires_api_key=True) must not have been called.
+    assert called == [], "paid engine must not be called when paid_allowed=False"
+    # Free engine wins.
+    assert result.engine == "stub_free_gate"
+    # Failures record the skip reason.
+    assert any("stub_paid_gate" in f and "paid_not_allowed" in f for f in result.failures)
 
 
 # ---------------------------------------------------------------------------
@@ -331,15 +354,15 @@ async def test_walk_walks_race_step_members_sequentially(
 
         return _stub_engine(name, behavior, on_call=_on_call)
 
-    monkeypatch.setitem(_REGISTRY, "race_empty1", lambda: _make_logging_engine("race_empty1", "empty"))
-    monkeypatch.setitem(_REGISTRY, "race_empty2", lambda: _make_logging_engine("race_empty2", "empty"))
+    monkeypatch.setitem(
+        _REGISTRY, "race_empty1", lambda: _make_logging_engine("race_empty1", "empty")
+    )
+    monkeypatch.setitem(
+        _REGISTRY, "race_empty2", lambda: _make_logging_engine("race_empty2", "empty")
+    )
     monkeypatch.setitem(_REGISTRY, "race_good3", lambda: _make_logging_engine("race_good3", "good"))
 
-    stub_ladder(
-        (
-            RaceStep(engines=("race_empty1", "race_empty2", "race_good3")),
-        )
-    )
+    stub_ladder((RaceStep(engines=("race_empty1", "race_empty2", "race_good3")),))
 
     result = await walk("https://example.com/")
 
@@ -370,14 +393,14 @@ async def test_walk_race_step_short_circuits_on_first_good(
 
         return _stub_engine(name, behavior, on_call=_on_call)
 
-    monkeypatch.setitem(_REGISTRY, "race_first_good", lambda: _make_logging_engine("race_first_good", "good"))
-    monkeypatch.setitem(_REGISTRY, "race_should_skip", lambda: _make_logging_engine("race_should_skip", "good"))
-
-    stub_ladder(
-        (
-            RaceStep(engines=("race_first_good", "race_should_skip")),
-        )
+    monkeypatch.setitem(
+        _REGISTRY, "race_first_good", lambda: _make_logging_engine("race_first_good", "good")
     )
+    monkeypatch.setitem(
+        _REGISTRY, "race_should_skip", lambda: _make_logging_engine("race_should_skip", "good")
+    )
+
+    stub_ladder((RaceStep(engines=("race_first_good", "race_should_skip")),))
 
     result = await walk("https://example.com/")
 
@@ -902,9 +925,7 @@ async def test_walk_opts_engines_dedupe_by_canonical_name(
     assert result.engine == "dedup_winner"
     # Both duplicate entries must appear in failures with :duplicate tag.
     dup_failures = [f for f in result.failures if "duplicate" in f]
-    assert len(dup_failures) == 2, (
-        f"both duplicates should be recorded; failures={result.failures}"
-    )
+    assert len(dup_failures) == 2, f"both duplicates should be recorded; failures={result.failures}"
 
 
 async def test_walk_opts_engines_policy_blocks_paid(
@@ -940,3 +961,191 @@ async def test_walk_opts_engines_policy_blocks_paid(
     assert result.engine == "stub_free"
     # Failures record the skip reason.
     assert any("stub_paid" in f and "paid_not_allowed" in f for f in result.failures)
+
+
+# ---------------------------------------------------------------------------
+# 30. Default ladder — paid_allowed enforced for engines inside a RaceStep
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_default_ladder_respects_paid_allowed_in_race_step(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """paid_allowed=False must block paid engines that appear inside a RaceStep.
+
+    Root cause of Codex P1 finding: the old code checked the RaceStep's own
+    estimated_cost_usd (often 0.0) rather than each engine's CAPABILITIES, so
+    paid members inside a race were silently allowed through.
+    """
+    from scrapefold.router import walk
+
+    paid_called: list[bool] = []
+
+    def _paid_call() -> None:
+        paid_called.append(True)
+
+    paid_engine = _stub_engine(
+        "race_paid_engine", "good", requires_api_key=True, on_call=_paid_call
+    )
+    free_engine = _stub_engine("race_free_engine", "good", requires_api_key=False)
+
+    monkeypatch.setitem(_REGISTRY, "race_paid_engine", lambda: paid_engine)
+    monkeypatch.setitem(_REGISTRY, "race_free_engine", lambda: free_engine)
+
+    # RaceStep with one paid + one free engine; the race step itself carries
+    # estimated_cost_usd=0.0 (the default), which is the exact scenario where
+    # the old code would bypass the gate.
+    stub_ladder((RaceStep(engines=("race_paid_engine", "race_free_engine")),))
+
+    opts = ScrapeOptions(extra={"policy": Policy(paid_allowed=False)})
+    result = await walk("https://example.com/", opts)
+
+    # The paid engine must never have been invoked.
+    assert paid_called == [], (
+        "paid engine inside RaceStep must not be called when paid_allowed=False"
+    )
+    # The free engine inside the same RaceStep must win.
+    assert result.engine == "race_free_engine"
+    assert any("race_paid_engine" in f and "paid_not_allowed" in f for f in result.failures)
+
+
+# ---------------------------------------------------------------------------
+# 31. Default ladder — max_cost_usd enforced for engines inside a RaceStep
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_default_ladder_respects_max_cost_usd_in_race_step(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """max_cost_usd=0 must block paid engines that appear inside a RaceStep.
+
+    Root cause of Codex P1 finding: the old code used the RaceStep's
+    estimated_cost_usd (0.0) for the budget check, so engines with
+    non-zero CAPABILITIES.estimated_cost_usd inside the race were not blocked.
+    """
+    from scrapefold.router import walk
+
+    paid_called: list[bool] = []
+
+    def _paid_call() -> None:
+        paid_called.append(True)
+
+    async def _fetch_paid(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        _paid_call()
+        return _make_result("race_costly_engine", url=url)
+
+    costly_engine = type(
+        "_StubRaceCostly",
+        (ScrapeEngine,),
+        {
+            "NAME": "race_costly_engine",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=True, estimated_cost_usd=0.001),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_paid,
+        },
+    )
+
+    monkeypatch.setitem(_REGISTRY, "race_costly_engine", lambda: costly_engine)
+
+    # RaceStep with a paid engine; step-level estimated_cost_usd stays at 0.0.
+    stub_ladder((RaceStep(engines=("race_costly_engine",)),))
+
+    # paid_allowed=True so policy gate passes — only the cost gate should block it.
+    opts = ScrapeOptions(extra={"max_cost_usd": 0.0, "policy": Policy(paid_allowed=True)})
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/", opts)
+
+    assert paid_called == [], "paid engine inside RaceStep must not be called when max_cost_usd=0"
+    assert any("budget:cost" in f for f in exc_info.value.failures)
+
+
+# ---------------------------------------------------------------------------
+# 32. Default ladder — dedup across SequentialStep and RaceStep
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_default_ladder_dedup_across_steps(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An engine appearing in both a SequentialStep and a RaceStep is called only once."""
+    from scrapefold.router import walk
+
+    call_count = {"n": 0}
+
+    def _bump() -> None:
+        call_count["n"] += 1
+
+    shared_engine = _stub_engine("shared_dedup_engine", "empty", on_call=_bump)
+    good_engine = _stub_engine("dedup_winner2", "good")
+
+    monkeypatch.setitem(_REGISTRY, "shared_dedup_engine", lambda: shared_engine)
+    monkeypatch.setitem(_REGISTRY, "dedup_winner2", lambda: good_engine)
+
+    stub_ladder(
+        (
+            SequentialStep(engine="shared_dedup_engine"),
+            RaceStep(engines=("shared_dedup_engine", "dedup_winner2")),
+        )
+    )
+
+    result = await walk("https://example.com/")
+
+    # shared_dedup_engine must only have been called once (from SequentialStep).
+    assert call_count["n"] == 1, (
+        f"engine must not be retried across steps; called {call_count['n']} times"
+    )
+    # dedup_winner2 (second member of the RaceStep) must win.
+    assert result.engine == "dedup_winner2"
+
+
+# ---------------------------------------------------------------------------
+# 33. _attempt_engine credits cost on EngineError (budget tracking)
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_helper_increments_budget_on_engine_error(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An engine that raises EngineError still counts toward engines_tried and cost_usd.
+
+    Verifies that the budget is updated even on failure so a subsequent
+    max_engines or max_cost_usd check reflects the previous (erroring) attempt.
+    """
+    from scrapefold.router import walk
+
+    async def _fetch_error(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        raise RuntimeError("simulated network error")
+
+    error_engine = type(
+        "_StubCostlyError",
+        (ScrapeEngine,),
+        {
+            "NAME": "costly_error_engine",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False, estimated_cost_usd=0.001),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_error,
+        },
+    )
+    good_engine = _stub_engine("after_error_good", "good")
+
+    monkeypatch.setitem(_REGISTRY, "costly_error_engine", lambda: error_engine)
+    monkeypatch.setitem(_REGISTRY, "after_error_good", lambda: good_engine)
+
+    stub_ladder(
+        (
+            SequentialStep(engine="costly_error_engine"),
+            SequentialStep(engine="after_error_good"),
+        )
+    )
+
+    result = await walk("https://example.com/")
+
+    # Walk must complete (good engine wins after the erroring one).
+    assert result.engine == "after_error_good"
+    # The erroring engine must appear in failures.
+    assert any("costly_error_engine" in f and "error" in f for f in result.failures)

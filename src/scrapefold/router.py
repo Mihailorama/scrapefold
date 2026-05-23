@@ -2,8 +2,9 @@
 
 Pure orchestration — engines come from ``scrapefold.engines.get_engine``, the
 ladder from ``scrapefold.ladders.get_ladder``. The router does no I/O itself;
-``Policy`` is enforced via ``ladders.is_step_allowed`` and ``WalkBudget`` via
-``ladders.check_budget``.
+policy and cost are enforced uniformly via ``_attempt_engine`` for every
+engine regardless of whether it arrives via the default ladder or
+``opts.engines`` override.
 
 v0.1 note: ``RaceStep`` members are walked sequentially (one at a time).
 Concurrent fan-out with first-good-wins cancellation is deferred to v0.2.
@@ -12,25 +13,21 @@ Concurrent fan-out with first-good-wins cancellation is deferred to v0.2.
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from scrapefold.detection import is_suspicious
 from scrapefold.engines import get_engine
 from scrapefold.engines.base import EngineError
 from scrapefold.ladders import (
     AllEnginesFailed,
-    BudgetExceeded,
     Policy,
     RaceStep,
     SequentialStep,
     SiteClass,
     WalkBudget,
-    check_budget,
     classify_url,
-    estimate_step_cost,
     get_default_policy,
     get_ladder,
-    is_step_allowed,
 )
 from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
@@ -49,44 +46,151 @@ def _resolve_policy(opts: ScrapeOptions, site_class: SiteClass) -> Policy:
     return get_default_policy(site_class)
 
 
-async def _try_engine(
+# ---------------------------------------------------------------------------
+# Return value from _attempt_engine
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _AttemptResult:
+    """Return value from ``_attempt_engine``.
+
+    Decouples the three possible outcomes cleanly:
+    - ``result`` is set → winner found (keep_walking is False).
+    - ``result`` is None, ``keep_walking`` is True  → skip/fail, try next.
+    - ``result`` is None, ``keep_walking`` is False → budget exhausted, stop.
+
+    ``cost_delta`` and ``elapsed_delta`` are always >= 0 and must be applied
+    by the caller to its running budget counters.
+    """
+
+    result: ScrapeResult | None
+    keep_walking: bool
+    cost_delta: float = 0.0
+    elapsed_delta: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Unified per-engine gate helper
+# ---------------------------------------------------------------------------
+
+
+async def _attempt_engine(
     engine_name: str,
     url: str,
     opts: ScrapeOptions,
+    policy: Policy,
+    budget_cost_usd: float,
+    budget_engines_tried: set[str],
+    max_engines: int,
+    max_cost_usd: float,
     failures: list[str],
-) -> ScrapeResult | None:
-    """Attempt a single named engine and return its result, or None on skip/failure.
+) -> _AttemptResult:
+    """Try one engine through all gates.
 
-    Side-effects: appends to *failures* when the engine is skipped or errors.
+    Returns an ``_AttemptResult`` describing what happened.  The caller must
+    add ``result.cost_delta`` and ``result.elapsed_delta`` to its running
+    budget accumulators.
+
+    Gates checked in order (first failure wins):
+    1. Registry lookup — unknown name → skip (keep walking).
+    2. Dedup by canonical NAME — already tried → skip (keep walking).
+    3. Policy gate — paid_not_allowed → skip (keep walking).
+    4. Max-engines budget — ceiling reached → stop walk.
+    5. Cost budget — would exceed max_cost_usd → stop walk.
+    6. Availability — engine.is_available() → skip (keep walking).
+    7. Invoke engine.scrape().
+    8. Quality checks — empty / suspicious → skip (keep walking).
+    9. Winner — return result (stop walk).
     """
+    # 1. Registry lookup
     try:
         engine_cls = get_engine(engine_name)
     except KeyError:
         logger.debug("router: unknown engine=%s", engine_name)
         failures.append(f"{engine_name}:unknown")
-        return None
+        return _AttemptResult(result=None, keep_walking=True)
 
     canonical = engine_cls.NAME
+
+    # 2. Dedup
+    if canonical in budget_engines_tried:
+        logger.debug("router: skip already-tried engine=%s", canonical)
+        return _AttemptResult(result=None, keep_walking=True)
+
+    # 3. Policy gate — check per-engine capabilities, not step metadata
+    if not policy.paid_allowed and engine_cls.CAPABILITIES.requires_api_key:
+        logger.debug("router: skip engine=%s reason=paid_not_allowed", canonical)
+        failures.append(f"{canonical}:skipped:paid_not_allowed")
+        return _AttemptResult(result=None, keep_walking=True)
+
+    # 4. Max-engines budget
+    if len(budget_engines_tried) >= max_engines:
+        logger.info("router: walk halted budget=max_engines")
+        failures.append("budget:max_engines")
+        return _AttemptResult(result=None, keep_walking=False)
+
+    # 5. Cost budget — use engine CAPABILITIES, not step metadata
+    engine_cost = float(engine_cls.CAPABILITIES.estimated_cost_usd or 0.0)
+    if budget_cost_usd + engine_cost > max_cost_usd:
+        logger.info("router: walk halted budget=cost")
+        failures.append(f"{canonical}:skipped:budget:cost")
+        return _AttemptResult(result=None, keep_walking=False)
+
+    # 6. Availability
     engine = engine_cls()
     if not engine.is_available():
         logger.debug("router: skip engine=%s not available", canonical)
         failures.append(f"{canonical}:unavailable")
-        return None
+        budget_engines_tried.add(canonical)
+        return _AttemptResult(result=None, keep_walking=True)
 
+    # Mark as tried before the call so errors still count toward dedup.
+    budget_engines_tried.add(canonical)
+
+    # 7. Invoke
     try:
         result = await engine.scrape(url, opts)
     except EngineError as exc:
+        # Credit cost even on error — the paid request was made.
         failures.append(f"{canonical}:error:{exc.message}")
-        return None
+        return _AttemptResult(
+            result=None,
+            keep_walking=True,
+            cost_delta=engine_cost,
+            elapsed_delta=float(exc.elapsed_ms),
+        )
 
+    # 8. Quality checks
     if result.is_empty():
         failures.append(f"{canonical}:empty")
-        return None
+        return _AttemptResult(
+            result=None,
+            keep_walking=True,
+            cost_delta=engine_cost,
+            elapsed_delta=float(result.elapsed_ms),
+        )
     if is_suspicious(result):
         failures.append(f"{canonical}:suspicious")
-        return None
+        return _AttemptResult(
+            result=None,
+            keep_walking=True,
+            cost_delta=engine_cost,
+            elapsed_delta=float(result.elapsed_ms),
+        )
 
-    return result
+    # 9. Winner
+    return _AttemptResult(
+        result=result,
+        keep_walking=False,
+        cost_delta=engine_cost,
+        elapsed_delta=float(result.elapsed_ms),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public walk entry point
+# ---------------------------------------------------------------------------
 
 
 async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
@@ -105,96 +209,64 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     opts = opts or ScrapeOptions()
     failures: list[str] = []
 
-    # --- opts.engines override path ---
-    # Empty tuple is coerced to None (use default ladder) for safety.
+    # -----------------------------------------------------------------------
+    # opts.engines override path
+    # -----------------------------------------------------------------------
     if opts.engines:
-        # Resolve policy and budget settings so they apply to explicit engines too.
         site_class_override = classify_url(url)
         policy_override = _resolve_policy(opts, site_class_override)
         max_cost_usd_override = float(opts.extra.get("max_cost_usd", _DEFAULT_MAX_COST_USD))
         max_engines_override = int(opts.extra.get("max_engines", _DEFAULT_MAX_ENGINES))
+
         cost_accum: float = 0.0
-        engines_called: int = 0
         elapsed_accum_ms: float = 0.0
-        seen_canonical: set[str] = set()  # dedup by canonical NAME
+        seen_canonical: set[str] = set()
 
         for name in opts.engines:
-            # Budget gate: max_engines ceiling (checked before any engine work).
-            if engines_called >= max_engines_override:
-                logger.info("router: walk halted budget=max_engines (override path)")
-                failures.append("budget:max_engines")
-                break
-
-            # Budget gate: elapsed-time ceiling (checked before any engine work).
+            # Elapsed-time budget (checked before any engine work).
             if elapsed_accum_ms > opts.timeout_s * 1000:
                 logger.info("router: walk halted budget=timeout (override path)")
                 failures.append("budget:timeout")
                 break
 
+            # Dedup: emit :duplicate tag and skip before calling the helper.
+            # We resolve the canonical name here so the tag is accurate.
             try:
-                engine_cls = get_engine(name)
+                _cls = get_engine(name)
+                _canon = _cls.NAME
             except KeyError:
-                logger.debug("router: unknown engine=%s", name)
-                failures.append(f"{name}:unknown")
+                _canon = name  # unknown — helper will record :unknown
+
+            if _canon in seen_canonical:
+                logger.debug("router: skip engine=%s reason=duplicate", _canon)
+                failures.append(f"{_canon}:duplicate")
                 continue
 
-            canonical = engine_cls.NAME
+            attempt = await _attempt_engine(
+                engine_name=name,
+                url=url,
+                opts=opts,
+                policy=policy_override,
+                budget_cost_usd=cost_accum,
+                budget_engines_tried=seen_canonical,
+                max_engines=max_engines_override,
+                max_cost_usd=max_cost_usd_override,
+                failures=failures,
+            )
 
-            # Dedup: skip if this canonical name was already attempted.
-            if canonical in seen_canonical:
-                logger.debug("router: skip engine=%s reason=duplicate", canonical)
-                failures.append(f"{canonical}:duplicate")
-                continue
-            seen_canonical.add(canonical)
+            cost_accum += attempt.cost_delta
+            elapsed_accum_ms += attempt.elapsed_delta
 
-            # Policy gate: block paid engines when policy forbids them.
-            # Synthesising a SequentialStep would carry cost=0.0 (unknown),
-            # so we check engine capabilities directly instead.
-            if not policy_override.paid_allowed and engine_cls().CAPABILITIES.requires_api_key:
-                logger.debug("router: skip engine=%s reason=paid_not_allowed", canonical)
-                failures.append(f"{canonical}:skipped:paid_not_allowed")
-                continue
-
-            # Budget gate: pre-check whether this engine's cost would exceed
-            # the remaining budget.  We read the cost from CAPABILITIES so
-            # max_cost_usd=0 correctly blocks the very first paid engine.
-            next_cost = float(engine_cls.CAPABILITIES.estimated_cost_usd or 0.0)
-            if cost_accum + next_cost > max_cost_usd_override:
-                logger.info("router: walk halted budget=cost (override path)")
-                failures.append(f"{canonical}:skipped:budget:cost")
+            if attempt.result is not None:
+                return replace(attempt.result, failures=failures)
+            if not attempt.keep_walking:
                 break
-
-            engine = engine_cls()
-            if not engine.is_available():
-                logger.debug("router: skip engine=%s not available", canonical)
-                failures.append(f"{canonical}:unavailable")
-                continue
-
-            try:
-                result = await engine.scrape(url, opts)
-            except EngineError as exc:
-                cost_accum += next_cost
-                engines_called += 1
-                elapsed_accum_ms += exc.elapsed_ms
-                failures.append(f"{canonical}:error:{exc.message}")
-                continue
-
-            cost_accum += next_cost
-            engines_called += 1
-            elapsed_accum_ms += result.elapsed_ms
-
-            if result.is_empty():
-                failures.append(f"{canonical}:empty")
-                continue
-            if is_suspicious(result):
-                failures.append(f"{canonical}:suspicious")
-                continue
-
-            return replace(result, failures=failures)
 
         raise AllEnginesFailed(url=url, failures=failures)
 
-    # --- Default ladder path ---
+    # -----------------------------------------------------------------------
+    # Default ladder path
+    # -----------------------------------------------------------------------
     site_class = classify_url(url)
     policy = _resolve_policy(opts, site_class)
     ladder = get_ladder(site_class)
@@ -202,14 +274,8 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
 
     max_engines = int(opts.extra.get("max_engines", _DEFAULT_MAX_ENGINES))
     max_cost_usd = float(opts.extra.get("max_cost_usd", _DEFAULT_MAX_COST_USD))
-    avg_response_mb = float(opts.extra.get("avg_response_mb", _DEFAULT_AVG_RESPONSE_MB))
 
     for step in ladder:
-        # Determine the list of engine names to attempt for this step.
-        # SequentialStep → single engine.
-        # RaceStep → multiple engines tried sequentially in v0.1 (concurrent
-        #            fan-out with first-good-wins is deferred to v0.2).
-        # Unknown step type → skip with a debug log.
         if isinstance(step, SequentialStep):
             engines_to_try = [step.engine]
         elif isinstance(step, RaceStep):
@@ -222,77 +288,32 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
             logger.debug("router: skip unknown step type: %r", step)
             continue
 
-        # Policy + budget check operate on the step as a whole before we enter
-        # the per-engine inner loop.
-        allowed, reason = is_step_allowed(step, policy)
-        if not allowed:
-            # Record a skip entry for each engine in the step.
-            for eng_name in engines_to_try:
-                failures.append(f"{eng_name}:skipped:{reason}")
-            logger.debug("router: skip step reason=%s: %r", reason, step)
-            continue
+        for engine_name in engines_to_try:
+            # Elapsed-time budget check (per-engine, mirrors override path).
+            if budget.elapsed_ms > opts.timeout_s * 1000:
+                logger.info("router: walk halted budget=timeout (ladder path)")
+                failures.append("budget:timeout")
+                raise AllEnginesFailed(url=url, failures=failures)
 
-        try:
-            check_budget(
-                step,
-                budget,
-                timeout_s=opts.timeout_s,
+            attempt = await _attempt_engine(
+                engine_name=engine_name,
+                url=url,
+                opts=opts,
+                policy=policy,
+                budget_cost_usd=budget.cost_usd,
+                budget_engines_tried=budget.engines_tried,
                 max_engines=max_engines,
                 max_cost_usd=max_cost_usd,
-                avg_response_mb=avg_response_mb,
+                failures=failures,
             )
-        except BudgetExceeded as exc:
-            logger.info("router: walk halted budget=%s", exc.reason)
-            failures.append(f"budget:{exc.reason}")
-            break
 
-        # Per-engine cost share: divide the step cost evenly across the engines
-        # in the step (for SequentialStep this is just the full step cost).
-        step_cost = estimate_step_cost(step, avg_response_mb=avg_response_mb)
-        per_engine_cost = step_cost / max(len(engines_to_try), 1)
+            budget.cost_usd += attempt.cost_delta
+            budget.elapsed_ms += int(attempt.elapsed_delta)
 
-        for engine_name in engines_to_try:
-            try:
-                engine_cls = get_engine(engine_name)
-            except KeyError:
-                logger.debug("router: unknown engine=%s", engine_name)
-                failures.append(f"{engine_name}:unknown")
-                continue
-
-            canonical = engine_cls.NAME
-            if canonical in budget.engines_tried:
-                logger.debug("router: skip already-tried engine=%s", canonical)
-                continue
-
-            engine = engine_cls()
-            if not engine.is_available():
-                logger.debug("router: skip engine=%s not available", canonical)
-                failures.append(f"{canonical}:unavailable")
-                budget.engines_tried.add(canonical)
-                continue
-
-            budget.engines_tried.add(canonical)
-
-            try:
-                result = await engine.scrape(url, opts)
-            except EngineError as exc:
-                budget.elapsed_ms += exc.elapsed_ms
-                budget.cost_usd += per_engine_cost
-                failures.append(f"{canonical}:error:{exc.message}")
-                continue
-
-            budget.elapsed_ms += result.elapsed_ms
-            budget.cost_usd += per_engine_cost
-
-            if result.is_empty():
-                failures.append(f"{canonical}:empty")
-                continue
-            if is_suspicious(result):
-                failures.append(f"{canonical}:suspicious")
-                continue
-
-            # First good result in this step wins; remaining race members are skipped.
-            return replace(result, failures=failures)
+            if attempt.result is not None:
+                return replace(attempt.result, failures=failures)
+            if not attempt.keep_walking:
+                raise AllEnginesFailed(url=url, failures=failures)
 
     raise AllEnginesFailed(url=url, failures=failures)
 
