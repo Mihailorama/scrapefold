@@ -54,7 +54,12 @@ def is_suspicious(
 
     Heuristics applied (any one is sufficient):
 
-    1. **Short text** — ``len(result.text) < min_text_chars``.
+    1. **Short text + failure signal** — ``len(result.text) < min_text_chars`` AND
+       either: (a) ``result.text`` is empty / whitespace-only, OR (b)
+       ``meta["status_code"]`` indicates an HTTP error (4xx or 5xx).
+       Short but non-empty text with a 2xx status is NOT suspicious under this
+       rule alone — other rules (antibot phrases, noscript/script domination) can
+       still flag it.
     2. **Anti-bot phrase** — any phrase in *antibot_phrases* appears (case-
        insensitive) in ``result.text`` or ``result.html``.
     3. **Noscript domination** — the ``<noscript>`` content exceeds 50 % of the
@@ -68,8 +73,17 @@ def is_suspicious(
     html: str | None = result.html
 
     if len(text) < min_text_chars:
-        logger.debug("is_suspicious: short text (%d < %d chars)", len(text), min_text_chars)
-        return True
+        status_code = result.status_code
+        is_error_status = status_code is not None and status_code >= 400
+        is_empty = not text.strip()
+        if is_empty or is_error_status:
+            logger.debug(
+                "is_suspicious: short text (%d < %d chars) with %s",
+                len(text),
+                min_text_chars,
+                "empty text" if is_empty else f"status_code={status_code}",
+            )
+            return True
 
     text_lower = text.lower()
     html_lower = (html or "").lower()

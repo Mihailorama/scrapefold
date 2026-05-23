@@ -55,16 +55,35 @@ class TestIsSuspiciousClean:
 
 class TestIsSuspiciousTextLength:
     def test_empty_text_is_suspicious(self) -> None:
+        # Empty text (whitespace-stripped) is always suspicious regardless of status.
         result = _result(text="")
         assert is_suspicious(result) is True
 
-    def test_short_text_below_threshold_is_suspicious(self) -> None:
-        result = _result(text="hi")
+    def test_whitespace_only_text_is_suspicious(self) -> None:
+        # Whitespace-only is treated as empty — suspicious regardless of status.
+        result = _result(text="   \n\t  ")
         assert is_suspicious(result) is True
 
-    def test_text_just_below_threshold_is_suspicious(self) -> None:
-        result = _result(text="A" * 199)
+    def test_short_text_with_error_status_is_suspicious(self) -> None:
+        # Short text + 4xx → suspicious (conjoint condition met via error status).
+        result = _result(text="hi", meta={"status_code": 403})
         assert is_suspicious(result) is True
+
+    def test_short_text_with_5xx_status_is_suspicious(self) -> None:
+        # Short text + 5xx → suspicious.
+        result = _result(text="A" * 199, meta={"status_code": 503})
+        assert is_suspicious(result) is True
+
+    def test_short_text_with_200_is_not_suspicious_by_rule1(self) -> None:
+        # Short but non-empty text + 200 → NOT suspicious under Rule 1.
+        # (Other rules can still flag it, but this tests Rule 1 isolation.)
+        result = _result(text="hi", meta={"status_code": 200})
+        assert is_suspicious(result) is False
+
+    def test_short_text_no_status_is_not_suspicious_by_rule1(self) -> None:
+        # Short non-empty text with no status code → NOT suspicious under Rule 1.
+        result = _result(text="A" * 199)
+        assert is_suspicious(result) is False
 
 
 # ---------------------------------------------------------------------------
