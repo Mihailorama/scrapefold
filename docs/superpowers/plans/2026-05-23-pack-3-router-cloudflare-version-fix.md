@@ -12,7 +12,7 @@
 
 ---
 
-## Phase A — Land the on-disk router shell
+## Phase A — Land the on-disk router shell + structured error contract
 
 Working tree as of `5039a61` already contains:
 - `src/scrapefold/router.py` (130 lines, sequential ladder walker)
@@ -21,6 +21,8 @@ Working tree as of `5039a61` already contains:
 - `tests/test_smoke.py` cleaned of the obsolete `NotImplementedError` test
 
 The 381 baseline + 13 router tests pass locally. The router skips `RaceStep` entries with a DEBUG log (TBD until Pack 9 = v0.2.0). The work is review-ready; this phase ships it.
+
+**Additionally** (Codex round-1 follow-up): upgrade `AllEnginesFailed` to carry structured `url` + `failures` so consumer migration in Pack 7 can be a single PR, not a backward-compat shim. Consumers will catch `AllEnginesFailed`, inspect `exc.url` + `exc.failures`, and decide. No marker-string legacy preserved.
 
 ### Task A.1 — Verify the working tree is clean and tests green
 
@@ -88,6 +90,117 @@ Expected: commit succeeds; `git status` reports a clean tree.
 
 Run: `./scripts/check.sh`
 Expected: `=== All checks passed ===` (same as A.1 Step 2 — sanity check that committing didn't drag in any pre-commit-hook surprises).
+
+### Task A.3 — Structured `AllEnginesFailed` (CRITICAL/HIGH fix from Codex round 1)
+
+Today `AllEnginesFailed` is `class AllEnginesFailed(Exception): pass` and the router raises `AllEnginesFailed(f"all engines failed for {url}: {failures}")`. That collapses structured failure data into an opaque string. Consumers can't introspect what was tried or why.
+
+**Files:**
+- Modify: `src/scrapefold/ladders.py:158-160`
+- Modify: `src/scrapefold/router.py:127`
+- Modify: `tests/test_router.py` (add structured-attrs assertion)
+
+- [ ] **Step 1: Write failing test**
+
+Append to `tests/test_router.py`:
+
+```python
+async def test_all_engines_failed_carries_url_and_failures(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """AllEnginesFailed exposes .url and .failures for consumer introspection."""
+    from scrapefold.router import walk
+
+    stub_ladder(
+        (
+            SequentialStep(engine="stub_empty"),
+            SequentialStep(engine="stub_raise"),
+        )
+    )
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/probe")
+
+    assert exc_info.value.url == "https://example.com/probe"
+    assert isinstance(exc_info.value.failures, list)
+    assert any("stub_empty" in f for f in exc_info.value.failures)
+    assert any("stub_raise" in f for f in exc_info.value.failures)
+```
+
+- [ ] **Step 2: Run failing test**
+
+Run: `pytest tests/test_router.py::test_all_engines_failed_carries_url_and_failures -v`
+Expected: AttributeError (`.url` / `.failures` don't exist on the exception).
+
+- [ ] **Step 3: Upgrade `AllEnginesFailed` in `ladders.py`**
+
+In `src/scrapefold/ladders.py`, replace lines 158-160:
+
+```python
+class AllEnginesFailed(Exception):  # noqa: N818
+    """Raised when every step in the ladder failed or was skipped.
+
+    Carries structured failure data so consumers can introspect what was
+    tried without parsing the exception's string form.
+    """
+
+    def __init__(self, url: str, failures: list[str]) -> None:
+        self.url = url
+        self.failures = list(failures)
+        super().__init__(f"all engines failed for {url}: {self.failures}")
+```
+
+- [ ] **Step 4: Update router's raise site**
+
+In `src/scrapefold/router.py`, replace the final line:
+
+```python
+raise AllEnginesFailed(f"all engines failed for {url}: {failures}")
+```
+
+with:
+
+```python
+raise AllEnginesFailed(url=url, failures=failures)
+```
+
+- [ ] **Step 5: Run test + full suite**
+
+Run: `pytest tests/test_router.py::test_all_engines_failed_carries_url_and_failures -v && ./scripts/check.sh`
+Expected: both green.
+
+- [ ] **Step 6: Document the error contract**
+
+Append to `CHANGELOG.md` `[Unreleased]`:
+
+```markdown
+### Changed — structured AllEnginesFailed (consumer error contract)
+
+- `AllEnginesFailed` now carries `.url: str` and `.failures: list[str]`.
+  Consumers no longer need to parse the exception message. The
+  `failures` list shape is `"<engine>:<reason>:<detail>"` (e.g.
+  `"firecrawl:error:404 Not Found"`, `"jina:empty"`,
+  `"scrapingbee:unavailable"`, `"budget:cost"`). Pack 7 consumer
+  migrations (downstream-consumer + downstream-consumer) target this contract directly.
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/scrapefold/ladders.py src/scrapefold/router.py tests/test_router.py CHANGELOG.md
+git commit -m "$(cat <<'EOF'
+feat: Pack 3 — structured AllEnginesFailed.url + .failures
+
+Consumers (downstream-consumer, downstream-consumer) now have a typed error surface to migrate
+onto in Pack 7. Replaces the opaque message-string approach that
+downstream-consumer' marker-string fallback was working around.
+
+Codex round-1 review HIGH finding #5 — addresses downstream-consumer PR1 safety
+by removing the need for any marker-preservation shim.
+EOF
+)"
+```
 
 ---
 
@@ -618,7 +731,12 @@ EOF
 
 ## Phase C — Cloudflare engine (TDD)
 
-Port `get_content_cloudflare` from `downstream-consumer/services/url_to_text_service.py` (lines 1452-1568). Two endpoints: `/markdown` (preferred) and `/content` (raw HTML fallback). Auth via `Authorization: Bearer ${CLOUDFLARE_API_TOKEN}`. Env vars: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+Port `get_content_cloudflare` from `downstream-consumer/services/url_to_text_service.py` (lines 1452-1568). Two endpoints: `/markdown` (preferred) and `/content` (raw HTML fallback). Auth via `Authorization: Bearer ${CLOUDFLARE_API_TOKEN}` — verified via context7 against Cloudflare's current Browser Rendering docs (snippet shows `-H 'Authorization: Bearer <apiToken>'` against `https://api.cloudflare.com/client/v4/accounts/<accountId>/browser-rendering/markdown`). Env vars: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+
+**Cost honesty (Codex round-1 HIGH #4):** Cloudflare Browser Rendering is billed per request. An empty `/markdown` response that triggers the `/content` fallback = 2 paid requests, not 1. The engine MUST:
+1. Record `meta["endpoint_calls"]` = list of endpoints actually hit (e.g. `["markdown"]` or `["markdown", "content"]`).
+2. Default `EngineCapabilities.estimated_cost_usd` to the **per-request** vendor rate so the router's cost budget accounts for it. (Concrete number lives in `EngineCapabilities`; verify against Cloudflare's pricing page at pack-open time.)
+3. Make the fallback opt-out via `opts.extra["cloudflare_skip_content_fallback"] = True` for callers who specifically want one-shot markdown.
 
 **Note:** `docs/workflows/development.md` env-vars table currently lists `CLOUDFLARE_API_KEY` — this is wrong. The Cloudflare ecosystem uses `_API_TOKEN`. Update that table as part of this phase.
 
@@ -684,6 +802,9 @@ async def test_markdown_endpoint_string_result(httpx_mock: HTTPXMock) -> None:
     assert result.markdown == _MARKDOWN_BODY
     assert result.engine == "cloudflare"
     assert result.text != ""  # derived from markdown
+    # Cost honesty (Codex round-1 HIGH #4)
+    assert result.meta["endpoint_calls"] == ["markdown"]
+    assert result.cost_usd > 0  # per-request paid
 
 
 # ---------------------------------------------------------------------------
@@ -732,6 +853,24 @@ async def test_falls_back_to_content_when_markdown_empty(httpx_mock: HTTPXMock) 
     assert result.html == _HTML_BODY
     assert "Hello" in result.text  # post-converted from HTML
     assert result.markdown != ""
+    # Cost honesty — both endpoints hit = 2× per-request cost
+    assert result.meta["endpoint_calls"] == ["markdown", "content"]
+    from scrapefold.engines.cloudflare import CloudflareEngine
+    assert result.cost_usd == CloudflareEngine._PER_REQUEST_USD * 2
+
+
+async def test_skip_content_fallback_opts_out(httpx_mock: HTTPXMock) -> None:
+    """opts.extra['cloudflare_skip_content_fallback']=True → only /markdown hit."""
+    from scrapefold.engines.base import EngineError
+    httpx_mock.add_response(url=_MD_URL, method="POST", json={"result": ""})
+
+    with pytest.raises(EngineError):
+        await _engine().scrape(
+            _TARGET_URL,
+            ScrapeOptions(extra={"cloudflare_skip_content_fallback": True}),
+        )
+    # /content was NOT hit — verify by checking only one request was made
+    assert len(httpx_mock.get_requests()) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -944,12 +1083,17 @@ class CloudflareEngine(ScrapeEngine):
     """
 
     NAME = "cloudflare"
+    # Per-request cost — Browser Rendering is billed per request. An empty
+    # /markdown that triggers the /content fallback = 2 paid requests; the
+    # router's cost budget needs to account for it. Verify the exact USD
+    # against Cloudflare's current pricing page at pack-open time.
+    _PER_REQUEST_USD = 0.0009  # placeholder — verify and update
     CAPABILITIES = EngineCapabilities(
         js_rendering=True,
         stealth=False,
         screenshot=False,
         requires_api_key=True,
-        estimated_cost_usd=0.0,  # included in Cloudflare Workers plan
+        estimated_cost_usd=_PER_REQUEST_USD,
         billing_unit="call",
         proxy_type="cloudflare",
         free_tier=False,
@@ -961,6 +1105,7 @@ class CloudflareEngine(ScrapeEngine):
         {
             "render_js",
             "timeout_s",
+            "extra",  # honors extra["cloudflare_skip_content_fallback"]
         }
     )
 
@@ -986,10 +1131,17 @@ class CloudflareEngine(ScrapeEngine):
             "render": opts.render_js,
             "gotoOptions": {"waitUntil": "domcontentloaded"},
         }
+        skip_fallback = bool(opts.extra.get("cloudflare_skip_content_fallback", False))
+        # endpoint_calls is surfaced in meta so callers / billing audit can see
+        # exactly which paid endpoints were hit on this scrape.
+        endpoint_calls: list[str] = []
+        cost_usd = 0.0
 
         async with httpx.AsyncClient(timeout=float(opts.timeout_s)) as client:
             # Step 1: /markdown
             md_resp = await client.post(f"{base_url}/markdown", headers=headers, json=body)
+            endpoint_calls.append("markdown")
+            cost_usd += self._PER_REQUEST_USD
 
             markdown_out = ""
             if md_resp.status_code == 200:
@@ -1006,19 +1158,32 @@ class CloudflareEngine(ScrapeEngine):
                     html=None,
                     engine=self.NAME,
                     elapsed_ms=0,  # base class fills
+                    cost_usd=cost_usd,
                     meta={
                         "status_code": md_resp.status_code,
-                        "endpoint": "markdown",
+                        "endpoint_calls": endpoint_calls,
                     },
                 )
 
-            # Step 2: /content fallback
+            if skip_fallback:
+                raise EngineError(
+                    engine=self.NAME,
+                    message=(
+                        f"/markdown ({md_resp.status_code}) returned empty for {url}; "
+                        "content fallback disabled by opts.extra"
+                    ),
+                    elapsed_ms=0,
+                )
+
+            # Step 2: /content fallback — second paid request
             logger.debug(
                 "engine=cloudflare /markdown empty/non-200 (%d) for %s; trying /content",
                 md_resp.status_code,
                 url,
             )
             html_resp = await client.post(f"{base_url}/content", headers=headers, json=body)
+            endpoint_calls.append("content")
+            cost_usd += self._PER_REQUEST_USD
 
             html_out = ""
             if html_resp.status_code == 200:
@@ -1045,9 +1210,10 @@ class CloudflareEngine(ScrapeEngine):
                 html=html_out,
                 engine=self.NAME,
                 elapsed_ms=0,
+                cost_usd=cost_usd,
                 meta={
                     "status_code": html_resp.status_code,
-                    "endpoint": "content",
+                    "endpoint_calls": endpoint_calls,
                 },
             )
 

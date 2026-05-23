@@ -4,13 +4,23 @@
 >
 > **PACK-OPEN REFRESH:** Re-run `scripts/check-deps-fresh.sh` and bump stale dep floors before starting. Pay special attention to `httpx`, `firecrawl-py`, `apify-client`, `outscraper` — Pack 5 touches their client lifecycles.
 
-**Goal:** Land `cache.py` (sha256-keyed disk cache with TTL) and convert HTTP-tier + SDK engines to reuse a single client across calls. Both consumed by the router at walk shutdown via `engine.aclose()`.
+**Goal:** Land `cache.py` (sha256-keyed disk cache with TTL), an `EnginePool` that spans the lifetime of a `crawl_site()` invocation, and convert HTTP-tier + SDK engines to reuse a single client across calls.
 
-**Architecture:** `cache.py` provides `Cache(dir, ttl_days)` with `async get(key)` / `async set(key, result)` and `make_key(url, opts)`. `scrape()` and `crawl_site()` consult the cache when `opts.skip_cache=False` (default). Each HTTP-tier engine gains a `self._client: httpx.AsyncClient` instance reused across calls, with `async aclose()` called at walk shutdown. SDK engines (Firecrawl / Apify / Outscraper) cache their vendor client instance on `self`.
+**Architecture (Codex round-1 CRITICAL fix):** The naive design — router constructs engines per-walk, closes them on walk-end — defeats client reuse during `crawl_site` because each URL is a fresh walk. **`EnginePool`** lives at the `crawl_site` level (or single-URL `scrape` level), is passed into `router.walk(url, opts, *, pool=...)`, and the router consults the pool instead of constructing engines directly. The pool closes all engines exactly once, at the end of the outermost call.
+
+- `cache.py` provides `Cache(dir, ttl_days)` with `async get(key)` / `async set(key, result)` and `make_key(url, opts)` (with **strict canonicalization** per Codex round-1 HIGH #3 — see Phase B).
+- `pool.py` provides `EnginePool` with `get(name) -> ScrapeEngine` (lazy instantiation, cached) and `async aclose()` (closes all held engines).
+- `router.walk(url, opts, *, pool=None)` — if `pool` is None, constructs an ephemeral pool for one walk; if provided, uses it (caller manages lifetime).
+- `crawl_site(url, opts, output)` opens one pool, threads it through every per-URL `scrape()` call, closes at the end.
+- Each HTTP-tier engine gains `self._client: httpx.AsyncClient` reused across calls; SDK engines (Firecrawl / Apify / Outscraper) cache the vendor client. `aclose()` cleans up.
 
 **Tech Stack:** Python 3.10+, httpx, hashlib, json, dataclasses.asdict, vendor SDKs (Firecrawl 4.x+, Apify, Outscraper).
 
 **Spec reference:** `docs/superpowers/specs/2026-05-23-v0.1.0-stable-roadmap-design.md` §3.3.
+
+**Codex round-1 findings addressed in this pack:**
+- CRITICAL — engine pool spans the crawl, not the walk (was: client reuse defeated by per-walk aclose).
+- HIGH #3 — cache canonicalizer is strict; non-serializable opts bypass cache with a logged warning instead of producing unstable keys.
 
 ---
 
@@ -90,6 +100,39 @@ def test_make_key_stable_across_dict_key_order() -> None:
     k1 = make_key("https://x/", ScrapeOptions(extra={"a": 1, "b": 2}))
     k2 = make_key("https://x/", ScrapeOptions(extra={"b": 2, "a": 1}))
     assert k1 == k2
+
+
+# ---------------------------------------------------------------------------
+# 1a. Strict canonicalization — Policy dataclass in extra is fine
+# ---------------------------------------------------------------------------
+
+
+def test_make_key_handles_policy_dataclass_in_extra() -> None:
+    from scrapefold import Policy
+
+    k1 = make_key("https://x/", ScrapeOptions(extra={"policy": Policy(paid_allowed=False)}))
+    k2 = make_key("https://x/", ScrapeOptions(extra={"policy": Policy(paid_allowed=False)}))
+    k3 = make_key("https://x/", ScrapeOptions(extra={"policy": Policy(paid_allowed=True)}))
+
+    assert k1 == k2
+    assert k1 != k3
+
+
+# ---------------------------------------------------------------------------
+# 1b. Strict canonicalization — non-serializable extra value bypasses cache
+# ---------------------------------------------------------------------------
+
+
+def test_make_key_returns_none_on_unserializable_extra(caplog) -> None:
+    """A callable / arbitrary object in extra → cache bypass (returns None)
+    with a logged warning instead of producing a non-deterministic key."""
+
+    async def my_callback() -> str:
+        return "x"
+
+    key = make_key("https://x/", ScrapeOptions(extra={"on_done": my_callback}))
+    assert key is None
+    assert any("not canonicalizable" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -240,18 +283,63 @@ logger = logging.getLogger(__name__)
 _DEFAULT_TTL_DAYS = 7
 
 
+_PRIMITIVES: tuple[type, ...] = (str, int, float, bool, type(None))
+
+
+def _canonicalize(obj: Any) -> Any:
+    """Recursively transform *obj* into a JSON-serializable, dict-key-sorted form.
+
+    Strict by design (Codex round-1 HIGH #3): unknown types raise
+    ``ValueError`` so the caller can bypass the cache with a logged
+    warning rather than producing a non-deterministic key via
+    ``default=str``.
+    """
+    if isinstance(obj, _PRIMITIVES):
+        return obj
+    if isinstance(obj, (list, tuple)):
+        return [_canonicalize(x) for x in obj]
+    if isinstance(obj, (set, frozenset)):
+        items = [_canonicalize(x) for x in obj]
+        try:
+            return sorted(items)
+        except TypeError as exc:
+            raise ValueError(f"set with mixed-comparable elements: {exc}") from exc
+    if isinstance(obj, dict):
+        out: dict[str, Any] = {}
+        for k in sorted(obj):
+            if not isinstance(k, str):
+                raise ValueError(f"non-string dict key: {k!r} ({type(k).__name__})")
+            out[k] = _canonicalize(obj[k])
+        return out
+    if is_dataclass(obj):
+        return _canonicalize(asdict(obj))
+    raise ValueError(
+        f"opts contains non-canonicalizable type: {type(obj).__name__}"
+    )
+
+
 def _canonical_opts(opts: ScrapeOptions) -> str:
-    """Produce a stable JSON string for opts, with dict keys sorted recursively."""
-    raw = asdict(opts)
-    return json.dumps(raw, sort_keys=True, default=str)
+    """Produce a stable JSON string for opts. Raises ``ValueError`` on failure."""
+    return json.dumps(_canonicalize(asdict(opts)), sort_keys=True)
 
 
-def make_key(url: str, opts: ScrapeOptions) -> str:
-    """Return the 64-char hex sha256 key for (url, opts)."""
+def make_key(url: str, opts: ScrapeOptions) -> str | None:
+    """Return the 64-char hex sha256 key for (url, opts), or ``None`` if opts
+    contains a non-canonicalizable value (cache must bypass).
+    """
+    try:
+        canonical = _canonical_opts(opts)
+    except ValueError as exc:
+        logger.warning(
+            "cache: opts not canonicalizable (%s); cache will bypass for url=%s",
+            exc,
+            url,
+        )
+        return None
     h = hashlib.sha256()
     h.update(url.encode("utf-8"))
     h.update(b"\x00")
-    h.update(_canonical_opts(opts).encode("utf-8"))
+    h.update(canonical.encode("utf-8"))
     return h.hexdigest()
 
 
@@ -357,6 +445,387 @@ EOF
 
 ---
 
+## Phase B.5 — `EnginePool` (Codex round-1 CRITICAL fix)
+
+The engine-pool lives outside the per-walk lifetime so it can be shared across all URLs in a `crawl_site()` call. Router gains an optional `pool=` kwarg; when present, it consults the pool instead of constructing engines directly.
+
+### Task B.5.1 — Failing tests
+
+**Files:**
+- Create: `tests/test_engine_pool.py`
+
+- [ ] **Step 1: Write tests**
+
+Create `tests/test_engine_pool.py`:
+
+```python
+"""Tests for EnginePool — engine instance caching across multiple walks."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
+from scrapefold.engines import _REGISTRY
+from scrapefold.pool import EnginePool
+
+
+def _make_stub_engine(name: str, *, ctor_log: list[str]) -> type[ScrapeEngine]:
+    class _Stub(ScrapeEngine):
+        NAME = name
+        CAPABILITIES = EngineCapabilities()
+        SUPPORTED_OPTIONS = frozenset()
+
+        def __init__(self) -> None:
+            super().__init__()
+            ctor_log.append(name)
+
+        async def _fetch(self, url: str, opts: Any) -> Any:
+            from scrapefold.result import ScrapeResult
+
+            return ScrapeResult(
+                url=url, text="x", markdown="# x", html=None,
+                engine=self.NAME, elapsed_ms=1,
+            )
+
+    return _Stub
+
+
+async def test_pool_caches_engine_across_get_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctor_log: list[str] = []
+    cls = _make_stub_engine("pooltest", ctor_log=ctor_log)
+    monkeypatch.setitem(_REGISTRY, "pooltest", lambda: cls)
+
+    pool = EnginePool()
+    e1 = pool.get("pooltest")
+    e2 = pool.get("pooltest")
+
+    assert e1 is e2
+    assert ctor_log == ["pooltest"]  # constructor called exactly once
+
+
+async def test_pool_aclose_closes_all_engines(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed: list[str] = []
+
+    class _Stub(ScrapeEngine):
+        NAME = "p_close"
+        CAPABILITIES = EngineCapabilities()
+        SUPPORTED_OPTIONS = frozenset()
+
+        async def _fetch(self, url, opts):
+            from scrapefold.result import ScrapeResult
+            return ScrapeResult(
+                url=url, text="x", markdown="# x", html=None,
+                engine=self.NAME, elapsed_ms=1,
+            )
+
+        async def aclose(self) -> None:
+            closed.append(self.NAME)
+
+    monkeypatch.setitem(_REGISTRY, "p_close", lambda: _Stub)
+
+    pool = EnginePool()
+    pool.get("p_close")
+    await pool.aclose()
+
+    assert closed == ["p_close"]
+    # Idempotent close
+    await pool.aclose()
+    assert closed == ["p_close"]
+
+
+async def test_pool_get_unknown_engine_raises_keyerror() -> None:
+    pool = EnginePool()
+    with pytest.raises(KeyError):
+        pool.get("does-not-exist")
+```
+
+- [ ] **Step 2: Run failing tests**
+
+Run: `pytest tests/test_engine_pool.py -v`
+Expected: `ModuleNotFoundError: scrapefold.pool`.
+
+### Task B.5.2 — Implement `EnginePool`
+
+**Files:**
+- Create: `src/scrapefold/pool.py`
+
+- [ ] **Step 1: Create module**
+
+Create `src/scrapefold/pool.py`:
+
+```python
+"""EnginePool — lazy, alias-resolving engine cache spanning the lifetime of a
+single crawl_site() call (or a single standalone scrape).
+
+The pool exists to defeat the trivial-client-reuse trap: if the router
+constructs+closes engines per walk, then a 50-URL crawl pays 50 TLS
+handshakes (HTTP-tier engines) and 50 SDK-init costs (Firecrawl/Apify/
+Outscraper). With a pool whose lifetime spans the crawl, each engine is
+constructed once and aclose()d once.
+"""
+
+from __future__ import annotations
+
+import logging
+
+from scrapefold.engines import get_engine, resolve_alias
+from scrapefold.engines.base import ScrapeEngine
+
+logger = logging.getLogger(__name__)
+
+
+class EnginePool:
+    """Cache of constructed engine instances, keyed by canonical engine name."""
+
+    def __init__(self) -> None:
+        self._engines: dict[str, ScrapeEngine] = {}
+        self._closed = False
+
+    def get(self, name: str) -> ScrapeEngine:
+        """Return the engine for *name*, constructing it on first request.
+
+        Raises KeyError when the engine is not registered.
+        Raises RuntimeError when called on an already-closed pool.
+        """
+        if self._closed:
+            raise RuntimeError("EnginePool: pool is already closed")
+        canonical = resolve_alias(name)
+        if canonical not in self._engines:
+            cls = get_engine(canonical)
+            self._engines[canonical] = cls()
+        return self._engines[canonical]
+
+    async def aclose(self) -> None:
+        """Close every constructed engine. Idempotent."""
+        if self._closed:
+            return
+        self._closed = True
+        for name, engine in self._engines.items():
+            try:
+                await engine.aclose()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("pool: aclose engine=%s failed: %s", name, exc)
+        self._engines.clear()
+
+
+__all__ = ["EnginePool"]
+```
+
+- [ ] **Step 2: Run tests**
+
+Run: `pytest tests/test_engine_pool.py -v`
+Expected: 3 PASS.
+
+### Task B.5.3 — Router accepts an optional pool
+
+**Files:**
+- Modify: `src/scrapefold/router.py`
+- Modify: `tests/test_router.py`
+
+- [ ] **Step 1: Failing test**
+
+Append to `tests/test_router.py`:
+
+```python
+async def test_walk_uses_provided_pool_and_does_not_close_it(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When walk(...) is called with an explicit pool, it must NOT close it.
+    The caller (crawl_site) owns the lifetime."""
+    from scrapefold.pool import EnginePool
+    from scrapefold.router import walk
+
+    closed_count = {"n": 0}
+    orig_aclose = EnginePool.aclose
+
+    async def _spy_aclose(self):
+        closed_count["n"] += 1
+        await orig_aclose(self)
+
+    monkeypatch.setattr(EnginePool, "aclose", _spy_aclose)
+
+    stub_ladder((SequentialStep(engine="stub_good"),))
+
+    pool = EnginePool()
+    await walk("https://example.com/a", pool=pool)
+    await walk("https://example.com/b", pool=pool)
+
+    assert closed_count["n"] == 0  # caller-owned pool not closed by walk
+    await pool.aclose()
+    assert closed_count["n"] == 1
+```
+
+- [ ] **Step 2: Patch router**
+
+In `src/scrapefold/router.py`:
+
+```python
+# Add to imports
+from scrapefold.pool import EnginePool
+
+# Change walk signature
+async def walk(
+    url: str,
+    opts: ScrapeOptions | None = None,
+    *,
+    pool: EnginePool | None = None,
+) -> ScrapeResult:
+    own_pool = pool is None
+    if own_pool:
+        pool = EnginePool()
+    try:
+        # ... existing setup ...
+
+        # Replace `engine_cls = get_engine(step.engine); ... engine = engine_cls()`
+        # with `engine = pool.get(step.engine)`.
+        # Keep the canonical-name dedup (engine.NAME).
+
+        # ... existing loop ...
+
+    finally:
+        if own_pool and pool is not None:
+            await pool.aclose()
+    raise AllEnginesFailed(url=url, failures=failures)
+```
+
+- [ ] **Step 3: Update `tests/test_router.py` to import `EnginePool` where needed; existing tests stay green (since `walk(url)` still creates its own pool).**
+
+- [ ] **Step 4: Run full suite**
+
+Run: `./scripts/check.sh`
+Expected: all green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/scrapefold/pool.py src/scrapefold/router.py tests/test_engine_pool.py tests/test_router.py
+git commit -m "$(cat <<'EOF'
+feat: Pack 5 — EnginePool spans the crawl lifetime (Codex CRITICAL)
+
+router.walk(url, opts, *, pool=None) — when an EnginePool is passed,
+the router uses it instead of constructing engines directly, and the
+caller owns aclose(). When None, walk() creates an ephemeral pool for
+itself.
+
+Closes the client-reuse trap: crawl_site can now share one
+EnginePool across 50 URLs → 50 engines constructed once, not 50×.
+EOF
+)"
+```
+
+### Task B.5.4 — `crawl_site` threads the pool through
+
+**Files:**
+- Modify: `src/scrapefold/crawler/__init__.py`
+- Modify: `tests/test_crawl_site.py`
+
+- [ ] **Step 1: Patch `crawler.crawl`**
+
+In `src/scrapefold/crawler/__init__.py`, modify `crawl` to open a pool and pass it through `scrape`:
+
+```python
+from scrapefold.pool import EnginePool
+
+async def crawl(
+    root: str,
+    opts: ScrapeOptions | None = None,
+    output: Path | str | None = None,
+) -> Path:
+    from scrapefold import scrape  # local — circular-avoid
+
+    opts = opts or ScrapeOptions()
+    max_pages = opts.max_pages if opts.max_pages else 100
+
+    urls = await discover_urls(root, max_urls=max_pages)
+    logger.info("crawler: discovered %d urls from %s", len(urls), root)
+
+    if not urls:
+        urls = [root]
+
+    pool = EnginePool()
+    results: list[ScrapeResult] = []
+    try:
+        for url in urls:
+            try:
+                results.append(await scrape(url, opts, pool=pool))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("crawler: scrape failed url=%s err=%s", url, exc)
+    finally:
+        await pool.aclose()
+
+    if output is None:
+        output = Path(tempfile.gettempdir()) / "scrapefold-crawl.md"
+    output = Path(output)
+    return write_stitched(results, output)
+```
+
+- [ ] **Step 2: Failing test for pool-sharing**
+
+Append to `tests/test_crawl_site.py`:
+
+```python
+async def test_crawl_site_shares_engine_pool_across_urls(
+    tmp_path: Path,
+    stub_discover: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """All URLs in one crawl_site call must share a single EnginePool."""
+    seen_pools: list[object] = []
+
+    async def _fake_scrape(url: str, opts=None, *, pool=None):
+        from scrapefold.result import ScrapeResult
+        seen_pools.append(pool)
+        return ScrapeResult(
+            url=url, text="x", markdown="# x", html=None,
+            engine="stub", elapsed_ms=1,
+        )
+
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+    out = tmp_path / "site.md"
+    await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=3),
+        output=out,
+    )
+
+    # All 3 scrapes got the same pool object
+    assert len(seen_pools) == 3
+    assert all(p is seen_pools[0] for p in seen_pools)
+    assert seen_pools[0] is not None
+```
+
+- [ ] **Step 3: Run tests + full suite**
+
+Run: `pytest tests/test_crawl_site.py tests/test_engine_pool.py tests/test_router.py -v && ./scripts/check.sh`
+Expected: all green.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/scrapefold/crawler/__init__.py tests/test_crawl_site.py
+git commit -m "$(cat <<'EOF'
+feat: Pack 5 — crawl_site threads one EnginePool across all URLs
+
+crawl_site() opens a pool, passes it through every per-URL scrape(),
+closes once at the end. With the per-engine client reuse from
+Phase D, this means one httpx.AsyncClient (or vendor SDK client) for
+the entire crawl.
+EOF
+)"
+```
+
+---
+
 ## Phase C — Wire cache into `scrape()` and `crawl_site()`
 
 ### Task C.1 — Add `opts.skip_cache` honor + `cache_dir` / `cache_ttl_days` extras
@@ -456,10 +925,20 @@ Expected: FAIL (currently no cache layer).
 In `src/scrapefold/__init__.py`, replace the current `scrape` function:
 
 ```python
-async def scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+async def scrape(
+    url: str,
+    opts: ScrapeOptions | None = None,
+    *,
+    pool: "EnginePool | None" = None,
+) -> ScrapeResult:
     """Single-URL scrape with engine auto-selection.
 
     Honors opts.skip_cache, opts.extra["cache_dir"], opts.extra["cache_ttl_days"].
+
+    When called from crawl_site(), the caller passes a long-lived
+    EnginePool; the router uses it instead of constructing+closing
+    engines per URL. When called standalone, an ephemeral pool is
+    created and closed inside walk().
     """
     from scrapefold.cache import Cache, make_key
     from scrapefold.router import walk
@@ -473,12 +952,13 @@ async def scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
             dir=opts.extra["cache_dir"],
             ttl_days=int(opts.extra.get("cache_ttl_days", 7)),
         )
-        cache_key = make_key(url, opts)
-        cached = await cache.get(cache_key)
-        if cached is not None:
-            return cached
+        cache_key = make_key(url, opts)  # may be None (bypass on uncacheable opts)
+        if cache_key is not None:
+            cached = await cache.get(cache_key)
+            if cached is not None:
+                return cached
 
-    result = await walk(url, opts)
+    result = await walk(url, opts, pool=pool)
 
     if cache is not None and cache_key is not None:
         await cache.set(cache_key, result)

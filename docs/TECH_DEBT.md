@@ -12,12 +12,26 @@ Items here are known shortcuts that were accepted in earlier PRs and need
 follow-up in later sprints. Each item has a P-priority, the PR that
 introduced it, and the sprint where it should land.
 
-## P1 — block S7 (router) or land alongside it
+## P1 — router-coupled items
 
 These seven items came out of Codex round-3 review of the ladders PR
 (`agentId: ae2836a633272deb6`). The structural design was approved
 (Option A); these are implementation pin-downs that belong in code, not
 in the ladders.py file alone.
+
+**v0.1.0 release split (per spec `docs/superpowers/specs/2026-05-23-v0.1.0-stable-roadmap-design.md` §2.3):**
+
+- v0.1.0 ships **sequential-only** — `RaceStep` entries in ladders are
+  skipped with a DEBUG log. Items below tagged "sequential-relevant"
+  land before the v0.1.0 tag (Pack 3 = router shell, Pack 4 = router
+  cost accounting + probe cache, Pack 5 = engine pool + client reuse).
+- Items tagged "RaceStep-coupled" defer to v0.2.0 — they cannot be
+  validated without race fan-out in the router. Item #1
+  (`budget_mode`), #2 (race billing), and #4 (race billing default)
+  are RaceStep-coupled.
+
+This split is non-negotiable per consumer-driven scope: both downstream-consumer
+and downstream-consumer only need sequential walks at v0.1.0 ship time.
 
 ### 1. `budget_mode` wiring in the router
 

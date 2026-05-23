@@ -104,9 +104,11 @@ async def fetch_markdown(url, cache_dir, timeout=60, render_js=True, logger=None
 
 ---
 
-## Phase C — downstream-consumer migration (4 PRs)
+## Phase C — downstream-consumer migration (3 PRs)
 
 **Repo:** `/Users/m/code/downstream-consumer/downstream-consumer`. Larger surface; expect 12+ call sites touched.
+
+**Codex round-1 HIGH #5 fix + user guidance:** PR1 ("collapse 8 funcs") and PR2 ("marker-string purge") **collapse into a single PR**. Reason: scrapefold's `AllEnginesFailed` now carries `.url` and `.failures` (Pack 3 Task A.3), so downstream-consumer can adopt the structured error contract in one shot — no temporary marker-preservation shim, no callers branching on `"Frc failed"` while wrappers return `""`.
 
 ### Task C.1 — Pin and parity corpus
 
@@ -114,28 +116,50 @@ async def fetch_markdown(url, cache_dir, timeout=60, render_js=True, logger=None
 - [ ] **Step 2:** Create `downstream-consumer/tests/scrapefold_parity/` with a 50-page-crawl corpus (Firecrawl `entireWebsite=True` recent runs).
 - [ ] **Step 3:** Write a parity harness that compares old code vs. new code for both single-URL and multi-page-crawl paths.
 
-### Task C.2 — PR 1: Collapse 8 `get_content_X` functions
+### Task C.2 — PR 1: Atomic migration to scrapefold's error contract
 
-- [ ] **Step 1:** In `services/url_to_text_service.py`, replace the bodies of `get_content_firecrawl`, `get_content_scrapingbee`, `get_content_selenium`, `get_content_jina`, `get_content_scrapingdog`, `get_content_cloudflare`, `get_content_scrapling`, `get_content_crawl4ai`, `get_content_outscraper` with one shared implementation:
+This single PR replaces all 8 `get_content_X` functions, the marker-string constants, and the chained-marker-fallback in `process_file_to_array_service.py` simultaneously.
+
+- [ ] **Step 1:** In `services/url_to_text_service.py`, replace the bodies of `get_content_firecrawl`, `get_content_scrapingbee`, `get_content_selenium`, `get_content_jina`, `get_content_scrapingdog`, `get_content_cloudflare`, `get_content_scrapling`, `get_content_crawl4ai`, `get_content_outscraper` with one shared implementation that propagates the structured error:
 
 ```python
-async def get_content_via_scrapefold(url, engine_name, sourceUrl="", include_external_links=False, **engine_specific_kwargs):
+async def get_content_via_scrapefold(
+    url: str,
+    engine_name: str,
+    sourceUrl: str = "",
+    include_external_links: bool = False,
+    **engine_specific_kwargs,
+) -> str | None:
+    """Return markdown on success, None on AllEnginesFailed.
+
+    Callers MUST branch on None (not on marker strings — those are gone).
+    """
     from scrapefold import scrape, ScrapeOptions, AllEnginesFailed
-    opts = ScrapeOptions(engines=[engine_name], extra={"source_url": sourceUrl})
+
+    opts = ScrapeOptions(
+        engines=[engine_name],
+        extra={
+            "source_url": sourceUrl,
+            "include_external_links": include_external_links,
+            **engine_specific_kwargs,
+        },
+    )
     try:
         result = await scrape(url, opts)
-    except AllEnginesFailed:
-        return ""  # marker-string purge happens in PR 2
+    except AllEnginesFailed as exc:
+        logger.warning(
+            "scrapefold engine=%s url=%s failed; tried=%s",
+            engine_name, url, exc.failures,
+        )
+        return None
     return result.markdown
 ```
 
-- [ ] **Step 2:** Each `get_content_X` becomes a one-liner: `return await get_content_via_scrapefold(url, "<engine>", ...)`. Vendor-specific kwargs (e.g. `take_screenshot`) flow through `opts.extra` until v0.2.0 ships dedicated options.
-- [ ] **Step 3:** Run parity harness; assert ≤ 5% byte-delta on `result.text`. Open PR 1.
+Each `get_content_X` becomes a one-liner: `return await get_content_via_scrapefold(url, "<engine>", ...)`. Return type changes from `str` to `str | None`.
 
-### Task C.3 — PR 2: Marker-string purge
-
-- [ ] **Step 1:** In `services/process_file_to_array_service.py`, delete the 8 marker constants (lines 39-43) and `_is_scraping_failed()` helper.
-- [ ] **Step 2:** Replace the chained `if html_text == "Frc failed": …` cascade (lines 448-465) with:
+- [ ] **Step 2:** In `services/process_file_to_array_service.py`:
+  - Delete the 8 marker constants (lines 39-43) and `_is_scraping_failed()`.
+  - Replace the chained `if html_text == "Frc failed": …` cascade (lines 448-465) with:
 
 ```python
 from scrapefold import scrape, ScrapeOptions, AllEnginesFailed
@@ -143,14 +167,18 @@ from scrapefold import scrape, ScrapeOptions, AllEnginesFailed
 try:
     result = await scrape(url, ScrapeOptions())
     html_text = result.markdown
-except AllEnginesFailed:
+except AllEnginesFailed as exc:
+    logger.warning("scrapefold fallback exhausted: url=%s tried=%s", exc.url, exc.failures)
     html_text = None
 ```
 
-- [ ] **Step 3:** Update any caller that branched on marker-string values to branch on `None` instead.
-- [ ] **Step 4:** Open PR 2 with parity green.
+  - Update every caller that previously branched on a marker string to branch on `None` instead. Grep for the 8 markers; each match is a call site.
 
-### Task C.4 — PR 3: Per-domain mapping review
+- [ ] **Step 3:** Run the parity harness. Assert: (a) ≤ 5% byte-delta on `result.text` for success cases; (b) all previously-failing-with-marker URLs now return `None`; (c) zero references to the 8 marker strings remain in `downstream-consumer/services/`.
+
+- [ ] **Step 4:** Open PR 1, request review.
+
+### Task C.4 — PR 2: Per-domain mapping review
 
 - [ ] **Step 1:** Review `website_scraper_mapping` dict entry by entry.
 - [ ] **Step 2:** For each entry:
@@ -159,9 +187,9 @@ except AllEnginesFailed:
   - If yes → **delete the entry**.
   - If no → **keep as one-line override**: `opts.engines=["forced_engine"]` with a comment.
 - [ ] **Step 3:** Hard cap: ≤ 3 surviving overrides. If more, that's a ladder bug → patch scrapefold (Pack 7.x).
-- [ ] **Step 4:** Open PR 3 with parity green.
+- [ ] **Step 4:** Open PR 2 with parity green.
 
-### Task C.5 — PR 4: `crawl_site` adoption
+### Task C.5 — PR 3: `crawl_site` adoption
 
 - [ ] **Step 1:** Replace the `entireWebsite=True` Firecrawl path in `process_file_to_array_service.py` with:
 
@@ -177,11 +205,11 @@ extracted_text = result_path.read_text()
 ```
 
 - [ ] **Step 2:** Run 50-page-crawl parity corpus.
-- [ ] **Step 3:** Open PR 4.
+- [ ] **Step 3:** Open PR 3.
 
 ### Task C.6 — downstream-consumer soak
 
-- [ ] All 4 PRs merged → downstream-consumer runs on rc1 for 1 calendar week at normal request volume.
+- [ ] All 3 PRs merged → downstream-consumer runs on rc1 for 1 calendar week at normal request volume.
 - [ ] Track scrapefold-attributable regressions → Pack 7.x patches.
 
 ---
@@ -219,7 +247,7 @@ When closed:
 **Spec coverage** (§3.5 + §5):
 - Tag `v0.1.0rc1` after Pack 6 → Phase A ✅
 - downstream-consumer migration PR 1/2/3 → Tasks B.2/3/4 ✅
-- downstream-consumer migration PR 1/2/3/4 → Tasks C.2/3/4/5 ✅
+- downstream-consumer migration PR 1/2/3 → Tasks C.2/4/5 (PR1 and PR2 collapsed per Codex round-1 HIGH #5) ✅
 - 1-week soak per consumer → Tasks B.5, C.6 ✅
 - Bugfix-only Pack 7.x → rc bumps → Phase D ✅
 - ≤ 3 surviving per-domain overrides hard cap → Task C.4 ✅
