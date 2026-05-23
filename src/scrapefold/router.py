@@ -93,7 +93,8 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     """Walk the resolved ladder and return the first non-empty result.
 
     If ``opts.engines`` is non-empty, those engine names are tried in order
-    instead of the default per-site-class ladder.
+    instead of the default per-site-class ladder.  Duplicate names (by
+    canonical ``engine_cls.NAME``) are skipped after the first attempt.
 
     Raises ``AllEnginesFailed`` if every step fails or is skipped.
 
@@ -115,6 +116,7 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
         cost_accum: float = 0.0
         engines_called: int = 0
         elapsed_accum_ms: float = 0.0
+        seen_canonical: set[str] = set()  # dedup by canonical NAME
 
         for name in opts.engines:
             # Budget gate: max_engines ceiling (checked before any engine work).
@@ -137,6 +139,13 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
                 continue
 
             canonical = engine_cls.NAME
+
+            # Dedup: skip if this canonical name was already attempted.
+            if canonical in seen_canonical:
+                logger.debug("router: skip engine=%s reason=duplicate", canonical)
+                failures.append(f"{canonical}:duplicate")
+                continue
+            seen_canonical.add(canonical)
 
             # Policy gate: block paid engines when policy forbids them.
             # Synthesising a SequentialStep would carry cost=0.0 (unknown),

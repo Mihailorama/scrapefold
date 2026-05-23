@@ -848,6 +848,65 @@ async def test_walk_opts_engines_respects_timeout_budget(
     assert any("budget:timeout" in f for f in failures), "budget:timeout must appear in failures"
 
 
+async def test_walk_opts_engines_dedupe_by_canonical_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Duplicate names in opts.engines invoke each engine at most once.
+
+    Sequence: dedup_engine is tried first (fails empty), then the same name
+    appears twice more in the list.  The engine must only be called once;
+    both duplicate entries must appear in failures as ``<canonical>:duplicate``.
+    A final good engine wins so the test can inspect result.failures.
+    """
+    from scrapefold.router import walk
+
+    call_log: list[str] = []
+
+    def _on_dup_call() -> None:
+        call_log.append("dedup_engine")
+
+    def _on_winner_call() -> None:
+        call_log.append("dedup_winner")
+
+    # dedup_engine: returns empty (so the walk continues past it).
+    dedup_engine = _stub_engine("dedup_engine", "empty", on_call=_on_dup_call)
+
+    # A second registry key that resolves to the SAME canonical NAME.
+    dedup_alias = type(
+        "_StubDedupAlias",
+        (ScrapeEngine,),
+        {
+            "NAME": "dedup_engine",  # same canonical NAME
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": dedup_engine._fetch,
+        },
+    )
+
+    # A fresh good engine that wins after all duplicates are skipped.
+    winner_engine = _stub_engine("dedup_winner", "good", on_call=_on_winner_call)
+
+    monkeypatch.setitem(_REGISTRY, "dedup_engine", lambda: dedup_engine)
+    monkeypatch.setitem(_REGISTRY, "dedup_alias", lambda: dedup_alias)
+    monkeypatch.setitem(_REGISTRY, "dedup_winner", lambda: winner_engine)
+
+    # "dedup_engine" appears first (called + fails empty), then twice more as
+    # duplicates (skipped), then the winner closes out.
+    opts = ScrapeOptions(engines=("dedup_engine", "dedup_engine", "dedup_alias", "dedup_winner"))
+    result = await walk("https://example.com/", opts)
+
+    # dedup_engine must have been called exactly once.
+    assert call_log.count("dedup_engine") == 1, (
+        f"dedup_engine must be invoked once; call_log={call_log}"
+    )
+    assert result.engine == "dedup_winner"
+    # Both duplicate entries must appear in failures with :duplicate tag.
+    dup_failures = [f for f in result.failures if "duplicate" in f]
+    assert len(dup_failures) == 2, (
+        f"both duplicates should be recorded; failures={result.failures}"
+    )
+
+
 async def test_walk_opts_engines_policy_blocks_paid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
