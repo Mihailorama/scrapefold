@@ -6,6 +6,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added — Pack 3 router shell (sequential)
+
+- `src/scrapefold/router.py` — `async walk(url, opts) -> ScrapeResult` walks the per-site-class ladder. Honors `Policy` (paid_allowed / legal_constraints_blocked / geography_required), `WalkBudget` ceilings (`max_engines`, `max_cost_usd`, `timeout_s`), and the `engines_tried` dedup set. `RaceStep` entries are skipped with a DEBUG log until Pack 9.
+- `tests/test_router.py` — 13 tests covering happy path, empty-result advance, EngineError advance, unavailable-engine skip, AllEnginesFailed, unknown-engine skip, policy gating, budget halt, RaceStep skip, public `scrape()` delegation, failures-list, no-retry-within-walk, EngineError-non-propagation.
+- `scrapefold.scrape(url, opts)` now delegates to `router.walk` instead of raising `NotImplementedError`.
+- `tests/test_smoke.py` — the obsolete `NotImplementedError` smoke test is removed.
+
 ## [0.1.0a1] — 2026-05-22
 
 ### Added — S1.5 per-site-class escalation ladders

@@ -25,6 +25,7 @@ from scrapefold.ladders import (
 )
 from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
+from scrapefold.router import walk as _walk
 
 __version__ = "0.1.0a1"
 
@@ -52,12 +53,10 @@ __all__ = [
 async def scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     """Single-URL scrape with engine auto-selection.
 
-    Scaffold stub — full router lands in S7. Currently raises
-    ``NotImplementedError`` since no engines are registered yet.
+    Walks the per-site-class ladder via ``scrapefold.router.walk``. Raises
+    ``AllEnginesFailed`` if no step in the ladder succeeds.
     """
-    raise NotImplementedError(
-        "scrape() requires at least one engine. Engines land in PRs S2-S6 and S11."
-    )
+    return await _walk(url, opts)
 
 
 async def crawl_site(url: str, opts: ScrapeOptions | None = None, **kwargs: object) -> str:

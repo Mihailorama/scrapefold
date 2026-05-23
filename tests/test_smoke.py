@@ -135,11 +135,6 @@ def test_engine_registry_contains_pack_2c_browser_engines() -> None:
     assert {"crawl4ai", "cloakbrowser", "selenium"}.issubset(names)
 
 
-async def test_public_scrape_is_not_implemented() -> None:
-    with pytest.raises(NotImplementedError):
-        await scrapefold.scrape("https://example.com")
-
-
 async def test_public_crawl_site_is_not_implemented() -> None:
     with pytest.raises(NotImplementedError):
         await scrapefold.crawl_site("https://example.com")
