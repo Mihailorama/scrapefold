@@ -863,7 +863,9 @@ async def test_cache_hit_skips_network(
     """Second call with the same (url, opts) reads from cache, not the router."""
     call_count = {"n": 0}
 
-    async def _fake_walk(url: str, opts: ScrapeOptions | None = None) -> Any:
+    async def _fake_walk(
+        url: str, opts: ScrapeOptions | None = None, *, pool=None
+    ) -> Any:
         call_count["n"] += 1
         from scrapefold.result import ScrapeResult
 
@@ -892,7 +894,9 @@ async def test_skip_cache_forces_network(
 ) -> None:
     call_count = {"n": 0}
 
-    async def _fake_walk(url: str, opts: ScrapeOptions | None = None) -> Any:
+    async def _fake_walk(
+        url: str, opts: ScrapeOptions | None = None, *, pool=None
+    ) -> Any:
         call_count["n"] += 1
         from scrapefold.result import ScrapeResult
 
@@ -1215,96 +1219,197 @@ EOF
 )"
 ```
 
-### Task D.4 — Router calls `aclose()` at walk shutdown
+### Task D.4 — Pool ownership contract: ephemeral vs. caller-owned
+
+**Note (Codex round-2 fix):** Phase B.5 already established the dual-mode router lifetime — `walk(url, opts)` without an explicit `pool=` creates an ephemeral pool and closes it; `walk(url, opts, pool=<explicit>)` uses the caller-owned pool and **does not** close it. This task verifies the contract holds via two targeted tests, and ensures the `aclose()` calls actually reach the engine `_client` / `_sdk_client` references that Phases D.2 and D.3 added.
 
 **Files:**
-- Modify: `src/scrapefold/router.py`
 - Modify: `tests/test_router.py`
+- Modify: `tests/test_engine_pool.py`
 
-- [ ] **Step 1: Failing test**
+- [ ] **Step 1: Ephemeral-pool contract test (failing if Phase B.5 regressed)**
 
 Append to `tests/test_router.py`:
 
 ```python
-async def test_router_closes_engines_after_walk(
+async def test_walk_without_pool_creates_and_closes_ephemeral_pool(
     stub_registry: dict[str, type[ScrapeEngine]],
     stub_ladder: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """walk(url) without pool=... must aclose the engine it constructed."""
     from scrapefold import EngineCapabilities, SequentialStep
     from scrapefold.engines import _REGISTRY
     from scrapefold.engines.base import ScrapeEngine
-    from scrapefold.options import ScrapeOptions
     from scrapefold.result import ScrapeResult
     from scrapefold.router import walk
 
     closed: list[str] = []
 
-    async def _aclose(self):
-        closed.append(self.NAME)
+    class _Stub(ScrapeEngine):
+        NAME = "ephemeral"
+        CAPABILITIES = EngineCapabilities()
+        SUPPORTED_OPTIONS = frozenset()
 
-    async def _fetch(self, url, opts):
-        return ScrapeResult(
-            url=url, text="x", markdown="# x", html=None,
-            engine=self.NAME, elapsed_ms=1,
-        )
+        async def _fetch(self, url, opts):
+            return ScrapeResult(
+                url=url, text="x", markdown="# x", html=None,
+                engine=self.NAME, elapsed_ms=1,
+            )
 
-    closing_engine = type(
-        "_StubClose",
-        (ScrapeEngine,),
-        {
-            "NAME": "closing_engine",
-            "CAPABILITIES": EngineCapabilities(),
-            "SUPPORTED_OPTIONS": frozenset(),
-            "_fetch": _fetch,
-            "aclose": _aclose,
-        },
-    )
-    monkeypatch.setitem(_REGISTRY, "closing_engine", lambda: closing_engine)
-    stub_ladder((SequentialStep(engine="closing_engine"),))
+        async def aclose(self) -> None:
+            closed.append(self.NAME)
+
+    monkeypatch.setitem(_REGISTRY, "ephemeral", lambda: _Stub)
+    stub_ladder((SequentialStep(engine="ephemeral"),))
 
     await walk("https://example.com/")
 
-    assert "closing_engine" in closed
+    assert closed == ["ephemeral"], "ephemeral pool must aclose its engines"
 ```
 
-- [ ] **Step 2: Patch router**
+- [ ] **Step 2: Caller-owned pool contract test (regression for Phase B.5 + D.4)**
 
-In `src/scrapefold/router.py`, modify the `walk()` function to track instantiated engines and close them on exit:
+Append to `tests/test_router.py` (this test verifies the *negative* — that walk does NOT close a passed pool):
 
 ```python
-async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
-    # ... existing setup ...
-    instantiated: list[ScrapeEngine] = []
-    try:
-        # ... existing loop, but after `engine = engine_cls()` add:
-        #     instantiated.append(engine)
-        # ... rest of loop unchanged ...
-        # On success:
-        return replace(result, failures=failures)
-    finally:
-        for e in instantiated:
-            try:
-                await e.aclose()
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("router: aclose engine=%s failed: %s", e.NAME, exc)
-    raise AllEnginesFailed(f"all engines failed for {url}: {failures}")
+async def test_walk_with_passed_pool_does_not_close_engines(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """walk(url, pool=p) must leave p open — caller owns the lifetime."""
+    from scrapefold import EngineCapabilities, SequentialStep
+    from scrapefold.engines import _REGISTRY
+    from scrapefold.engines.base import ScrapeEngine
+    from scrapefold.pool import EnginePool
+    from scrapefold.result import ScrapeResult
+    from scrapefold.router import walk
+
+    closed: list[str] = []
+
+    class _Stub(ScrapeEngine):
+        NAME = "caller_owned"
+        CAPABILITIES = EngineCapabilities()
+        SUPPORTED_OPTIONS = frozenset()
+
+        async def _fetch(self, url, opts):
+            return ScrapeResult(
+                url=url, text="x", markdown="# x", html=None,
+                engine=self.NAME, elapsed_ms=1,
+            )
+
+        async def aclose(self) -> None:
+            closed.append(self.NAME)
+
+    monkeypatch.setitem(_REGISTRY, "caller_owned", lambda: _Stub)
+    stub_ladder((SequentialStep(engine="caller_owned"),))
+
+    pool = EnginePool()
+    await walk("https://example.com/a", pool=pool)
+    await walk("https://example.com/b", pool=pool)
+
+    # Pool is still open — same engine instance reused; no aclose calls yet
+    assert closed == []
+    e1 = pool.get("caller_owned")
+    e2 = pool.get("caller_owned")
+    assert e1 is e2  # one engine across both walks
+
+    # Closing the pool fires aclose exactly once on each held engine
+    await pool.aclose()
+    assert closed == ["caller_owned"]
 ```
 
-(Adjust `try/finally` placement so `aclose` runs whether the walk returns a result OR raises `AllEnginesFailed`.)
+- [ ] **Step 3: Run tests**
 
-- [ ] **Step 3: Run tests + commit**
+Run: `pytest tests/test_router.py::test_walk_without_pool_creates_and_closes_ephemeral_pool tests/test_router.py::test_walk_with_passed_pool_does_not_close_engines -v`
+Expected: both PASS (if Phase B.5 router patch is correct).
+
+If they FAIL, that means the router patch in Phase B.5 Task B.5.3 Step 2 didn't fully wire the ephemeral-vs-caller-owned branch. Fix it in `src/scrapefold/router.py`:
+
+```python
+async def walk(
+    url: str,
+    opts: ScrapeOptions | None = None,
+    *,
+    pool: EnginePool | None = None,
+) -> ScrapeResult:
+    own_pool = pool is None
+    if own_pool:
+        pool = EnginePool()
+    try:
+        # ... existing setup + ladder loop, replacing `engine = engine_cls()`
+        # with `engine = pool.get(step.engine)` ...
+        # ... return replace(result, failures=failures) on success ...
+        # ... raise AllEnginesFailed(url=url, failures=failures) on exhaustion ...
+    finally:
+        if own_pool and pool is not None:
+            await pool.aclose()
+```
+
+The key invariant: `await pool.aclose()` only runs when the router constructed the pool itself. A caller-owned pool is never closed by `walk()`.
+
+- [ ] **Step 4: Verify Phase D.2/D.3 engine `aclose()` actually closes the cached client**
+
+Add to `tests/test_engine_pool.py`:
+
+```python
+async def test_pool_aclose_propagates_to_engine_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When the pool closes, each engine's aclose() must release its
+    httpx.AsyncClient / SDK client reference."""
+    from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
+    from scrapefold.engines import _REGISTRY
+    from scrapefold.pool import EnginePool
+
+    state = {"client": object(), "closed": False}
+
+    class _ClientEngine(ScrapeEngine):
+        NAME = "client_engine"
+        CAPABILITIES = EngineCapabilities()
+        SUPPORTED_OPTIONS = frozenset()
+
+        def __init__(self) -> None:
+            super().__init__()
+            self._client = state["client"]
+
+        async def _fetch(self, url, opts):
+            from scrapefold.result import ScrapeResult
+            return ScrapeResult(
+                url=url, text="x", markdown="# x", html=None,
+                engine=self.NAME, elapsed_ms=1,
+            )
+
+        async def aclose(self) -> None:
+            self._client = None
+            state["closed"] = True
+
+    monkeypatch.setitem(_REGISTRY, "client_engine", lambda: _ClientEngine)
+
+    pool = EnginePool()
+    engine = pool.get("client_engine")
+    assert engine._client is state["client"]
+    await pool.aclose()
+    assert state["closed"] is True
+    assert engine._client is None
+```
+
+- [ ] **Step 5: Run all the D.4 tests + full suite + commit**
 
 ```bash
+pytest tests/test_router.py tests/test_engine_pool.py -v
 ./scripts/check.sh
-git add src/scrapefold/router.py tests/test_router.py
+git add tests/test_router.py tests/test_engine_pool.py src/scrapefold/router.py
 git commit -m "$(cat <<'EOF'
-feat: Pack 5 — router calls engine.aclose() in finally block
+test: Pack 5 D.4 — pool ownership contract pinned
 
-After each walk (success or AllEnginesFailed), the router closes every
-engine instance it constructed. Combined with the per-engine client
-reuse from D.2/D.3, this gives a single-client lifetime per walk
-without leaking sockets when many walks happen back-to-back.
+Two new router tests verify the ephemeral-vs-caller-owned pool
+contract from Phase B.5: walk() without pool aclose()s the engines
+it constructed; walk(pool=p) leaves p open. One new pool test
+verifies that pool.aclose() actually propagates to each engine's
+aclose() (which releases the cached _client / _sdk_client from
+Phases D.2/D.3).
 EOF
 )"
 ```

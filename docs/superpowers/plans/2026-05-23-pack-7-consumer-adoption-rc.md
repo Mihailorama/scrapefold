@@ -4,7 +4,7 @@
 
 **Goal:** Tag `v0.1.0rc1`, then migrate `downstream-consumer` and `downstream-consumer` onto it. Run a one-week soak window. Bugfix-only Pack 7.x → `rc2`, `rc3` as consumer regressions land. Exit when 7 calendar days pass with zero scrapefold-attributable issues OR both consumer maintainers explicitly approve.
 
-**Architecture:** Three sub-phases. **A.** Tag `v0.1.0rc1` from the head of Pack 6. **B.** Migrate `downstream-consumer` (3 PRs). **C.** Migrate `downstream-consumer` (4 PRs). Each consumer PR commits a parity-replay test corpus before deletion of old code. Issues found land as Pack 7.x patches in scrapefold and bump the rc.
+**Architecture:** Three sub-phases. **A.** Tag `v0.1.0rc1` from the head of Pack 6. **B.** Migrate `downstream-consumer` (3 PRs). **C.** Migrate `downstream-consumer` (3 PRs — Codex round-1 collapsed the original PR1+PR2 into a single atomic migration). Each consumer PR commits a parity-replay test corpus before deletion of old code. Issues found land as Pack 7.x patches in scrapefold and bump the rc.
 
 **Spec reference:** `docs/superpowers/specs/2026-05-23-v0.1.0-stable-roadmap-design.md` §3.5 + §5.
 
