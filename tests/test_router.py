@@ -619,6 +619,62 @@ async def test_walk_opts_engines_all_fail_raises(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# 21. opts.engines override — max_cost_usd=0 blocks a paid engine pre-call
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_opts_engines_respects_max_cost_usd_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """opts.engines + max_cost_usd=0 MUST NOT invoke a paid engine.
+
+    The engine has estimated_cost_usd > 0; cost_accum starts at 0.
+    pre-check: 0 + cost > 0 → skip before scrape() is ever called.
+    """
+    from scrapefold.router import walk
+
+    paid_called: list[bool] = []
+
+    def _paid_call() -> None:
+        paid_called.append(True)
+
+    paid_engine = type(
+        "_StubPaidCost",
+        (ScrapeEngine,),
+        {
+            "NAME": "stub_paid_cost",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=True, estimated_cost_usd=0.001),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": lambda self, url, opts: (_ for _ in ()).throw(
+                AssertionError("must not call")
+            ),
+        },
+    )
+
+    async def _fetch_paid(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        _paid_call()
+        return _make_result("stub_paid_cost", url=url)
+
+    paid_engine._fetch = _fetch_paid  # type: ignore[attr-defined]
+
+    monkeypatch.setitem(_REGISTRY, "stub_paid_cost", lambda: paid_engine)
+
+    # paid_allowed=True so the policy gate passes — only the cost gate should block it.
+    opts = ScrapeOptions(
+        engines=("stub_paid_cost",),
+        extra={"max_cost_usd": 0.0, "policy": Policy(paid_allowed=True)},
+    )
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/", opts)
+
+    # The engine must never have been invoked.
+    assert paid_called == [], "paid engine must not be called when max_cost_usd=0"
+    # Failures should record the budget skip.
+    assert any("budget:cost" in f for f in exc_info.value.failures)
+
+
 async def test_walk_opts_engines_policy_blocks_paid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

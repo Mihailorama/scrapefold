@@ -125,13 +125,13 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
                 failures.append(f"{canonical}:skipped:paid_not_allowed")
                 continue
 
-            # Budget gate: respect max_cost_usd even on the override path.
-            # We don't know the step cost without a ladder entry, so we
-            # skip cost accumulation but still block if budget is already
-            # exhausted (cost_accum > max_cost_usd_override).
-            if cost_accum > max_cost_usd_override:
+            # Budget gate: pre-check whether this engine's cost would exceed
+            # the remaining budget.  We read the cost from CAPABILITIES so
+            # max_cost_usd=0 correctly blocks the very first paid engine.
+            next_cost = float(engine_cls.CAPABILITIES.estimated_cost_usd or 0.0)
+            if cost_accum + next_cost > max_cost_usd_override:
                 logger.info("router: walk halted budget=cost (override path)")
-                failures.append("budget:cost")
+                failures.append(f"{canonical}:skipped:budget:cost")
                 break
 
             engine = engine_cls()
@@ -143,8 +143,11 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
             try:
                 result = await engine.scrape(url, opts)
             except EngineError as exc:
+                cost_accum += next_cost
                 failures.append(f"{canonical}:error:{exc.message}")
                 continue
+
+            cost_accum += next_cost
 
             if result.is_empty():
                 failures.append(f"{canonical}:empty")
