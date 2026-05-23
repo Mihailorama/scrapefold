@@ -147,6 +147,5 @@ def test_dist_metadata_version_matches_dunder_version() -> None:
     import scrapefold
 
     assert scrapefold.__version__ == version("scrapefold"), (
-        f"drift: __init__.py={scrapefold.__version__!r} "
-        f"metadata={version('scrapefold')!r}"
+        f"drift: __init__.py={scrapefold.__version__!r} metadata={version('scrapefold')!r}"
     )
