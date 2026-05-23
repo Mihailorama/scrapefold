@@ -307,27 +307,84 @@ async def test_router_halts_when_engine_budget_exhausted(
 
 
 # ---------------------------------------------------------------------------
-# 9. RaceStep in the ladder is currently skipped (TBD), walk falls through
+# 9. RaceStep in the ladder is walked sequentially in v0.1
 # ---------------------------------------------------------------------------
 
 
-async def test_router_skips_race_step_for_now(
+async def test_walk_walks_race_step_members_sequentially(
     stub_registry: dict[str, type[ScrapeEngine]],
     stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """RaceStep members must be tried one-by-one (sequential within race) in v0.1.
+
+    Build a ladder with a single RaceStep containing 3 engines.  The first two
+    return empty; the third returns success.  All three must be invoked.
+    """
     from scrapefold.router import walk
+
+    call_log: list[str] = []
+
+    def _make_logging_engine(name: str, behavior: str) -> type[ScrapeEngine]:
+        def _on_call() -> None:
+            call_log.append(name)
+
+        return _stub_engine(name, behavior, on_call=_on_call)
+
+    monkeypatch.setitem(_REGISTRY, "race_empty1", lambda: _make_logging_engine("race_empty1", "empty"))
+    monkeypatch.setitem(_REGISTRY, "race_empty2", lambda: _make_logging_engine("race_empty2", "empty"))
+    monkeypatch.setitem(_REGISTRY, "race_good3", lambda: _make_logging_engine("race_good3", "good"))
 
     stub_ladder(
         (
-            RaceStep(engines=("stub_good", "stub_empty")),  # not yet implemented
-            SequentialStep(engine="stub_good"),
+            RaceStep(engines=("race_empty1", "race_empty2", "race_good3")),
         )
     )
 
     result = await walk("https://example.com/")
 
-    # RaceStep skipped → SequentialStep wins.
-    assert result.engine == "stub_good"
+    # All three engines in the race must have been called in order.
+    assert call_log == ["race_empty1", "race_empty2", "race_good3"], (
+        f"expected all 3 race members called in order; got {call_log}"
+    )
+    assert result.engine == "race_good3"
+    # The two failed engines appear in failures.
+    joined = " ".join(result.failures)
+    assert "race_empty1" in joined
+    assert "race_empty2" in joined
+
+
+async def test_walk_race_step_short_circuits_on_first_good(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Once a RaceStep member returns a good result the remaining members are skipped."""
+    from scrapefold.router import walk
+
+    call_log: list[str] = []
+
+    def _make_logging_engine(name: str, behavior: str) -> type[ScrapeEngine]:
+        def _on_call() -> None:
+            call_log.append(name)
+
+        return _stub_engine(name, behavior, on_call=_on_call)
+
+    monkeypatch.setitem(_REGISTRY, "race_first_good", lambda: _make_logging_engine("race_first_good", "good"))
+    monkeypatch.setitem(_REGISTRY, "race_should_skip", lambda: _make_logging_engine("race_should_skip", "good"))
+
+    stub_ladder(
+        (
+            RaceStep(engines=("race_first_good", "race_should_skip")),
+        )
+    )
+
+    result = await walk("https://example.com/")
+
+    assert result.engine == "race_first_good"
+    assert "race_should_skip" not in call_log, (
+        "second race member must not be called once first returns a good result"
+    )
 
 
 # ---------------------------------------------------------------------------

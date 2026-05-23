@@ -4,6 +4,9 @@ Pure orchestration — engines come from ``scrapefold.engines.get_engine``, the
 ladder from ``scrapefold.ladders.get_ladder``. The router does no I/O itself;
 ``Policy`` is enforced via ``ladders.is_step_allowed`` and ``WalkBudget`` via
 ``ladders.check_budget``.
+
+v0.1 note: ``RaceStep`` members are walked sequentially (one at a time).
+Concurrent fan-out with first-good-wins cancellation is deferred to v0.2.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from scrapefold.ladders import (
     AllEnginesFailed,
     BudgetExceeded,
     Policy,
+    RaceStep,
     SequentialStep,
     SiteClass,
     WalkBudget,
@@ -92,8 +96,10 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     instead of the default per-site-class ladder.
 
     Raises ``AllEnginesFailed`` if every step fails or is skipped.
-    ``RaceStep`` entries are currently skipped — concurrent fan-out lands in
-    a follow-up slice.
+
+    v0.1 ladder walk: both ``SequentialStep`` and ``RaceStep`` entries are
+    walked sequentially (one engine at a time).  Concurrent fan-out with
+    first-good-wins cancellation is deferred to v0.2.
     """
     opts = opts or ScrapeOptions()
     failures: list[str] = []
@@ -190,14 +196,31 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     avg_response_mb = float(opts.extra.get("avg_response_mb", _DEFAULT_AVG_RESPONSE_MB))
 
     for step in ladder:
-        if not isinstance(step, SequentialStep):
-            logger.debug("router: skip non-sequential step (race fan-out TBD): %r", step)
+        # Determine the list of engine names to attempt for this step.
+        # SequentialStep → single engine.
+        # RaceStep → multiple engines tried sequentially in v0.1 (concurrent
+        #            fan-out with first-good-wins is deferred to v0.2).
+        # Unknown step type → skip with a debug log.
+        if isinstance(step, SequentialStep):
+            engines_to_try = [step.engine]
+        elif isinstance(step, RaceStep):
+            engines_to_try = list(step.engines)
+            logger.debug(
+                "router: RaceStep walked sequentially in v0.1 (fan-out deferred): %r",
+                step,
+            )
+        else:
+            logger.debug("router: skip unknown step type: %r", step)
             continue
 
+        # Policy + budget check operate on the step as a whole before we enter
+        # the per-engine inner loop.
         allowed, reason = is_step_allowed(step, policy)
         if not allowed:
-            logger.debug("router: skip engine=%s reason=%s", step.engine, reason)
-            failures.append(f"{step.engine}:skipped:{reason}")
+            # Record a skip entry for each engine in the step.
+            for eng_name in engines_to_try:
+                failures.append(f"{eng_name}:skipped:{reason}")
+            logger.debug("router: skip step reason=%s: %r", reason, step)
             continue
 
         try:
@@ -214,46 +237,53 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
             failures.append(f"budget:{exc.reason}")
             break
 
-        try:
-            engine_cls = get_engine(step.engine)
-        except KeyError:
-            logger.debug("router: unknown engine=%s", step.engine)
-            failures.append(f"{step.engine}:unknown")
-            continue
-
-        canonical = engine_cls.NAME
-        if canonical in budget.engines_tried:
-            logger.debug("router: skip already-tried engine=%s", canonical)
-            continue
-
-        engine = engine_cls()
-        if not engine.is_available():
-            logger.debug("router: skip engine=%s not available", canonical)
-            failures.append(f"{canonical}:unavailable")
-            budget.engines_tried.add(canonical)
-            continue
-
-        budget.engines_tried.add(canonical)
+        # Per-engine cost share: divide the step cost evenly across the engines
+        # in the step (for SequentialStep this is just the full step cost).
         step_cost = estimate_step_cost(step, avg_response_mb=avg_response_mb)
+        per_engine_cost = step_cost / max(len(engines_to_try), 1)
 
-        try:
-            result = await engine.scrape(url, opts)
-        except EngineError as exc:
-            budget.elapsed_ms += exc.elapsed_ms
-            budget.cost_usd += step_cost
-            failures.append(f"{canonical}:error:{exc.message}")
-            continue
+        for engine_name in engines_to_try:
+            try:
+                engine_cls = get_engine(engine_name)
+            except KeyError:
+                logger.debug("router: unknown engine=%s", engine_name)
+                failures.append(f"{engine_name}:unknown")
+                continue
 
-        budget.elapsed_ms += result.elapsed_ms
-        budget.cost_usd += step_cost
+            canonical = engine_cls.NAME
+            if canonical in budget.engines_tried:
+                logger.debug("router: skip already-tried engine=%s", canonical)
+                continue
 
-        if result.is_empty():
-            failures.append(f"{canonical}:empty")
-            continue
-        if is_suspicious(result):
-            failures.append(f"{canonical}:suspicious")
-            continue
-        return replace(result, failures=failures)
+            engine = engine_cls()
+            if not engine.is_available():
+                logger.debug("router: skip engine=%s not available", canonical)
+                failures.append(f"{canonical}:unavailable")
+                budget.engines_tried.add(canonical)
+                continue
+
+            budget.engines_tried.add(canonical)
+
+            try:
+                result = await engine.scrape(url, opts)
+            except EngineError as exc:
+                budget.elapsed_ms += exc.elapsed_ms
+                budget.cost_usd += per_engine_cost
+                failures.append(f"{canonical}:error:{exc.message}")
+                continue
+
+            budget.elapsed_ms += result.elapsed_ms
+            budget.cost_usd += per_engine_cost
+
+            if result.is_empty():
+                failures.append(f"{canonical}:empty")
+                continue
+            if is_suspicious(result):
+                failures.append(f"{canonical}:suspicious")
+                continue
+
+            # First good result in this step wins; remaining race members are skipped.
+            return replace(result, failures=failures)
 
     raise AllEnginesFailed(url=url, failures=failures)
 
