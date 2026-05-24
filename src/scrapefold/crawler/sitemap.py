@@ -97,16 +97,25 @@ async def discover_urls(
 
     found: list[str] = []
 
+    visited: set[str] = set()
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Tier 1 — /sitemap.xml direct
-        await _walk_sitemap(client, sitemap_url, found)
+        found = await _walk_sitemap(
+            client, sitemap_url, visited=visited, max_urls=max_urls
+        )
 
         # Tier 2 — /robots.txt sitemap directives
         if not found:
             robots_resp = await _fetch(client, robots_url)
             if robots_resp is not None and robots_resp.status_code == 200:
                 for nested in _parse_robots_for_sitemaps(robots_resp.text):
-                    await _walk_sitemap(client, nested, found)
+                    more = await _walk_sitemap(
+                        client, nested, visited=visited, max_urls=max_urls - len(found)
+                    )
+                    found.extend(more)
+                    if len(found) >= max_urls:
+                        break
 
         # Tier 3 — BFS from root page
         if not found:
@@ -120,15 +129,50 @@ async def discover_urls(
     return filtered[:max_urls]
 
 
-async def _walk_sitemap(client: httpx.AsyncClient, sitemap_url: str, found: list[str]) -> None:
-    """Fetch *sitemap_url* and recurse into nested sitemap-index entries."""
+async def _walk_sitemap(
+    client: httpx.AsyncClient,
+    sitemap_url: str,
+    *,
+    visited: set[str],
+    max_urls: int,
+    depth: int = 0,
+    max_depth: int = 5,
+) -> list[str]:
+    """Fetch *sitemap_url* and recurse into nested sitemap-index entries.
+
+    *visited* prevents infinite loops from self-referential sitemap indexes.
+    *max_urls* caps total page URLs collected — the walk short-circuits once
+    this budget is reached, avoiding unnecessary HTTP requests.
+    *max_depth* (default 5) is a hard ceiling on recursion depth.
+    """
+    if sitemap_url in visited:
+        return []
+    if depth > max_depth:
+        logger.debug("sitemap: max_depth=%d reached at %s", max_depth, sitemap_url)
+        return []
+    visited.add(sitemap_url)
+
     resp = await _fetch(client, sitemap_url)
     if resp is None or resp.status_code != 200:
-        return
-    pages, nested = _parse_sitemap(resp.text)
-    found.extend(pages)
-    for n in nested:
-        await _walk_sitemap(client, n, found)
+        return []
+
+    pages, nested_sitemaps = _parse_sitemap(resp.text)
+    out: list[str] = list(pages)
+
+    for child in nested_sitemaps:
+        if len(out) >= max_urls:
+            break
+        more = await _walk_sitemap(
+            client,
+            child,
+            visited=visited,
+            max_urls=max_urls - len(out),
+            depth=depth + 1,
+            max_depth=max_depth,
+        )
+        out.extend(more)
+
+    return out
 
 
 __all__ = ["discover_urls"]
