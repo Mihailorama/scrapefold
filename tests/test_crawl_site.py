@@ -105,3 +105,50 @@ async def test_crawl_site_accepts_and_ignores_unimplemented_kwargs(
         cache_ttl_hours=24,
     )
     assert result_path == out
+
+
+# ---------------------------------------------------------------------------
+# Finding 3 (Codex P2 round-3): max_pages=0 / negative returns empty crawl
+# ---------------------------------------------------------------------------
+
+
+async def test_crawl_site_zero_max_pages_returns_empty(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """opts.max_pages=0 returns a Path to an empty file; discover_urls is not called."""
+
+    async def _fail_discover(*_args: object, **_kwargs: object) -> list[str]:
+        raise AssertionError("discover_urls must not be called when max_pages=0")
+
+    monkeypatch.setattr("scrapefold.crawler.sitemap.discover_urls", _fail_discover)
+
+    out = tmp_path / "zero.md"
+    result_path = await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=0),
+        output=out,
+    )
+    assert result_path == out
+    assert out.read_text() == ""
+
+
+async def test_crawl_site_negative_max_pages_returns_empty(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """opts.max_pages=-1 returns a Path to an empty file; discover_urls is not called."""
+
+    async def _fail_discover(*_args: object, **_kwargs: object) -> list[str]:
+        raise AssertionError("discover_urls must not be called when max_pages<0")
+
+    monkeypatch.setattr("scrapefold.crawler.sitemap.discover_urls", _fail_discover)
+
+    out = tmp_path / "neg.md"
+    result_path = await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=-1),
+        output=out,
+    )
+    assert result_path == out
+    assert out.read_text() == ""

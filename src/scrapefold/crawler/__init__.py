@@ -31,7 +31,11 @@ async def crawl(
     from scrapefold import scrape  # local import — avoids circular
 
     opts = opts or ScrapeOptions()
-    max_pages = opts.max_pages if opts.max_pages else 100
+    max_pages = opts.max_pages if opts.max_pages is not None else 100
+    if max_pages <= 0:
+        if output is None:
+            output = Path(tempfile.gettempdir()) / "scrapefold-crawl.md"
+        return write_stitched([], Path(output))
 
     urls = await sitemap.discover_urls(
         root,
