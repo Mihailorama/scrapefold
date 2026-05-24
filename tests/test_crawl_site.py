@@ -81,11 +81,13 @@ async def test_crawl_site_honors_max_pages(
 async def test_crawl_site_default_output_under_tmp(
     stub_discover: None, stub_scrape: dict[str, Any]
 ) -> None:
-    # No output= given → crawl_site picks a sensible default
+    # No output= given → crawl_site picks a unique temp file
     result_path = await scrapefold.crawl_site(
         "https://example.com/", opts=ScrapeOptions(max_pages=1)
     )
     assert result_path.exists()
+    assert result_path.name.startswith("scrapefold-crawl-")
+    assert result_path.suffix == ".md"
     result_path.unlink()  # cleanup
 
 
@@ -152,3 +154,43 @@ async def test_crawl_site_negative_max_pages_returns_empty(
     )
     assert result_path == out
     assert out.read_text() == ""
+
+
+# ---------------------------------------------------------------------------
+# Finding 2 (Codex P2 round-4): unique default output paths
+# ---------------------------------------------------------------------------
+
+
+async def test_crawl_site_default_output_paths_are_unique(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two successive default crawls produce two distinct output files."""
+
+    async def _fake_discover(root: str, *, max_urls: int, **_kwargs: object) -> list[str]:
+        return ["https://example.com/"][:max_urls]
+
+    async def _fake_scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+        return ScrapeResult(
+            url=url,
+            text=f"text-{url}",
+            markdown=f"# {url}",
+            html=None,
+            engine="stub",
+            elapsed_ms=1,
+        )
+
+    monkeypatch.setattr("scrapefold.crawler.sitemap.discover_urls", _fake_discover)
+    monkeypatch.setattr("scrapefold.crawler.scrape", _fake_scrape, raising=False)
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+    result_a = await scrapefold.crawl_site("https://example.com/", opts=ScrapeOptions(max_pages=1))
+    result_b = await scrapefold.crawl_site("https://example.com/", opts=ScrapeOptions(max_pages=1))
+
+    assert result_a != result_b, "default output paths must be unique across crawls"
+    assert result_a.name.startswith("scrapefold-crawl-")
+    assert result_b.name.startswith("scrapefold-crawl-")
+
+    # cleanup
+    for p in (result_a, result_b):
+        if p.exists():
+            p.unlink()
