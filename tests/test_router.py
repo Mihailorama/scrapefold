@@ -1298,6 +1298,110 @@ async def test_walk_unavailable_engine_deduped_but_not_counted(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# 38. Cost-budget skip-engine instead of halt-walk
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_skips_costly_engine_but_continues_to_free_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cost-too-high on engine X must not block free engine Y later in the walk.
+
+    Two engines: paid_engine (cost=0.01), free_engine (cost=0.0).
+    max_cost_usd=0.0 → paid_engine skipped, free_engine still tried and wins.
+    """
+    from scrapefold.router import walk
+
+    paid_called: list[bool] = []
+
+    async def _fetch_paid(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        paid_called.append(True)
+        return _make_result("cost_paid_engine", url=url)
+
+    paid_engine = type(
+        "_StubCostPaid",
+        (ScrapeEngine,),
+        {
+            "NAME": "cost_paid_engine",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=True, estimated_cost_usd=0.01),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_paid,
+        },
+    )
+    free_engine = _stub_engine("cost_free_engine", "good")
+
+    monkeypatch.setitem(_REGISTRY, "cost_paid_engine", lambda: paid_engine)
+    monkeypatch.setitem(_REGISTRY, "cost_free_engine", lambda: free_engine)
+
+    opts = ScrapeOptions(
+        engines=("cost_paid_engine", "cost_free_engine"),
+        extra={"max_cost_usd": 0.0, "policy": Policy(paid_allowed=True)},
+    )
+    result = await walk("https://example.com/", opts)
+
+    # paid engine must never have been invoked.
+    assert paid_called == [], "paid engine must not be called when max_cost_usd=0"
+    # free engine wins — walk must NOT have halted at the paid engine.
+    assert result.engine == "cost_free_engine"
+    # Failures must record the budget skip for the paid engine.
+    assert any("cost_paid_engine" in f and "budget:cost" in f for f in result.failures), (
+        f"expected budget:cost skip for paid engine; got {result.failures}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 39. Empty geography=() means global, passes geography_required gate
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_geography_required_allows_global_engines(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Engines with empty geography=() are global and pass geography_required gate.
+
+    Engine has geography=(), policy has geography_required='eu'.
+    Engine is NOT skipped; engine is invoked and wins.
+    """
+    from scrapefold.router import walk
+
+    global_engine_called: list[bool] = []
+
+    async def _fetch_global(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        global_engine_called.append(True)
+        return _make_result("geo_global", url=url)
+
+    global_engine = type(
+        "_StubGeoGlobal",
+        (ScrapeEngine,),
+        {
+            "NAME": "geo_global",
+            # Empty geography = global / no preference → should pass any geography_required
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False, geography=()),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_global,
+        },
+    )
+
+    monkeypatch.setitem(_REGISTRY, "geo_global", lambda: global_engine)
+
+    opts = ScrapeOptions(
+        engines=("geo_global",),
+        extra={"policy": Policy(geography_required="eu")},
+    )
+    result = await walk("https://example.com/", opts)
+
+    # Global engine must have been invoked and must win.
+    assert global_engine_called == [True], (
+        "global engine (geography=()) must be called when geography_required='eu'"
+    )
+    assert result.engine == "geo_global"
+    # No geography skip must appear in failures.
+    assert not any("geo_global" in f and "skipped:geography" in f for f in result.failures), (
+        f"global engine must not be blocked by geography gate; got {result.failures}"
+    )
+
+
 async def test_walk_helper_increments_budget_on_engine_error(
     stub_ladder: Any,
     monkeypatch: pytest.MonkeyPatch,
