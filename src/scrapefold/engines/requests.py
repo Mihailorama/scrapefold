@@ -52,13 +52,39 @@ async def _fetch_with_same_host_redirects(
     follow_subdomains: bool = scope.get("follow_subdomains", False)
 
     for _ in range(max_hops):
-        resp = await client.get(current, headers=headers)
+        try:
+            resp = await client.get(current, headers=headers)
+        except httpx.RemoteProtocolError as exc:
+            # httpx parses the Location header even with follow_redirects=False;
+            # a malformed Location (e.g. unterminated IPv6 bracket) raises
+            # RemoteProtocolError before we can inspect it ourselves.  Treat it
+            # as a scope violation so the router terminates the walk.
+            raise RedirectScopeViolation(
+                engine="requests",
+                message=(
+                    f"malformed redirect Location header rejected by same_host_redirect_scope "
+                    f"(root={root!r} httpx_error={exc!s})"
+                ),
+                elapsed_ms=0,
+                target=current,
+            ) from None
         if resp.status_code not in _REDIRECT_STATUS:
             return resp
         location = resp.headers.get("location")
         if not location:
             return resp
-        target = urljoin(current, location)
+        try:
+            target = urljoin(current, location)
+        except ValueError:
+            raise RedirectScopeViolation(
+                engine="requests",
+                message=(
+                    f"malformed redirect Location header rejected by same_host_redirect_scope "
+                    f"(root={root!r} location={location!r})"
+                ),
+                elapsed_ms=0,
+                target=location,
+            ) from None
         if not _same_host(target, root, follow_subdomains):
             raise RedirectScopeViolation(
                 engine="requests",

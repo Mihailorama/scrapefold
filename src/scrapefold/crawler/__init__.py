@@ -65,7 +65,15 @@ async def _preflight_head(
     if not location:
         return True  # malformed redirect — let scrape engine handle it
 
-    target = urljoin(url, location)
+    try:
+        target = urljoin(url, location)
+    except ValueError:
+        logger.debug(
+            "crawler: malformed Location header %r in preflight for %s — skipping url",
+            location,
+            url,
+        )
+        return False
     if _same_host(target, root, follow_subdomains):
         return True  # same-host redirect — safe
 

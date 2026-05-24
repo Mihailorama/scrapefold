@@ -355,3 +355,68 @@ async def test_crawl_site_preflight_200_proceeds_to_scrape(
     )
 
     assert "https://example.com/page" in scraped_urls, "200 HEAD response must not block the scrape"
+
+
+# ---------------------------------------------------------------------------
+# Codex round-9 P2: preflight HEAD — malformed Location header must not raise ValueError
+# ---------------------------------------------------------------------------
+
+
+async def test_crawl_site_preflight_skips_url_with_malformed_location(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 302 with a malformed Location header in HEAD MUST NOT raise ValueError.
+
+    The URL should be skipped (treated as unsafe), not abort the crawl.
+    """
+    import httpx
+
+    scraped_urls: list[str] = []
+
+    async def _fake_discover(root: str, *, max_urls: int, **_kwargs: object) -> list[str]:
+        return ["https://example.com/bad-redirect", "https://example.com/safe"][:max_urls]
+
+    async def _fake_scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+        scraped_urls.append(url)
+        return ScrapeResult(
+            url=url,
+            text=f"text-{url}",
+            markdown=f"# {url}",
+            html=None,
+            engine="stub",
+            elapsed_ms=1,
+        )
+
+    monkeypatch.setattr("scrapefold.crawler.sitemap.discover_urls", _fake_discover)
+    monkeypatch.setattr("scrapefold.crawler.scrape", _fake_scrape, raising=False)
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+    async def _fake_head(
+        self: httpx.AsyncClient,
+        url: str,
+        **kwargs: object,
+    ) -> httpx.Response:
+        if "bad-redirect" in url:
+            # 302 with a malformed Location header (unterminated IPv6 bracket)
+            return httpx.Response(
+                302,
+                headers={"location": "http://[::1"},
+                request=httpx.Request("HEAD", url),
+            )
+        return httpx.Response(200, request=httpx.Request("HEAD", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "head", _fake_head)
+
+    out = tmp_path / "out.md"
+    # Must not raise ValueError; malformed Location causes URL to be skipped.
+    await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=5),
+        output=out,
+    )
+
+    assert "https://example.com/bad-redirect" not in scraped_urls, (
+        "URL with malformed Location header must be skipped"
+    )
+    assert "https://example.com/safe" in scraped_urls, "safe URL must still be scraped"

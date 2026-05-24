@@ -58,7 +58,15 @@ async def _fetch(
         location = resp.headers.get("location")
         if not location:
             return resp
-        target = urljoin(current, location)
+        try:
+            target = urljoin(current, location)
+        except ValueError:
+            logger.debug(
+                "sitemap: malformed Location header %r during redirect from %s — aborting",
+                location,
+                current,
+            )
+            return None
         if root is not None and not _same_host(target, root, follow_subdomains):
             logger.debug(
                 "sitemap: redirect to off-host target rejected (root=%s target=%s)",
@@ -126,7 +134,11 @@ def _bfs_links_from_html(html: str, *, base_url: str) -> list[str]:
         href = (raw_href if isinstance(raw_href, str) else str(raw_href)).strip()
         if not href:
             continue
-        out.append(urljoin(base_url, href))
+        try:
+            out.append(urljoin(base_url, href))
+        except ValueError:
+            logger.debug("sitemap: malformed href %r in %s — skipped", href, base_url)
+            continue
     return out
 
 

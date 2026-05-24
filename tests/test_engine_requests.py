@@ -11,7 +11,7 @@ import json
 import pytest
 from pytest_httpx import HTTPXMock
 
-from scrapefold.engines.base import EngineError
+from scrapefold.engines.base import EngineError, RedirectScopeViolation
 from scrapefold.engines.requests import RequestsEngine
 from scrapefold.options import ScrapeOptions
 
@@ -476,3 +476,37 @@ async def test_requests_engine_allows_www_normalised_same_host(
     )
     result = await _engine().scrape("https://www.example.com/page", opts)
     assert result.meta["status_code"] == 200
+
+
+# ---------------------------------------------------------------------------
+# Codex round-9 P2: malformed Location header raises RedirectScopeViolation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_requests_engine_malformed_location_raises_redirect_scope_violation(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """With same_host_redirect_scope set, a malformed Location header raises
+    RedirectScopeViolation (not ValueError), so the router terminates the walk
+    rather than escalating to another engine.
+    """
+    httpx_mock.add_response(
+        url="https://example.com/page",
+        status_code=302,
+        headers={"location": "http://[::1"},
+    )
+    # No mock for the malformed target — engine must abort before following the hop.
+
+    opts = ScrapeOptions(
+        extra={
+            "same_host_redirect_scope": {
+                "root": "https://example.com",
+                "follow_subdomains": False,
+            }
+        }
+    )
+    # Must raise RedirectScopeViolation (not ValueError) so the router
+    # terminates the walk instead of escalating.
+    with pytest.raises(RedirectScopeViolation):
+        await _engine().scrape("https://example.com/page", opts)

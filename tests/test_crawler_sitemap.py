@@ -504,3 +504,58 @@ async def test_parse_sitemap_handles_namespace_less_xml(httpx_mock: HTTPXMock) -
     urls = await discover_urls("https://example.com")
     assert "https://example.com/a" in urls
     assert "https://example.com/b" in urls
+
+
+# ---------------------------------------------------------------------------
+# Codex round-9 P2: urljoin() guards — malformed URLs must not raise ValueError
+# ---------------------------------------------------------------------------
+
+
+async def test_bfs_links_from_html_skips_malformed_href(httpx_mock: HTTPXMock) -> None:
+    """A malformed href (e.g. unterminated IPv6 bracket) MUST NOT abort BFS discovery."""
+    httpx_mock.add_response(url="https://example.com/sitemap.xml", status_code=404)
+    httpx_mock.add_response(url="https://example.com/robots.txt", status_code=404)
+    # Root page: one good link and one malformed href that triggers ValueError in urljoin.
+    httpx_mock.add_response(
+        url="https://example.com/",
+        status_code=200,
+        html=(
+            "<html><body>"
+            '<a href="/good">Good</a>'
+            '<a href="http://[::1">Malformed IPv6</a>'
+            "</body></html>"
+        ),
+        headers={"content-type": "text/html"},
+    )
+    httpx_mock.add_response(
+        url="https://example.com/good",
+        status_code=200,
+        html="<html><body>Good page</body></html>",
+        headers={"content-type": "text/html"},
+    )
+
+    # Must not raise ValueError; malformed href is silently dropped.
+    urls = await discover_urls("https://example.com/", max_urls=100, max_depth=2)
+
+    assert "https://example.com/good" in urls
+    # Malformed IPv6 URL must not appear in results
+    assert not any("[::1" in u for u in urls)
+
+
+@pytest.mark.httpx_mock(assert_all_responses_were_requested=False)
+async def test_sitemap_fetch_skips_malformed_location_header(httpx_mock: HTTPXMock) -> None:
+    """A sitemap redirect with a malformed Location header MUST NOT raise ValueError."""
+    # /sitemap.xml returns 302 with a malformed Location header.
+    httpx_mock.add_response(
+        url="https://example.com/sitemap.xml",
+        status_code=302,
+        headers={"location": "http://[::1"},
+        text="",
+    )
+    # Tier 2 and 3 fallbacks absent so we get empty result.
+    httpx_mock.add_response(url="https://example.com/robots.txt", status_code=404)
+    httpx_mock.add_response(url="https://example.com/", status_code=404)
+
+    # Must not raise ValueError; malformed redirect is treated as fetch failure.
+    urls = await discover_urls("https://example.com/", max_urls=100)
+    assert urls == []
