@@ -144,9 +144,13 @@ async def _attempt_engine(
             failures.append(f"{canonical}:skipped:legal:{sorted(blocked)}")
             return _AttemptResult(result=None, keep_walking=True)
 
-    # 3c. Policy gate — geography_required
+    # 3c. Policy gate — geography_required.
+    # Empty geography=() means "global / no preference" — those engines pass.
+    # Only block engines that declare a non-empty geography that excludes the
+    # required region.
     if (
         policy.geography_required
+        and engine_cls.CAPABILITIES.geography  # non-empty → engine has a declared region
         and policy.geography_required not in engine_cls.CAPABILITIES.geography
     ):
         logger.debug(
@@ -161,12 +165,14 @@ async def _attempt_engine(
         failures.append("budget:max_engines")
         return _AttemptResult(result=None, keep_walking=False)
 
-    # 5. Cost budget — use engine CAPABILITIES, not step metadata
+    # 5. Cost budget — use engine CAPABILITIES, not step metadata.
+    # Cost-too-high is per-engine, not walk-wide: a cheaper engine downstream
+    # may still be tried, so we skip this engine but keep walking.
     engine_cost = float(engine_cls.CAPABILITIES.estimated_cost_usd or 0.0)
     if budget_cost_usd + engine_cost > max_cost_usd:
-        logger.info("router: walk halted budget=cost")
+        logger.debug("router: skip engine=%s reason=budget:cost", canonical)
         failures.append(f"{canonical}:skipped:budget:cost")
-        return _AttemptResult(result=None, keep_walking=False)
+        return _AttemptResult(result=None, keep_walking=True)
 
     # 6. Availability — checked BEFORE crediting the budget counter.
     # Unavailable engines are added to dedup_seen (so duplicates in the list
