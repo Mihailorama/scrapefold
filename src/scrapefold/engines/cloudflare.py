@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 import httpx
 
@@ -111,7 +112,12 @@ class CloudflareEngine(ScrapeEngine):
         endpoint_calls: list[str] = []
         cost_usd = 0.0
 
-        async with httpx.AsyncClient(timeout=float(opts.timeout_s)) as client:
+        # Track a wall-clock deadline so the /content fallback cannot spend a
+        # second full timeout_s on top of the time already consumed by /markdown.
+        timeout_s = float(opts.timeout_s)
+        deadline = time.monotonic() + timeout_s
+
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
             # Step 1: /markdown
             md_resp = await client.post(f"{base_url}/markdown", headers=headers, json=body)
             endpoint_calls.append("markdown")
@@ -156,13 +162,30 @@ class CloudflareEngine(ScrapeEngine):
                     elapsed_ms=0,
                 )
 
-            # Step 2: /content fallback — second paid request
+            # Step 2: /content fallback — second paid request.
+            # Use remaining time (deadline - now) so this call cannot spend another
+            # full timeout_s on top of what /markdown already consumed.
+            remaining = deadline - time.monotonic()
+            if remaining <= 1.0:
+                raise EngineError(
+                    engine=self.NAME,
+                    message=(
+                        f"timeout exhausted after /markdown for {url}; "
+                        f"cannot retry /content (remaining={remaining:.1f}s)"
+                    ),
+                    elapsed_ms=0,
+                )
+
             logger.debug(
-                "engine=cloudflare /markdown empty/non-200 (%d) for %s; trying /content",
+                "engine=cloudflare /markdown empty/non-200 (%d) for %s; trying /content"
+                " (remaining=%.1fs)",
                 md_resp.status_code,
                 url,
+                remaining,
             )
-            html_resp = await client.post(f"{base_url}/content", headers=headers, json=body)
+            html_resp = await client.post(
+                f"{base_url}/content", headers=headers, json=body, timeout=remaining
+            )
             endpoint_calls.append("content")
             cost_usd += self._PER_REQUEST_USD
 

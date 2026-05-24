@@ -289,6 +289,64 @@ def test_marker_present() -> None:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# 15. Timeout exhausted after /markdown → raises EngineError, /content NOT called
+# ---------------------------------------------------------------------------
+
+
+async def test_fallback_raises_when_timeout_exhausted(
+    httpx_mock: HTTPXMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If /markdown consumes nearly all timeout_s, /content is NOT called and EngineError
+    is raised (remaining <= 1.0s guard).
+
+    Strategy A (behavioral): monkeypatch time.monotonic so that by the time the deadline
+    check runs the remaining time is 0 s (i.e. deadline has already passed).
+    Only /markdown is mocked; if /content were called the httpx_mock fixture would raise
+    an un-mocked request error, making the assertion doubly enforced.
+    """
+    import scrapefold.engines.cloudflare as cf_module
+
+    # time.monotonic() is called by:
+    #   base.scrape:  call 1 → started
+    #   cloudflare._fetch: call 2 → deadline = t0 + timeout_s
+    #   cloudflare._fetch: call 3 → remaining check (post-/markdown) — must be >= deadline
+    #   base.scrape:  call 4 → elapsed calculation after EngineError
+    # We want remaining = deadline - call3 <= 0, so call3 >= t0 + timeout_s.
+    t0 = 1_000.0
+    timeout_s = 10.0
+    # call1=t0, call2=t0 (deadline set), call3=t0+timeout_s (no remaining), call4=t0+timeout_s
+    call_values: list[float] = [t0, t0, t0 + timeout_s, t0 + timeout_s]
+    call_index = {"i": 0}
+
+    def _mock_monotonic() -> float:
+        idx = call_index["i"]
+        call_index["i"] += 1
+        if idx < len(call_values):
+            return call_values[idx]
+        return call_values[-1]  # any extra calls get the last value
+
+    monkeypatch.setattr(cf_module.time, "monotonic", _mock_monotonic)
+
+    # Only /markdown is registered; /content must NOT be called.
+    httpx_mock.add_response(url=_MD_URL, method="POST", json={"result": ""})
+
+    with pytest.raises(EngineError) as excinfo:
+        await _engine().scrape(_TARGET_URL, ScrapeOptions(timeout_s=timeout_s))
+
+    assert "timeout exhausted" in str(excinfo.value).lower()
+    # Exactly one request must have been made (/markdown only).
+    assert len(httpx_mock.get_requests()) == 1, (
+        "/content must NOT be called when timeout is exhausted after /markdown"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 14. /markdown endpoint returns {"result": {"markdown": null}} — must fall back
+# ---------------------------------------------------------------------------
+
+
 async def test_markdown_endpoint_null_markdown_falls_back(httpx_mock: HTTPXMock) -> None:
     """{"result": {"markdown": null}} must trigger /content fallback, not return 'None'."""
     httpx_mock.add_response(
