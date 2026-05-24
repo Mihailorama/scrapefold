@@ -257,6 +257,60 @@ async def test_crawl_site_skips_url_that_redirects_off_host(
     assert "https://example.com/safe" in scraped_urls, "non-redirecting URL must still be scraped"
 
 
+async def test_crawl_site_injects_redirect_scope_into_per_url_opts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """crawl_site MUST inject same_host_redirect_scope into opts.extra for each scrape call."""
+    import httpx
+
+    captured: list[tuple[str, object]] = []
+
+    async def _fake_discover(root: str, *, max_urls: int, **_kwargs: object) -> list[str]:
+        return ["https://example.com/a", "https://example.com/b"][:max_urls]
+
+    async def _fake_scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+        scope = (opts.extra or {}).get("same_host_redirect_scope")
+        captured.append((url, scope))
+        return ScrapeResult(
+            url=url,
+            text=f"text-{url}",
+            markdown=f"# {url}",
+            html=None,
+            engine="stub",
+            elapsed_ms=1,
+        )
+
+    monkeypatch.setattr("scrapefold.crawler.sitemap.discover_urls", _fake_discover)
+    monkeypatch.setattr("scrapefold.crawler.scrape", _fake_scrape, raising=False)
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+    async def _fake_head(
+        self: httpx.AsyncClient,
+        url: str,
+        **kwargs: object,
+    ) -> httpx.Response:
+        return httpx.Response(200, request=httpx.Request("HEAD", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "head", _fake_head)
+
+    out = tmp_path / "out.md"
+    await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=5),
+        output=out,
+    )
+
+    assert len(captured) == 2, "both discovered URLs should be scraped"
+    for url, scope in captured:
+        assert scope is not None, f"same_host_redirect_scope must be set for {url}"
+        assert isinstance(scope, dict)
+        assert scope["root"] == "https://example.com/", (
+            f"scope root must equal the crawl root, got {scope['root']!r}"
+        )
+        assert "follow_subdomains" in scope
+
+
 async def test_crawl_site_preflight_200_proceeds_to_scrape(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
+from urllib.parse import urljoin
 
 import httpx
 
-from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
+from scrapefold._host_utils import same_host as _same_host
+from scrapefold.engines.base import EngineCapabilities, EngineError, ScrapeEngine
 from scrapefold.html_to_text import html_to_both
 from scrapefold.options import ScrapeOptions, build_target_headers
 from scrapefold.result import ScrapeResult
@@ -19,6 +22,52 @@ from scrapefold.result import ScrapeResult
 logger = logging.getLogger(__name__)
 
 _DEFAULT_USER_AGENT = "scrapefold-requests/0.1"
+_REDIRECT_STATUS = frozenset({301, 302, 303, 307, 308})
+
+
+async def _fetch_with_same_host_redirects(
+    client: httpx.AsyncClient,
+    url: str,
+    headers: dict[str, str],
+    *,
+    scope: dict[str, Any],
+    max_hops: int = 5,
+) -> httpx.Response:
+    """Manually follow redirects, rejecting any off-host target.
+
+    When a redirect target is not on the same host as *scope["root"]*,
+    raises :class:`~scrapefold.engines.base.EngineError` so the router
+    treats it like any other engine failure (escalation or abort).
+
+    *scope* keys:
+      - ``"root"``             — the anchor URL for host comparison.
+      - ``"follow_subdomains"`` — forwarded to :func:`~scrapefold._host_utils.same_host`.
+    """
+    current = url
+    root: str = scope["root"]
+    follow_subdomains: bool = scope.get("follow_subdomains", False)
+
+    for _ in range(max_hops):
+        resp = await client.get(current, headers=headers)
+        if resp.status_code not in _REDIRECT_STATUS:
+            return resp
+        location = resp.headers.get("location")
+        if not location:
+            return resp
+        target = urljoin(current, location)
+        if not _same_host(target, root, follow_subdomains):
+            raise EngineError(
+                engine="requests",
+                message=(
+                    f"redirect to off-host target rejected by same_host_redirect_scope "
+                    f"(root={root!r} target={target!r})"
+                ),
+                elapsed_ms=0,
+            )
+        current = target
+
+    # Exhausted hops — return whatever the last response was.
+    return resp  # type: ignore[return-value]  # always assigned inside the loop
 
 
 class RequestsEngine(ScrapeEngine):
@@ -50,21 +99,35 @@ class RequestsEngine(ScrapeEngine):
             "custom_headers",
             "cookies",
             "timeout_s",
+            "extra",  # carries same_host_redirect_scope and other escape-hatch keys
         }
     )
 
     async def _fetch(self, url: str, opts: ScrapeOptions) -> ScrapeResult:
-        """Fetch *url* with the given options and return a ``ScrapeResult``."""
+        """Fetch *url* with the given options and return a ``ScrapeResult``.
+
+        When ``opts.extra["same_host_redirect_scope"]`` is set to a dict with
+        keys ``"root"`` (str) and optionally ``"follow_subdomains"`` (bool),
+        redirects are followed manually and any hop that leaves the declared
+        host raises :class:`~scrapefold.engines.base.EngineError`.  This is
+        the engine-level SSRF guard; the crawler's HEAD pre-flight is a
+        cheap early-skip on top of it.
+        """
         # Cookies travel via the httpx client; the rest go as headers.
         headers = build_target_headers(opts, include_cookies=False)
         headers.setdefault("User-Agent", _DEFAULT_USER_AGENT)
 
+        scope = opts.extra.get("same_host_redirect_scope") if opts.extra else None
+
         async with httpx.AsyncClient(
             timeout=float(opts.timeout_s),
-            follow_redirects=True,
+            follow_redirects=scope is None,  # manual loop when scope is set
             cookies=opts.cookies or {},
         ) as client:
-            response = await client.get(url, headers=headers)
+            if scope is None:
+                response = await client.get(url, headers=headers)
+            else:
+                response = await _fetch_with_same_host_redirects(client, url, headers, scope=scope)
 
         content_type = response.headers.get("content-type", "")
         ct_base = content_type.split(";")[0].strip().lower()

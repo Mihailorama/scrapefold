@@ -351,3 +351,128 @@ async def test_binary_content_type_yields_empty_text(httpx_mock: HTTPXMock) -> N
     assert result.markdown == ""
     assert result.html is None
     assert result.meta["status_code"] == 200
+
+
+# ---------------------------------------------------------------------------
+# 17. same_host_redirect_scope — off-host redirect → EngineError raised
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_requests_engine_rejects_offhost_redirect_when_scope_set(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """With same_host_redirect_scope set, an off-host 302 raises EngineError."""
+    httpx_mock.add_response(
+        url="https://example.com/page",
+        status_code=302,
+        headers={"location": "http://internal.corp/secret"},
+    )
+    # No mock for internal.corp — engine must abort before following the hop.
+
+    opts = ScrapeOptions(
+        extra={
+            "same_host_redirect_scope": {
+                "root": "https://example.com",
+                "follow_subdomains": False,
+            }
+        }
+    )
+    with pytest.raises(EngineError, match="off-host"):
+        await _engine().scrape("https://example.com/page", opts)
+
+
+# ---------------------------------------------------------------------------
+# 18. same_host_redirect_scope — same-host redirect → followed normally
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_requests_engine_follows_same_host_redirect_when_scope_set(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """Same-host 302 is followed and the final response is returned."""
+    httpx_mock.add_response(
+        url="https://example.com/page",
+        status_code=302,
+        headers={"location": "https://example.com/new-page"},
+    )
+    httpx_mock.add_response(
+        url="https://example.com/new-page",
+        status_code=200,
+        headers={"content-type": "text/html"},
+        text="<html><body>hello</body></html>",
+    )
+
+    opts = ScrapeOptions(
+        extra={
+            "same_host_redirect_scope": {
+                "root": "https://example.com",
+                "follow_subdomains": False,
+            }
+        }
+    )
+    result = await _engine().scrape("https://example.com/page", opts)
+    assert "hello" in result.text
+    assert result.meta["status_code"] == 200
+
+
+# ---------------------------------------------------------------------------
+# 19. No scope → httpx default follow_redirects=True (regression guard)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_requests_engine_follows_redirects_normally_when_no_scope(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """Without a scope, existing redirect behavior is unchanged."""
+    httpx_mock.add_response(
+        url="https://example.com/old",
+        status_code=301,
+        headers={"location": "https://example.com/new"},
+        text="",
+    )
+    httpx_mock.add_response(
+        url="https://example.com/new",
+        status_code=200,
+        headers={"content-type": "text/plain"},
+        text="final",
+    )
+    result = await _engine().scrape("https://example.com/old")
+    assert result.meta["status_code"] == 200
+    assert str(result.meta["final_url"]) == "https://example.com/new"
+
+
+# ---------------------------------------------------------------------------
+# 20. same_host_redirect_scope — off-host via www-strip normalisation passes
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_requests_engine_allows_www_normalised_same_host(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """www.example.com → example.com redirect is treated as same-host."""
+    httpx_mock.add_response(
+        url="https://www.example.com/page",
+        status_code=301,
+        headers={"location": "https://example.com/page"},
+    )
+    httpx_mock.add_response(
+        url="https://example.com/page",
+        status_code=200,
+        headers={"content-type": "text/plain"},
+        text="ok",
+    )
+
+    opts = ScrapeOptions(
+        extra={
+            "same_host_redirect_scope": {
+                "root": "https://www.example.com",
+                "follow_subdomains": False,
+            }
+        }
+    )
+    result = await _engine().scrape("https://www.example.com/page", opts)
+    assert result.meta["status_code"] == 200
