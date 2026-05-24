@@ -33,7 +33,11 @@ async def crawl(
     opts = opts or ScrapeOptions()
     max_pages = opts.max_pages if opts.max_pages else 100
 
-    urls = await sitemap.discover_urls(root, max_urls=max_pages)
+    urls = await sitemap.discover_urls(
+        root,
+        max_urls=max_pages,
+        follow_subdomains=opts.follow_subdomains,
+    )
     logger.info("crawler: discovered %d urls from %s", len(urls), root)
 
     if not urls:

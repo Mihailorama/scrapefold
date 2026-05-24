@@ -71,12 +71,21 @@ def _bfs_links_from_html(html: str, *, base_url: str) -> list[str]:
     return out
 
 
-async def discover_urls(root: str, *, max_urls: int = 100) -> list[str]:
+async def discover_urls(
+    root: str,
+    *,
+    max_urls: int = 100,
+    follow_subdomains: bool = False,
+) -> list[str]:
     """Discover same-host crawlable URLs from *root*, capped at *max_urls*.
 
     Tries `<root>/sitemap.xml`, then `<root>/robots.txt` Sitemap directives,
     then BFS from the root page's links. Returns filtered, deduped,
     discovery-order URLs.
+
+    *follow_subdomains* is forwarded to :func:`~scrapefold.crawler.filters.filter_urls`.
+    When ``False`` (default) only the root host (www/apex-equivalent) is
+    accepted; when ``True`` all subdomains of the registered domain pass.
     """
     if max_urls <= 0:
         return []
@@ -107,7 +116,7 @@ async def discover_urls(root: str, *, max_urls: int = 100) -> list[str]:
                 if "html" in ct or "<html" in root_resp.text[:512].lower():
                     found = _bfs_links_from_html(root_resp.text, base_url=root)
 
-    filtered = filter_urls(found, root=root)
+    filtered = filter_urls(found, root=root, follow_subdomains=follow_subdomains)
     return filtered[:max_urls]
 
 

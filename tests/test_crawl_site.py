@@ -34,7 +34,7 @@ def stub_scrape(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 @pytest.fixture
 def stub_discover(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _fake_discover(root: str, *, max_urls: int) -> list[str]:
+    async def _fake_discover(root: str, *, max_urls: int, **_kwargs: object) -> list[str]:
         return [
             "https://example.com/",
             "https://example.com/a",
