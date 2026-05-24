@@ -440,3 +440,41 @@ async def test_sitemap_fetch_rejects_offhost_redirect(httpx_mock: HTTPXMock) -> 
         f"Off-host redirect target was fetched: {[r.url for r in all_requests]}"
     )
     assert urls == []
+
+
+# ---------------------------------------------------------------------------
+# Finding 2 (Codex P2 round-3): BFS skips non-crawlable links before fetch
+# ---------------------------------------------------------------------------
+
+
+async def test_bfs_fallback_skips_non_crawlable_links(httpx_mock: HTTPXMock) -> None:
+    """BFS does NOT fetch /logout or *.pdf links found in same-host HTML."""
+    httpx_mock.add_response(url="https://example.com/sitemap.xml", status_code=404)
+    httpx_mock.add_response(url="https://example.com/robots.txt", status_code=404)
+    # Root links to /good, /logout (auth-protected), and a PDF.
+    httpx_mock.add_response(
+        url="https://example.com/",
+        status_code=200,
+        html=(
+            "<html><body>"
+            '<a href="/good">Good</a>'
+            '<a href="/logout">Logout</a>'
+            '<a href="/file.pdf">PDF</a>'
+            "</body></html>"
+        ),
+        headers={"content-type": "text/html"},
+    )
+    httpx_mock.add_response(
+        url="https://example.com/good",
+        status_code=200,
+        html="<html><body>Good page</body></html>",
+        headers={"content-type": "text/html"},
+    )
+
+    urls = await discover_urls("https://example.com/", max_urls=100, max_depth=3)
+
+    all_requests = httpx_mock.get_requests()
+    fetched = [str(r.url) for r in all_requests]
+    assert not any("/logout" in u for u in fetched), f"/logout was fetched: {fetched}"
+    assert not any("file.pdf" in u for u in fetched), f"PDF was fetched: {fetched}"
+    assert "https://example.com/good" in urls

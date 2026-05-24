@@ -16,7 +16,7 @@ import httpx
 import tldextract
 from bs4 import BeautifulSoup
 
-from scrapefold.crawler.filters import filter_urls
+from scrapefold.crawler.filters import filter_urls, is_crawlable
 
 logger = logging.getLogger(__name__)
 
@@ -330,7 +330,11 @@ async def _bfs_crawl(
         if depth < max_depth:
             links = _bfs_links_from_html(resp.text, base_url=url)
             for link in links:
-                if link not in visited and _same_host(link, root, follow_subdomains):
+                if (
+                    link not in visited
+                    and _same_host(link, root, follow_subdomains)
+                    and is_crawlable(link)
+                ):
                     queue.append((link, depth + 1))
 
     return found
