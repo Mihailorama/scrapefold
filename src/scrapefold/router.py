@@ -193,6 +193,16 @@ async def _attempt_engine(
     try:
         result = await engine.scrape(url, opts)
     except EngineError as exc:
+        # If the underlying cause is an ImportError the SDK is not installed.
+        # Treat that as "unavailable" — no paid call was made so no cost is
+        # credited and the slot is NOT consumed.
+        if isinstance(exc.__cause__, ImportError):
+            import_exc: ImportError = exc.__cause__
+            budget_engines_tried.discard(canonical)
+            mod = import_exc.name or str(import_exc)
+            logger.debug("router: skip engine=%s reason=missing_sdk:%s", canonical, mod)
+            failures.append(f"{canonical}:unavailable:missing_sdk:{mod}")
+            return _AttemptResult(result=None, keep_walking=True, cost_delta=0.0, elapsed_delta=0.0)
         # Credit cost even on error — the paid request was made.
         failures.append(f"{canonical}:error:{exc.message}")
         return _AttemptResult(

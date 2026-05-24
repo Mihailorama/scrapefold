@@ -1615,3 +1615,60 @@ async def test_walk_timeout_boundary_halts_walk(
         "boundary_next must not be called when elapsed_accum_ms == timeout_s*1000"
     )
     assert any("budget:timeout" in f for f in exc_info.value.failures)
+
+
+# ---------------------------------------------------------------------------
+# 42. ImportError from scrape() is treated as unavailable — no slot consumed
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_treats_import_error_as_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Engine whose scrape() raises ImportError must not consume a budget slot.
+
+    Scenario: opts.engines=("missing_sdk", "next_good") with max_engines=1.
+    missing_sdk raises ImportError during _fetch(), so it must be treated as
+    unavailable — failures records :unavailable:missing_sdk:... and the engine
+    slot is NOT consumed.  next_good must still be tried and must win.
+    """
+    from scrapefold.router import walk
+
+    async def _fetch_missing_sdk(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        raise ImportError("No module named 'scrapling'", name="scrapling")
+
+    missing_sdk_engine = type(
+        "_StubMissingSDK",
+        (ScrapeEngine,),
+        {
+            "NAME": "missing_sdk",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_missing_sdk,
+        },
+    )
+    next_good_engine = _stub_engine("next_good_after_import_err", "good")
+
+    monkeypatch.setitem(_REGISTRY, "missing_sdk", lambda: missing_sdk_engine)
+    monkeypatch.setitem(_REGISTRY, "next_good_after_import_err", lambda: next_good_engine)
+
+    # max_engines=1 — if missing_sdk consumed the slot, next_good would be blocked.
+    opts = ScrapeOptions(
+        engines=("missing_sdk", "next_good_after_import_err"),
+        extra={"max_engines": 1},
+    )
+    result = await walk("https://example.com/", opts)
+
+    # next_good must win (missing_sdk did not consume the engine slot).
+    assert result.engine == "next_good_after_import_err", (
+        "engine after ImportError must still be tried when missing SDK engine doesn't consume slot"
+    )
+    # missing_sdk must appear as unavailable:missing_sdk in failures.
+    assert any("missing_sdk:unavailable:missing_sdk:" in f for f in result.failures), (
+        f"expected :unavailable:missing_sdk: entry; got {result.failures}"
+    )
+    # budget:max_engines must NOT appear (the slot was never consumed).
+    assert not any("budget:max_engines" in f for f in result.failures), (
+        f"budget:max_engines must not appear; ImportError engine did not consume a slot; "
+        f"failures={result.failures}"
+    )
