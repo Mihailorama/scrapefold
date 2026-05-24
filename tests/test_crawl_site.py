@@ -87,3 +87,21 @@ async def test_crawl_site_default_output_under_tmp(
     )
     assert result_path.exists()
     result_path.unlink()  # cleanup
+
+
+async def test_crawl_site_accepts_and_ignores_unimplemented_kwargs(
+    tmp_path: Path,
+    stub_discover: None,
+    stub_scrape: dict[str, Any],
+) -> None:
+    """README-documented kwargs (cache_dir, cache_ttl_hours) MUST NOT raise TypeError."""
+    out = tmp_path / "x.md"
+    # These kwargs are Pack 5 scope — for now they must be silently ignored.
+    result_path = await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=1),
+        output=out,
+        cache_dir=tmp_path / "cache",
+        cache_ttl_hours=24,
+    )
+    assert result_path == out

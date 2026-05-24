@@ -63,13 +63,23 @@ async def crawl_site(
     url: str,
     opts: ScrapeOptions | None = None,
     output: object | None = None,
+    **_unused: object,
 ) -> object:
     """Whole-site crawl → single markdown file.
 
     Discovers URLs from ``url`` (sitemap → robots → BFS), scrapes each
     via ``scrape()``, and writes a stitched .md file at ``output``
     (defaults to ``<tmp>/scrapefold-crawl.md``). Returns the output Path.
+
+    Unknown keyword arguments (e.g. ``cache_dir``, ``cache_ttl_hours``) are
+    accepted and silently ignored — they are planned for a future pack.
     """
+    import logging as _logging
+
+    if _unused:
+        _logging.getLogger(__name__).debug(
+            "crawl_site: ignoring unimplemented kwargs: %s", sorted(_unused.keys())
+        )
     from scrapefold.crawler import crawl
 
     return await crawl(url, opts=opts, output=output)  # type: ignore[arg-type]
