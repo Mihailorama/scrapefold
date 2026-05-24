@@ -15,9 +15,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, replace
 
+import tldextract
+
 from scrapefold.detection import is_suspicious
 from scrapefold.engines import get_engine
-from scrapefold.engines.base import EngineError
+from scrapefold.engines.base import EngineError, ScrapeEngine
 from scrapefold.ladders import (
     AllEnginesFailed,
     Policy,
@@ -26,6 +28,7 @@ from scrapefold.ladders import (
     SiteClass,
     WalkBudget,
     classify_url,
+    estimate_step_cost,
     get_default_policy,
     get_ladder,
 )
@@ -37,6 +40,28 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_ENGINES = 4
 _DEFAULT_MAX_COST_USD = 0.05
 _DEFAULT_AVG_RESPONSE_MB = 2.0
+
+# ---------------------------------------------------------------------------
+# Probe cache (P1 #7)
+# ---------------------------------------------------------------------------
+
+_PROBE_CACHE: dict[tuple[str, str], bool] = {}
+
+
+def _probe_scope_key(engine_cls: type[ScrapeEngine], url: str) -> tuple[str, str] | None:
+    """Return the ``(engine_name, scope_key)`` cache key, or ``None`` if scope=='none'."""
+    scope = getattr(engine_cls, "PROBE_SCOPE", "none")
+    if scope == "none":
+        return None
+    if scope == "per_url":
+        return (engine_cls.NAME, url)
+    if scope == "per_domain":
+        ext = tldextract.extract(url)
+        domain = f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
+        return (engine_cls.NAME, domain)
+    if scope == "per_session":
+        return (engine_cls.NAME, "_session")
+    return None
 
 
 def _resolve_policy(opts: ScrapeOptions, site_class: SiteClass) -> Policy:
@@ -109,6 +134,7 @@ async def _attempt_engine(
     4. Max-engines budget — ceiling reached → stop walk.
     5. Cost budget — would exceed max_cost_usd → stop walk.
     6. Availability — engine.is_available() → skip (keep walking).
+    6b. Probe cache — prior probe returned False → skip (keep walking).
     7. Invoke engine.scrape().
     8. Quality checks — empty / suspicious → skip (keep walking).
     9. Winner — return result (stop walk).
@@ -165,10 +191,21 @@ async def _attempt_engine(
         failures.append("budget:max_engines")
         return _AttemptResult(result=None, keep_walking=False)
 
-    # 5. Cost budget — use engine CAPABILITIES, not step metadata.
+    # 5. Cost budget — use engine CAPABILITIES fields to build the cost estimate
+    # (P1 #3: use the engine's own avg_response_mb_estimate for gb-billed engines).
+    # Always call estimate_step_cost via a synthetic SequentialStep so the routing
+    # logic goes through one code path.  The cost / billing_unit come from the
+    # engine's CAPABILITIES (not the ladder step), which is the authority for
+    # per-engine costs.
     # Cost-too-high is per-engine, not walk-wide: a cheaper engine downstream
     # may still be tried, so we skip this engine but keep walking.
-    engine_cost = float(engine_cls.CAPABILITIES.estimated_cost_usd or 0.0)
+    engine_mb = engine_cls.CAPABILITIES.avg_response_mb_estimate
+    _cost_step = SequentialStep(
+        engine=canonical,
+        estimated_cost_usd=float(engine_cls.CAPABILITIES.estimated_cost_usd or 0.0),
+        billing_unit=engine_cls.CAPABILITIES.billing_unit,
+    )
+    engine_cost = estimate_step_cost(_cost_step, avg_response_mb=engine_mb)
     if budget_cost_usd + engine_cost > max_cost_usd:
         logger.debug("router: skip engine=%s reason=budget:cost", canonical)
         failures.append(f"{canonical}:skipped:budget:cost")
@@ -184,6 +221,27 @@ async def _attempt_engine(
         failures.append(f"{canonical}:unavailable")
         dedup_seen.add(canonical)
         return _AttemptResult(result=None, keep_walking=True)
+
+    # 6b. Probe cache (P1 #7) — skip engine if a prior probe returned False;
+    # run the probe (once per scope) if no cached result exists yet.
+    # A cached False means the engine is known-bad for this URL/domain/session;
+    # a cached True (or no probe defined) means proceed.
+    cache_key = _probe_scope_key(engine_cls, url)
+    if cache_key is not None:
+        cached_probe = _PROBE_CACHE.get(cache_key)
+        if cached_probe is False:
+            logger.debug("router: probe cache says skip engine=%s for %s", canonical, url)
+            failures.append(f"{canonical}:probe_cache_skip")
+            dedup_seen.add(canonical)
+            return _AttemptResult(result=None, keep_walking=True)
+        if cached_probe is None and hasattr(engine, "probe"):
+            probe_ok = await engine.probe(url)
+            _PROBE_CACHE[cache_key] = probe_ok
+            if not probe_ok:
+                logger.debug("router: probe failed engine=%s for %s", canonical, url)
+                failures.append(f"{canonical}:probe_failed")
+                dedup_seen.add(canonical)
+                return _AttemptResult(result=None, keep_walking=True)
 
     # Mark as seen and as tried before the call so errors still count.
     dedup_seen.add(canonical)

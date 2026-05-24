@@ -1672,3 +1672,120 @@ async def test_walk_treats_import_error_as_unavailable(
         f"budget:max_engines must not appear; ImportError engine did not consume a slot; "
         f"failures={result.failures}"
     )
+
+
+# ---------------------------------------------------------------------------
+# F.1 — Per-engine avg_response_mb overrides the router default (P1 #3)
+# ---------------------------------------------------------------------------
+
+
+async def test_router_uses_engine_avg_response_mb_override(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A step whose engine declares avg_response_mb_estimate must use that
+    value (not the router default) when estimating step cost."""
+    from scrapefold import EngineCapabilities, SequentialStep
+    from scrapefold.engines import _REGISTRY
+    from scrapefold.engines.base import ScrapeEngine
+    from scrapefold.router import walk
+
+    captured_mb: list[float] = []
+
+    # Build a stub engine that declares avg_response_mb_estimate=20.0 (browser-class)
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions):
+        from scrapefold.result import ScrapeResult
+
+        return ScrapeResult(
+            url=url, text="ok", markdown="# ok", html=None, engine="big_browser",
+            elapsed_ms=1,
+        )
+
+    big_engine = type(
+        "_StubBig",
+        (ScrapeEngine,),
+        {
+            "NAME": "big_browser",
+            "CAPABILITIES": EngineCapabilities(avg_response_mb_estimate=20.0, requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch,
+        },
+    )
+    monkeypatch.setitem(_REGISTRY, "big_browser", lambda: big_engine)
+
+    # Patch _estimate_step_cost so we can see what avg_response_mb arrived
+    import scrapefold.ladders as ladders_mod
+
+    original = ladders_mod.estimate_step_cost
+
+    def _spy(step, *, avg_response_mb=2.0):
+        captured_mb.append(avg_response_mb)
+        return original(step, avg_response_mb=avg_response_mb)
+
+    monkeypatch.setattr(ladders_mod, "estimate_step_cost", _spy)
+    # Also patch the import inside router
+    import scrapefold.router as router_mod
+    monkeypatch.setattr(router_mod, "estimate_step_cost", _spy)
+
+    stub_ladder((SequentialStep(engine="big_browser", estimated_cost_usd=0.01),))
+
+    await walk("https://example.com/")
+
+    assert captured_mb, "estimate_step_cost was never called"
+    assert captured_mb[0] == 20.0, (
+        f"expected per-engine override 20.0, got {captured_mb[0]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# F.2 — Probe results are cached per-domain across walks (P1 #7)
+# ---------------------------------------------------------------------------
+
+
+async def test_router_caches_per_domain_probe_across_urls(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold import EngineCapabilities, SequentialStep
+    from scrapefold.engines import _REGISTRY
+    from scrapefold.engines.base import ScrapeEngine
+    from scrapefold.result import ScrapeResult
+    from scrapefold.router import _PROBE_CACHE, walk
+
+    _PROBE_CACHE.clear()  # isolation
+
+    probe_calls: list[str] = []
+
+    async def _probe(self: ScrapeEngine, url: str) -> bool:
+        probe_calls.append(url)
+        return True
+
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions):
+        return ScrapeResult(
+            url=url, text="ok", markdown="# ok", html=None,
+            engine="probe_engine", elapsed_ms=1,
+        )
+
+    cached_engine = type(
+        "_StubCached",
+        (ScrapeEngine,),
+        {
+            "NAME": "probe_engine",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "PROBE_SCOPE": "per_domain",
+            "probe": _probe,
+            "_fetch": _fetch,
+        },
+    )
+    monkeypatch.setitem(_REGISTRY, "probe_engine", lambda: cached_engine)
+    stub_ladder((SequentialStep(engine="probe_engine"),))
+
+    # Crawl two URLs on the same domain (example.com classifies as static_general
+    # so stub_ladder applies; both share the same registered domain → 1 probe total).
+    await walk("https://example.com/page1")
+    await walk("https://example.com/page2")
+
+    assert len(probe_calls) == 1, f"expected 1 probe per domain, got {len(probe_calls)}"
