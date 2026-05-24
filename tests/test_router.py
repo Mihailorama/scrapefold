@@ -1444,3 +1444,83 @@ async def test_walk_helper_increments_budget_on_engine_error(
     assert result.engine == "after_error_good"
     # The erroring engine must appear in failures.
     assert any("costly_error_engine" in f and "error" in f for f in result.failures)
+
+
+# ---------------------------------------------------------------------------
+# 40. Timeout boundary — elapsed_accum_ms == timeout_s*1000 halts the walk
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_timeout_boundary_halts_walk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """elapsed_accum_ms == timeout_s*1000 must halt the walk (>= semantics).
+
+    opts.engines=("boundary_slow", "boundary_next") where boundary_slow returns
+    elapsed_ms=1000 and timeout_s=1 (budget = 1000 ms).  After boundary_slow
+    completes, elapsed_accum_ms equals exactly timeout_s*1000 — the walk must
+    stop and NOT invoke boundary_next.
+    """
+    from scrapefold.router import walk
+
+    call_log: list[str] = []
+
+    async def _fetch_slow(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        call_log.append(self.NAME)
+        # Return empty so the walk would continue — the timeout check is what stops it.
+        return ScrapeResult(
+            url=url,
+            text="",
+            markdown="",
+            html=None,
+            engine=self.NAME,
+            elapsed_ms=1000,  # exactly == timeout_s * 1000
+        )
+
+    async def _fetch_next(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        call_log.append(self.NAME)
+        return ScrapeResult(
+            url=url,
+            text=_GOOD_TEXT,
+            markdown=f"# {_GOOD_TEXT}",
+            html=None,
+            engine=self.NAME,
+            elapsed_ms=1,
+        )
+
+    slow_engine = type(
+        "_StubBoundarySlow",
+        (ScrapeEngine,),
+        {
+            "NAME": "boundary_slow",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_slow,
+        },
+    )
+    next_engine = type(
+        "_StubBoundaryNext",
+        (ScrapeEngine,),
+        {
+            "NAME": "boundary_next",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_next,
+        },
+    )
+
+    monkeypatch.setitem(_REGISTRY, "boundary_slow", lambda: slow_engine)
+    monkeypatch.setitem(_REGISTRY, "boundary_next", lambda: next_engine)
+
+    # timeout_s=1 → budget = 1000 ms; boundary_slow returns exactly 1000 ms elapsed.
+    opts = ScrapeOptions(engines=("boundary_slow", "boundary_next"), timeout_s=1)
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/", opts)
+
+    # boundary_slow was called; boundary_next must NOT be called (>= semantics).
+    assert "boundary_slow" in call_log
+    assert "boundary_next" not in call_log, (
+        "boundary_next must not be called when elapsed_accum_ms == timeout_s*1000"
+    )
+    assert any("budget:timeout" in f for f in exc_info.value.failures)

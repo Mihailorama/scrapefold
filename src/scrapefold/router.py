@@ -268,7 +268,7 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
 
         for name in opts.engines:
             # Elapsed-time budget (checked before any engine work).
-            if elapsed_accum_ms > opts.timeout_s * 1000:
+            if elapsed_accum_ms >= opts.timeout_s * 1000:
                 logger.info("router: walk halted budget=timeout (override path)")
                 failures.append("budget:timeout")
                 break
@@ -338,7 +338,7 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
 
         for engine_name in engines_to_try:
             # Elapsed-time budget check (per-engine, mirrors override path).
-            if budget.elapsed_ms > opts.timeout_s * 1000:
+            if budget.elapsed_ms >= opts.timeout_s * 1000:
                 logger.info("router: walk halted budget=timeout (ladder path)")
                 failures.append("budget:timeout")
                 raise AllEnginesFailed(url=url, failures=failures)
