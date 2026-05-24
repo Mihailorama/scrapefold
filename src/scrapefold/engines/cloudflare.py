@@ -34,7 +34,10 @@ def _extract_markdown(payload: dict) -> str:  # type: ignore[type-arg]
     if isinstance(result, str):
         return result.strip()
     if isinstance(result, dict):
-        return str(result.get("markdown", "")).strip()
+        md = result.get("markdown")
+        if md is None:
+            return ""
+        return str(md).strip()
     return ""
 
 

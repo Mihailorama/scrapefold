@@ -282,3 +282,24 @@ def test_registered_in_engine_registry() -> None:
 def test_marker_present() -> None:
     # Marker test that always passes; pinned by test count in the spec.
     assert True
+
+
+# ---------------------------------------------------------------------------
+# 14. /markdown endpoint returns {"result": {"markdown": null}} — must fall back
+# ---------------------------------------------------------------------------
+
+
+async def test_markdown_endpoint_null_markdown_falls_back(httpx_mock: HTTPXMock) -> None:
+    """{"result": {"markdown": null}} must trigger /content fallback, not return 'None'."""
+    httpx_mock.add_response(
+        url=_MD_URL,
+        method="POST",
+        json={"result": {"markdown": None}},
+    )
+    httpx_mock.add_response(url=_CONTENT_URL, method="POST", json={"result": _HTML_BODY})
+
+    result = await _engine().scrape(_TARGET_URL)
+
+    assert result.markdown != "None", "null markdown payload must not produce the literal 'None'"
+    assert result.markdown != "", "fallback must populate markdown from /content"
+    assert result.meta["endpoint_calls"] == ["markdown", "content"]
