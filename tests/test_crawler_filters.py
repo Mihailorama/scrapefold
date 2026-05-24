@@ -201,3 +201,30 @@ def test_filter_urls_follow_subdomains_true_accepts_subdomains() -> None:
     ]
     result = filter_urls(urls, root="https://example.com/", follow_subdomains=True)
     assert "https://admin.example.com/b" in result
+
+
+# ---------------------------------------------------------------------------
+# 9. Malformed URL robustness (Codex round 8 P2)
+# ---------------------------------------------------------------------------
+
+
+def test_is_crawlable_rejects_malformed_ipv6_url() -> None:
+    """Malformed URLs must be skipped, not raise ValueError."""
+    assert is_crawlable("http://[::1") is False
+    assert is_crawlable("http://[invalid") is False
+
+
+def test_strip_tracking_params_passthrough_on_parse_failure() -> None:
+    """Malformed URLs round-trip unchanged through strip_tracking_params."""
+    assert strip_tracking_params("http://[::1") == "http://[::1"
+
+
+def test_filter_urls_skips_malformed_entries() -> None:
+    """A malformed URL inside a sitemap-derived list must not crash filter_urls."""
+    urls = [
+        "https://example.com/good",
+        "http://[::1",  # malformed — must be dropped silently
+        "https://example.com/also-good",
+    ]
+    result = filter_urls(urls, root="https://example.com")
+    assert result == ["https://example.com/good", "https://example.com/also-good"]

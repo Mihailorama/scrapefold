@@ -57,7 +57,10 @@ def is_crawlable(url: str) -> bool:
     """
     if not url or url.startswith("#"):
         return False
-    parsed = urlparse(url)
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
     if parsed.scheme not in ("http", "https"):
         return False
     path_lower = parsed.path.lower()
@@ -69,7 +72,10 @@ def is_crawlable(url: str) -> bool:
 
 def strip_tracking_params(url: str) -> str:
     """Drop utm_*, fbclid, gclid, msclkid, etc. from the URL's query string."""
-    parsed = urlparse(url)
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return url
     if not parsed.query:
         return url
     kept = [
