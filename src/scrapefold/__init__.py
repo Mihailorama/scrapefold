@@ -27,7 +27,7 @@ from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
 from scrapefold.router import walk as _walk
 
-__version__ = "0.1.0a1"
+__version__ = "0.1.0a2"
 
 __all__ = [
     "AllEnginesFailed",

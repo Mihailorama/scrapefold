@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.1.0a2] - 2026-05-24
+
+Pack 3 — sequential router shell + Cloudflare Browser Rendering engine + comprehensive cost/policy/timeout enforcement. The public `scrape()` path is live for sequential ladders and explicit `opts.engines` overrides; the router now walks `RaceStep` members sequentially (parallel fan-out remains deferred to v0.2). `AllEnginesFailed` is now a structured exception with `.url` and `.failures` attributes. Release mechanics scaffolded: dynamic version from `__init__.py`, dep-freshness audit script, CHANGELOG gate.
+
 ### Changed — dependency floors refreshed
 
 - Bumped lower-bound pins to current PyPI stable (pack-opening
@@ -23,6 +27,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   - `ruff` 0.4 → 0.15
   - `mypy` 1.8 → 2.1
 
+### Changed — structured AllEnginesFailed (consumer error contract)
+
+- `AllEnginesFailed` now carries `.url: str` and `.failures: list[str]`.
+  Consumers no longer need to parse the exception message. The
+  `failures` list shape is `"<engine>:<reason>:<detail>"` (e.g.
+  `"firecrawl:error:404 Not Found"`, `"jina:empty"`,
+  `"scrapingbee:unavailable"`, `"budget:cost"`). Pack 7 consumer
+  migrations (downstream-consumer + downstream-consumer) target this contract directly.
+
 ### Fixed — golden-rule violation: router now consults detection.is_suspicious
 
 - The sequential router shell originally only checked `result.is_empty()`
@@ -33,6 +46,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   advances on True with a `"<engine>:suspicious"` failure entry.
 - Internal: `_resolve_policy` site_class arg typed as `SiteClass` instead
   of `str`; load-bearing `type: ignore[arg-type]` removed.
+
+### Fixed — detection: is_suspicious short-text check is now conjoint
+
+- `detection.is_suspicious` previously flagged any result with fewer than
+  50 chars regardless of HTTP status. Now short-text is only suspicious
+  when the status code is also non-2xx or when the result is empty,
+  eliminating false positives for legitimately short pages (e.g. API
+  endpoints returning `{"ok":true}`).
 
 ### Added — Pack 3 cloudflare engine
 
@@ -50,19 +71,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added — Pack 3 router shell (sequential)
 
-- `src/scrapefold/router.py` — `async walk(url, opts) -> ScrapeResult` walks the per-site-class ladder. Honors `Policy` (paid_allowed / legal_constraints_blocked / geography_required), `WalkBudget` ceilings (`max_engines`, `max_cost_usd`, `timeout_s`), and the `engines_tried` dedup set. `RaceStep` entries are skipped with a DEBUG log until Pack 9.
+- `src/scrapefold/router.py` — `async walk(url, opts) -> ScrapeResult` walks the per-site-class ladder. Honors `Policy` (paid_allowed / legal_constraints_blocked / geography_required), `WalkBudget` ceilings (`max_engines`, `max_cost_usd`, `timeout_s`), and the `engines_tried` dedup set. `RaceStep` entries are walked sequentially with a DEBUG log until Pack 9.
 - `tests/test_router.py` — 13 tests covering happy path, empty-result advance, EngineError advance, unavailable-engine skip, AllEnginesFailed, unknown-engine skip, policy gating, budget halt, RaceStep skip, public `scrape()` delegation, failures-list, no-retry-within-walk, EngineError-non-propagation.
 - `scrapefold.scrape(url, opts)` now delegates to `router.walk` instead of raising `NotImplementedError`.
 - `tests/test_smoke.py` — the obsolete `NotImplementedError` smoke test is removed.
+- Budget enforcement: 12 rounds of Codex review hardening. Key fixes: cost-budget skips engine (not halts walk), unavailable engines don't consume `max_engines` slot, timeout boundary uses `>=`, actual cost credits over estimate, `opts.engines` override respects all budget/policy gates, geography `()` means global.
 
-### Changed — structured AllEnginesFailed (consumer error contract)
+### Added — release mechanics scaffolding
 
-- `AllEnginesFailed` now carries `.url: str` and `.failures: list[str]`.
-  Consumers no longer need to parse the exception message. The
-  `failures` list shape is `"<engine>:<reason>:<detail>"` (e.g.
-  `"firecrawl:error:404 Not Found"`, `"jina:empty"`,
-  `"scrapingbee:unavailable"`, `"budget:cost"`). Pack 7 consumer
-  migrations (downstream-consumer + downstream-consumer) target this contract directly.
+- `scripts/check-deps-fresh.sh` — pack-opening dep-floor nag: parses `pyproject.toml` lower bounds and warns when a dependency is more than 90 days behind PyPI stable.
+- `scripts/check-changelog.sh` — PR-time gate: fails if `## [Unreleased]` is empty (no changes documented), scoped to the `[Unreleased]` section only.
+- `scripts/check.sh` — version-equality gate added: reads dynamic version from `pyproject.toml` (via `tomli`) and asserts it matches `__init__.__version__`; prevents version drift between the two sources.
+- `pyproject.toml` — `tomli` added as Python 3.10 compat dep for the version check; broken `obscura` and `brightdata` optional extras removed.
 
 ## [0.1.0a1] — 2026-05-22
 
@@ -121,6 +141,7 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a1...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a2...HEAD
+[0.1.0a2]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a1...v0.1.0a2
 [0.1.0a1]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a0...v0.1.0a1
 [0.1.0a0]: https://github.com/mihailorama/scrapefold/releases/tag/v0.1.0a0
