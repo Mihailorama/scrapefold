@@ -194,3 +194,110 @@ async def test_crawl_site_default_output_paths_are_unique(
     for p in (result_a, result_b):
         if p.exists():
             p.unlink()
+
+
+# ---------------------------------------------------------------------------
+# Finding 1 (Codex P1 round-4): pre-flight HEAD rejects scrape-time off-host redirects
+# ---------------------------------------------------------------------------
+
+
+async def test_crawl_site_skips_url_that_redirects_off_host(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A discovered URL that 302s off-host MUST NOT be scraped (SSRF guard)."""
+    import httpx
+
+    scraped_urls: list[str] = []
+
+    async def _fake_discover(root: str, *, max_urls: int, **_kwargs: object) -> list[str]:
+        return ["https://example.com/redirector", "https://example.com/safe"][:max_urls]
+
+    async def _fake_scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+        scraped_urls.append(url)
+        return ScrapeResult(
+            url=url,
+            text=f"text-{url}",
+            markdown=f"# {url}",
+            html=None,
+            engine="stub",
+            elapsed_ms=1,
+        )
+
+    monkeypatch.setattr("scrapefold.crawler.sitemap.discover_urls", _fake_discover)
+    monkeypatch.setattr("scrapefold.crawler.scrape", _fake_scrape, raising=False)
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+    # HEAD responses: redirector → 302 off-host; safe → 200
+    async def _fake_head(
+        self: httpx.AsyncClient,
+        url: str,
+        **kwargs: object,  # type: ignore[override]
+    ) -> httpx.Response:
+        if "redirector" in url:
+            return httpx.Response(
+                302,
+                headers={"location": "http://internal.corp/secret"},
+                request=httpx.Request("HEAD", url),
+            )
+        return httpx.Response(200, request=httpx.Request("HEAD", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "head", _fake_head)
+
+    out = tmp_path / "out.md"
+    await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=5),
+        output=out,
+    )
+
+    assert "https://example.com/redirector" not in scraped_urls, (
+        "off-host redirect URL must not be scraped"
+    )
+    assert "https://example.com/safe" in scraped_urls, "non-redirecting URL must still be scraped"
+
+
+async def test_crawl_site_preflight_200_proceeds_to_scrape(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A URL returning 200 on HEAD must proceed to scrape (no false-positive block)."""
+    import httpx
+
+    scraped_urls: list[str] = []
+
+    async def _fake_discover(root: str, *, max_urls: int, **_kwargs: object) -> list[str]:
+        return ["https://example.com/page"][:max_urls]
+
+    async def _fake_scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+        scraped_urls.append(url)
+        return ScrapeResult(
+            url=url,
+            text="content",
+            markdown="# content",
+            html=None,
+            engine="stub",
+            elapsed_ms=1,
+        )
+
+    monkeypatch.setattr("scrapefold.crawler.sitemap.discover_urls", _fake_discover)
+    monkeypatch.setattr("scrapefold.crawler.scrape", _fake_scrape, raising=False)
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+    async def _fake_head(
+        self: httpx.AsyncClient,
+        url: str,
+        **kwargs: object,  # type: ignore[override]
+    ) -> httpx.Response:
+        return httpx.Response(200, request=httpx.Request("HEAD", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "head", _fake_head)
+
+    out = tmp_path / "out.md"
+    await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=1),
+        output=out,
+    )
+
+    assert "https://example.com/page" in scraped_urls, "200 HEAD response must not block the scrape"

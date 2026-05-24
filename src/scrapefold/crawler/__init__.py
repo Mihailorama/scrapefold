@@ -9,13 +9,19 @@ import logging
 import os
 import tempfile
 from pathlib import Path
+from urllib.parse import urljoin
+
+import httpx
 
 import scrapefold.crawler.sitemap as sitemap
+from scrapefold.crawler.sitemap import _same_host
 from scrapefold.crawler.stitcher import write_stitched
 from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
+
+_REDIRECT_STATUS = frozenset({301, 302, 303, 307, 308})
 
 
 def _default_output_path() -> Path:
@@ -30,6 +36,43 @@ def _default_output_path() -> Path:
     return Path(path)
 
 
+async def _preflight_head(
+    client: httpx.AsyncClient,
+    url: str,
+    root: str,
+    follow_subdomains: bool,
+) -> bool:
+    """HEAD *url* without following redirects; return True if safe to scrape.
+
+    Returns False (skip the URL) when the server issues a 3xx redirect to an
+    off-host target.  Returns True for 2xx, 4xx, 5xx, and same-host redirects.
+
+    NOTE: HEAD and GET can return different status codes on some servers
+    (e.g. a HEAD 405 does not mean GET will fail).  This check is conservative:
+    it only blocks off-host redirects; it never blocks non-redirect responses.
+    """
+    try:
+        resp = await client.head(url, follow_redirects=False)
+    except httpx.HTTPError as exc:
+        logger.debug("crawler: preflight HEAD failed url=%s err=%s", url, exc)
+        # Cannot confirm safety; let the scrape engine decide
+        return True
+
+    if resp.status_code not in _REDIRECT_STATUS:
+        return True  # 2xx / 4xx / 5xx — proceed to scrape
+
+    location = resp.headers.get("location")
+    if not location:
+        return True  # malformed redirect — let scrape engine handle it
+
+    target = urljoin(url, location)
+    if _same_host(target, root, follow_subdomains):
+        return True  # same-host redirect — safe
+
+    logger.warning("crawler: skipping url=%s — redirects off-host to %s", url, target)
+    return False
+
+
 async def crawl(
     root: str,
     opts: ScrapeOptions | None = None,
@@ -38,7 +81,8 @@ async def crawl(
     """Walk a site → produce one stitched markdown file.
 
     Discovery: sitemap → robots → BFS (see ``crawler.sitemap``).
-    Per-URL fetch delegates to ``scrapefold.scrape``.
+    Per-URL fetch delegates to ``scrapefold.scrape`` after a lightweight
+    HEAD pre-flight that rejects scrape-time off-host redirects (SSRF guard).
     Output: ``crawler.stitcher.write_stitched``.
 
     Pass an explicit ``output=`` for a predictable output path; omitting it
@@ -65,11 +109,16 @@ async def crawl(
         urls = [root]  # at least try the root
 
     results: list[ScrapeResult] = []
-    for url in urls:
-        try:
-            results.append(await scrape(url, opts))
-        except Exception as exc:  # broad — per-URL failures must not abort the crawl
-            logger.warning("crawler: scrape failed url=%s err=%s", url, exc)
+    follow_subdomains = opts.follow_subdomains
+    async with httpx.AsyncClient(timeout=10.0) as head_client:
+        for url in urls:
+            if not await _preflight_head(head_client, url, root, follow_subdomains):
+                logger.info("crawler: url skipped (redirect_offhost) url=%s", url)
+                continue
+            try:
+                results.append(await scrape(url, opts))
+            except Exception as exc:  # broad — per-URL failures must not abort the crawl
+                logger.warning("crawler: scrape failed url=%s err=%s", url, exc)
 
     if output is None:
         output = _default_output_path()
