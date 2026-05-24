@@ -203,11 +203,27 @@ class EngineError(Exception):
         return f"[{self.engine}] {self.message}"
 
 
+@dataclass(frozen=True)
+class RedirectScopeViolation(EngineError):  # noqa: N818 — intentional domain-specific name
+    """Raised when a redirect leaves the declared same-host scope.
+
+    Subclass of :class:`EngineError` so all existing ``isinstance(exc,
+    EngineError)`` checks still match.  The router catches this specific
+    subclass *before* the generic ``EngineError`` handler and terminates the
+    walk immediately — no escalation to other engines.
+
+    ``target`` is the off-host URL that triggered the violation.
+    """
+
+    target: str = ""
+
+
 __all__ = [
     "BillingUnit",
     "EngineCapabilities",
     "EngineError",
     "ProbeScope",
     "ProxyType",
+    "RedirectScopeViolation",
     "ScrapeEngine",
 ]

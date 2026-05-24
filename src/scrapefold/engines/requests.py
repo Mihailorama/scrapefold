@@ -14,7 +14,11 @@ from urllib.parse import urljoin
 import httpx
 
 from scrapefold._host_utils import same_host as _same_host
-from scrapefold.engines.base import EngineCapabilities, EngineError, ScrapeEngine
+from scrapefold.engines.base import (
+    EngineCapabilities,
+    RedirectScopeViolation,
+    ScrapeEngine,
+)
 from scrapefold.html_to_text import html_to_both
 from scrapefold.options import ScrapeOptions, build_target_headers
 from scrapefold.result import ScrapeResult
@@ -56,13 +60,14 @@ async def _fetch_with_same_host_redirects(
             return resp
         target = urljoin(current, location)
         if not _same_host(target, root, follow_subdomains):
-            raise EngineError(
+            raise RedirectScopeViolation(
                 engine="requests",
                 message=(
                     f"redirect to off-host target rejected by same_host_redirect_scope "
                     f"(root={root!r} target={target!r})"
                 ),
                 elapsed_ms=0,
+                target=target,
             )
         current = target
 

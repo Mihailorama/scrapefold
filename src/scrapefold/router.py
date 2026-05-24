@@ -19,7 +19,7 @@ import tldextract
 
 from scrapefold.detection import is_suspicious
 from scrapefold.engines import get_engine
-from scrapefold.engines.base import EngineError, ScrapeEngine
+from scrapefold.engines.base import EngineError, RedirectScopeViolation, ScrapeEngine
 from scrapefold.ladders import (
     AllEnginesFailed,
     Policy,
@@ -250,6 +250,19 @@ async def _attempt_engine(
     # 7. Invoke
     try:
         result = await engine.scrape(url, opts)
+    except RedirectScopeViolation as exc:
+        # SSRF guard: an off-host redirect was detected.  This is not a
+        # transient engine failure — escalating to another engine would just
+        # follow the same redirect on a different backend.  Terminate the walk.
+        target = exc.target or exc.message
+        logger.warning("router: redirect_offhost url=%s target=%s — walk terminated", url, target)
+        failures.append(f"{canonical}:redirect_offhost:{target}")
+        return _AttemptResult(
+            result=None,
+            keep_walking=False,
+            cost_delta=0.0,
+            elapsed_delta=float(exc.elapsed_ms),
+        )
     except EngineError as exc:
         # If the underlying cause is an ImportError the SDK is not installed.
         # Treat that as "unavailable" — no paid call was made so no cost is

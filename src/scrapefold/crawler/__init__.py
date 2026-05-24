@@ -88,12 +88,24 @@ async def crawl(
     Pass an explicit ``output=`` for a predictable output path; omitting it
     allocates a unique temp file via :func:`_default_output_path`.
 
-    **SSRF protection** — ``crawl`` injects ``opts.extra["same_host_redirect_scope"]``
-    into the per-URL options so the ``requests`` engine rejects off-host redirects
-    encountered during the actual GET (not only on the HEAD pre-flight).  **Vendor
-    engines** (firecrawl, scrapingbee, cloudflare, jina, brightdata) handle redirects
-    on their own backends and the scope is NOT enforced through them.  For
-    SSRF-sensitive deployments either constrain engine selection to ``requests`` or
+    **SSRF protection**
+
+    ``crawl`` injects ``opts.extra["same_host_redirect_scope"]`` into the
+    per-URL options so the ``requests`` engine raises
+    :class:`~scrapefold.engines.base.RedirectScopeViolation` on any off-host
+    redirect.  The router catches this exception and *terminates the walk* for
+    that URL — it does **not** escalate to other engines, which would simply
+    follow the redirect on their own backend.
+
+    **Scope-aware**: ``requests`` engine only.
+
+    **NOT scope-aware**: vendor engines (firecrawl, scrapingbee, cloudflare,
+    jina, brightdata) and local stealth engines (scrapling, crawl4ai,
+    cloakbrowser, selenium).  If invoked directly via
+    ``opts.engines=("firecrawl",)`` or reached via the default escalation
+    ladder, they may follow off-host redirects on their backend without raising.
+    For SSRF-sensitive deployments embedded in services, restrict engine
+    selection with ``opts.engines=("requests",)`` in ``crawl_site`` calls, or
     add network-layer egress controls.
     """
     from dataclasses import replace as _replace

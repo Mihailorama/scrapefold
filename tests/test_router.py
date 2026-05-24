@@ -1294,6 +1294,85 @@ async def test_walk_unavailable_engine_deduped_but_not_counted(
 
 
 # ---------------------------------------------------------------------------
+# 40. RedirectScopeViolation terminates the walk — no escalation to fallback
+# ---------------------------------------------------------------------------
+
+
+async def test_router_terminates_walk_on_redirect_scope_violation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RedirectScopeViolation raised by one engine MUST terminate the walk.
+
+    No escalation to subsequent engines must occur — the violation signals that
+    following the redirect on any other backend would be an SSRF risk.
+
+    Ladder: [scope_aware (raises RedirectScopeViolation), fallback_engine (would succeed)].
+    Expected: AllEnginesFailed with scope_aware:redirect_offhost:... in failures,
+    and fallback_engine NOT in budget.engines_tried (i.e. not invoked).
+    """
+    from scrapefold.engines.base import RedirectScopeViolation
+    from scrapefold.router import walk
+
+    _off_host_target = "http://internal.corp/secret"
+
+    fallback_called: list[bool] = []
+
+    async def _fetch_scope_aware(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        raise RedirectScopeViolation(
+            engine="scope_aware",
+            message=f"redirect to off-host target (root='https://example.com' target={_off_host_target!r})",
+            elapsed_ms=5,
+            target=_off_host_target,
+        )
+
+    async def _fetch_fallback(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        fallback_called.append(True)
+        return _make_result("fallback_engine", url=url)
+
+    scope_aware_cls = type(
+        "_StubScopeAware",
+        (ScrapeEngine,),
+        {
+            "NAME": "scope_aware",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_scope_aware,
+        },
+    )
+    fallback_cls = type(
+        "_StubFallback",
+        (ScrapeEngine,),
+        {
+            "NAME": "fallback_engine",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_fallback,
+        },
+    )
+
+    monkeypatch.setitem(_REGISTRY, "scope_aware", lambda: scope_aware_cls)
+    monkeypatch.setitem(_REGISTRY, "fallback_engine", lambda: fallback_cls)
+
+    opts = ScrapeOptions(engines=("scope_aware", "fallback_engine"))
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/redirector", opts)
+
+    # Fallback engine must NOT have been invoked — walk terminated.
+    assert fallback_called == [], (
+        "fallback engine must not be called after RedirectScopeViolation terminates the walk"
+    )
+
+    failures = exc_info.value.failures
+    # The violation must be recorded with the off-host target.
+    assert any("scope_aware:redirect_offhost" in f and "internal.corp" in f for f in failures), (
+        f"expected redirect_offhost failure with target; got {failures}"
+    )
+    # No budget:max_engines or other termination reasons — only the scope violation.
+    assert not any("budget:" in f for f in failures), f"no budget failure expected; got {failures}"
+
+
+# ---------------------------------------------------------------------------
 # 33 (budget). _attempt_engine credits cost on EngineError (budget tracking)
 # ---------------------------------------------------------------------------
 
