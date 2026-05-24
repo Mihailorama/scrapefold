@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from pytest_httpx import HTTPXMock
 
 from scrapefold.crawler.sitemap import discover_urls
@@ -409,3 +410,33 @@ async def test_bfs_fallback_off_host_links_excluded(httpx_mock: HTTPXMock) -> No
     assert not any("other.com" in str(r.url) for r in all_requests), (
         f"Off-host URL was fetched: {[r.url for r in all_requests]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Finding 1 (Codex P1 round-3): SSRF via HTTP redirect
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.httpx_mock(assert_all_responses_were_requested=False)
+async def test_sitemap_fetch_rejects_offhost_redirect(httpx_mock: HTTPXMock) -> None:
+    """A /sitemap.xml that 302s to an off-host URL MUST NOT be followed."""
+    # /sitemap.xml returns 302 → internal.corp
+    httpx_mock.add_response(
+        url="https://example.com/sitemap.xml",
+        status_code=302,
+        headers={"location": "http://internal.corp/x.xml"},
+        text="",
+    )
+    # Tier 2: robots.txt absent
+    httpx_mock.add_response(url="https://example.com/robots.txt", status_code=404)
+    # Tier 3 BFS may attempt root — provide 404s so it yields nothing
+    httpx_mock.add_response(url="https://example.com", status_code=404)
+    httpx_mock.add_response(url="https://example.com/", status_code=404)
+
+    urls = await discover_urls("https://example.com", max_urls=100)
+
+    all_requests = httpx_mock.get_requests()
+    assert not any("internal.corp" in str(r.url) for r in all_requests), (
+        f"Off-host redirect target was fetched: {[r.url for r in all_requests]}"
+    )
+    assert urls == []

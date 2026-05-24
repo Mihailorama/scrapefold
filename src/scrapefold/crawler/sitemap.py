@@ -53,13 +53,51 @@ def _same_host(url: str, root: str, follow_subdomains: bool) -> bool:
         return url_host == root_host
 
 
-async def _fetch(client: httpx.AsyncClient, url: str) -> httpx.Response | None:
-    try:
-        resp = await client.get(url, follow_redirects=True)
-    except httpx.HTTPError as exc:
-        logger.debug("sitemap: GET %s failed: %s", url, exc)
-        return None
-    return resp
+_REDIRECT_STATUS = frozenset({301, 302, 303, 307, 308})
+_MAX_REDIRECT_HOPS = 5
+
+
+async def _fetch(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    root: str | None = None,
+    follow_subdomains: bool = False,
+) -> httpx.Response | None:
+    """GET *url* with optional same-host redirect validation.
+
+    When *root* is provided every redirect hop is validated against the same
+    host as *root* before following it.  An off-host redirect target is NOT
+    followed; the 3xx response itself is returned so callers see a non-200
+    status and treat it as a missing resource (safe degradation).
+
+    When *root* is ``None`` the function still refuses to follow redirects
+    automatically — it returns the first response regardless of status,
+    keeping behaviour consistent and predictable.
+    """
+    current = url
+    for _hop in range(_MAX_REDIRECT_HOPS):
+        try:
+            resp = await client.get(current, follow_redirects=False)
+        except httpx.HTTPError as exc:
+            logger.debug("sitemap: GET %s failed: %s", current, exc)
+            return None
+        if resp.status_code not in _REDIRECT_STATUS:
+            return resp
+        location = resp.headers.get("location")
+        if not location:
+            return resp
+        target = urljoin(current, location)
+        if root is not None and not _same_host(target, root, follow_subdomains):
+            logger.debug(
+                "sitemap: redirect to off-host target rejected (root=%s target=%s)",
+                root,
+                target,
+            )
+            return resp  # return 3xx; caller treats non-200 as missing
+        current = target
+    logger.debug("sitemap: too many redirects for %s", url)
+    return None
 
 
 def _parse_sitemap(xml_text: str) -> tuple[list[str], list[str]]:
@@ -145,7 +183,9 @@ async def discover_urls(
 
         # Tier 2 — /robots.txt sitemap directives
         if not found:
-            robots_resp = await _fetch(client, robots_url)
+            robots_resp = await _fetch(
+                client, robots_url, root=root, follow_subdomains=follow_subdomains
+            )
             if robots_resp is not None and robots_resp.status_code == 200:
                 for nested in _parse_robots_for_sitemaps(robots_resp.text):
                     # SSRF guard: reject off-host Sitemap: directives silently
@@ -220,7 +260,7 @@ async def _walk_sitemap(
         return []
     visited.add(sitemap_url)
 
-    resp = await _fetch(client, sitemap_url)
+    resp = await _fetch(client, sitemap_url, root=root, follow_subdomains=follow_subdomains)
     if resp is None or resp.status_code != 200:
         return []
 
@@ -277,7 +317,7 @@ async def _bfs_crawl(
 
         visited.add(url)
 
-        resp = await _fetch(client, url)
+        resp = await _fetch(client, url, root=root, follow_subdomains=follow_subdomains)
         if resp is None or resp.status_code != 200:
             continue
 
