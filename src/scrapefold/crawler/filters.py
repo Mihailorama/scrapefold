@@ -3,7 +3,7 @@
 Three responsibilities:
 - ``is_crawlable(url)``: scheme / extension / well-known-path gate.
 - ``strip_tracking_params(url)``: drop utm_*, fbclid, gclid query params.
-- ``filter_urls(urls, root)``: same-host dedup + tracking strip + crawlable.
+- ``filter_urls(urls, root, follow_subdomains)``: same-host dedup + fragment/tracking strip + crawlable.
 """
 
 from __future__ import annotations
@@ -86,20 +86,40 @@ def _registered_domain(url: str) -> str:
     return f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
 
 
-def filter_urls(urls: list[str], *, root: str) -> list[str]:
+def filter_urls(
+    urls: list[str],
+    *,
+    root: str,
+    follow_subdomains: bool = False,
+) -> list[str]:
     """Filter a URL list to same-host crawlable URLs with tracking stripped.
 
     Order-preserving; deduplicated; empties returned as an empty list.
+
+    When *follow_subdomains* is ``False`` (default), only the root host and
+    its www/apex equivalent are accepted — e.g. ``admin.example.com`` is
+    excluded even though it shares the registered domain.  Set
+    *follow_subdomains* to ``True`` to keep all subdomains of the same
+    registered domain (original behaviour).
     """
+    root_host = urlparse(root).netloc.lower().lstrip("www.") if not follow_subdomains else None
     root_domain = _registered_domain(root)
+
     seen: set[str] = set()
     out: list[str] = []
     for raw in urls:
         if not is_crawlable(raw):
             continue
-        if _registered_domain(raw) != root_domain:
-            continue
+        if follow_subdomains:
+            if _registered_domain(raw) != root_domain:
+                continue
+        else:
+            url_host = urlparse(raw).netloc.lower().lstrip("www.")
+            if url_host != root_host:
+                continue
         cleaned = strip_tracking_params(raw)
+        # Strip fragment so that /page#intro and /page#pricing deduplicate.
+        cleaned = urlunparse(urlparse(cleaned)._replace(fragment=""))
         if cleaned in seen:
             continue
         seen.add(cleaned)

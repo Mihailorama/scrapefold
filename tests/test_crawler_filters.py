@@ -155,3 +155,49 @@ def test_filter_urls_treats_www_and_apex_as_same_host() -> None:
     ]
     result = filter_urls(urls, root="https://example.com/")
     assert set(result) == {"https://www.example.com/a", "https://example.com/b"}
+
+
+# ---------------------------------------------------------------------------
+# 7. filter_urls — fragment stripping + dedup
+# ---------------------------------------------------------------------------
+
+
+def test_filter_urls_dedupes_after_fragment_strip() -> None:
+    """URLs differing only in fragment must dedupe to one entry."""
+    urls = [
+        "https://example.com/page",
+        "https://example.com/page#intro",
+        "https://example.com/page#pricing",
+    ]
+    result = filter_urls(urls, root="https://example.com/")
+    assert result == ["https://example.com/page"]
+
+
+# ---------------------------------------------------------------------------
+# 8. filter_urls — follow_subdomains gate
+# ---------------------------------------------------------------------------
+
+
+def test_filter_urls_default_excludes_arbitrary_subdomains() -> None:
+    """follow_subdomains=False (default) rejects admin.example.com when root is example.com."""
+    urls = [
+        "https://example.com/a",
+        "https://admin.example.com/b",
+        "https://cdn.example.com/c",
+        "https://www.example.com/d",  # www is the conventional apex-equivalent
+    ]
+    result = filter_urls(urls, root="https://example.com/")
+    assert "https://admin.example.com/b" not in result
+    assert "https://cdn.example.com/c" not in result
+    assert "https://example.com/a" in result
+    assert "https://www.example.com/d" in result
+
+
+def test_filter_urls_follow_subdomains_true_accepts_subdomains() -> None:
+    """follow_subdomains=True keeps admin.example.com when registered domain matches."""
+    urls = [
+        "https://example.com/a",
+        "https://admin.example.com/b",
+    ]
+    result = filter_urls(urls, root="https://example.com/", follow_subdomains=True)
+    assert "https://admin.example.com/b" in result
