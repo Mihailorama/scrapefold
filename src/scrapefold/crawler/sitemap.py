@@ -13,6 +13,7 @@ from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree as ET
 
 import httpx
+import tldextract
 from bs4 import BeautifulSoup
 
 from scrapefold.crawler.filters import filter_urls
@@ -21,6 +22,35 @@ logger = logging.getLogger(__name__)
 
 _SITEMAP_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 _ROBOTS_SITEMAP_RE = re.compile(r"^\s*Sitemap:\s*(\S+)\s*$", re.IGNORECASE | re.MULTILINE)
+
+
+def _same_host(url: str, root: str, follow_subdomains: bool) -> bool:
+    """Return True if *url* is on the same host as *root*.
+
+    Mirrors the host comparison used by :func:`~scrapefold.crawler.filters.filter_urls`.
+    When *follow_subdomains* is ``False``, only exact host (www/apex-normalised)
+    matches pass.  When ``True``, all subdomains of the same registered domain pass.
+    """
+    try:
+        url_parsed = urlparse(url)
+        root_parsed = urlparse(root)
+    except Exception:
+        return False
+
+    if url_parsed.scheme not in ("http", "https"):
+        return False
+
+    if follow_subdomains:
+
+        def _reg_domain(u: str) -> str:
+            ext = tldextract.extract(u)
+            return f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
+
+        return _reg_domain(url) == _reg_domain(root)
+    else:
+        url_host = url_parsed.netloc.lower().removeprefix("www.")
+        root_host = root_parsed.netloc.lower().removeprefix("www.")
+        return url_host == root_host
 
 
 async def _fetch(client: httpx.AsyncClient, url: str) -> httpx.Response | None:
@@ -102,7 +132,12 @@ async def discover_urls(
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Tier 1 — /sitemap.xml direct
         found = await _walk_sitemap(
-            client, sitemap_url, visited=visited, max_urls=max_urls
+            client,
+            sitemap_url,
+            visited=visited,
+            max_urls=max_urls,
+            root=root,
+            follow_subdomains=follow_subdomains,
         )
 
         # Tier 2 — /robots.txt sitemap directives
@@ -110,8 +145,22 @@ async def discover_urls(
             robots_resp = await _fetch(client, robots_url)
             if robots_resp is not None and robots_resp.status_code == 200:
                 for nested in _parse_robots_for_sitemaps(robots_resp.text):
+                    # SSRF guard: reject off-host Sitemap: directives silently
+                    if not _same_host(nested, root, follow_subdomains):
+                        logger.debug(
+                            "sitemap: robots.txt Sitemap directive points off-host "
+                            "(root=%s directive=%s) — skipping",
+                            root,
+                            nested,
+                        )
+                        continue
                     more = await _walk_sitemap(
-                        client, nested, visited=visited, max_urls=max_urls - len(found)
+                        client,
+                        nested,
+                        visited=visited,
+                        max_urls=max_urls - len(found),
+                        root=root,
+                        follow_subdomains=follow_subdomains,
                     )
                     found.extend(more)
                     if len(found) >= max_urls:
@@ -135,6 +184,8 @@ async def _walk_sitemap(
     *,
     visited: set[str],
     max_urls: int,
+    root: str,
+    follow_subdomains: bool,
     depth: int = 0,
     max_depth: int = 5,
 ) -> list[str]:
@@ -144,7 +195,19 @@ async def _walk_sitemap(
     *max_urls* caps total page URLs collected — the walk short-circuits once
     this budget is reached, avoiding unnecessary HTTP requests.
     *max_depth* (default 5) is a hard ceiling on recursion depth.
+    *root* and *follow_subdomains* are used to validate nested sitemap URLs
+    before fetching them (SSRF guard).
     """
+    # Host validation BEFORE visited-set check so attacker cannot poison the
+    # visited set with off-origin URLs and prevent legitimate same-host walks.
+    if not _same_host(sitemap_url, root, follow_subdomains):
+        logger.debug(
+            "sitemap: nested sitemap URL is off-host (root=%s url=%s) — skipping",
+            root,
+            sitemap_url,
+        )
+        return []
+
     if sitemap_url in visited:
         return []
     if depth > max_depth:
@@ -167,6 +230,8 @@ async def _walk_sitemap(
             child,
             visited=visited,
             max_urls=max_urls - len(out),
+            root=root,
+            follow_subdomains=follow_subdomains,
             depth=depth + 1,
             max_depth=max_depth,
         )

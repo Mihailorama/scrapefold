@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from pytest_httpx import HTTPXMock
 
 from scrapefold.crawler.sitemap import discover_urls
@@ -243,3 +242,61 @@ async def test_walk_sitemap_caps_index_traversal_at_max_urls(httpx_mock: HTTPXMo
     assert len(urls) == 5
     # All from s1 (page-10-*).
     assert all("page-10-" in u for u in urls)
+
+
+# ---------------------------------------------------------------------------
+# Finding 1 (Codex P1): SSRF guard — off-host sitemap URLs must not be fetched
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_sitemap_rejects_offhost_loc_in_index(httpx_mock: HTTPXMock) -> None:
+    """A sitemap-index whose <loc> points off-host MUST NOT cause an off-host fetch."""
+    off_host_url = "http://internal.corp/secret.xml"
+    index_xml = (
+        '<?xml version="1.0"?>'
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"<sitemap><loc>{off_host_url}</loc></sitemap>"
+        "</sitemapindex>"
+    )
+    httpx_mock.add_response(
+        url="https://example.com/sitemap.xml",
+        status_code=200,
+        text=index_xml,
+        headers={"content-type": "application/xml"},
+    )
+    # Tier 2: robots.txt has no extra sitemaps
+    httpx_mock.add_response(url="https://example.com/robots.txt", status_code=404)
+    # Tier 3 BFS fallback: BFS root fetch
+    httpx_mock.add_response(url="https://example.com/", status_code=404)
+
+    urls = await discover_urls("https://example.com/", max_urls=100)
+
+    # No request to internal.corp should have been made.
+    all_requests = httpx_mock.get_requests()
+    assert not any("internal.corp" in str(r.url) for r in all_requests), (
+        f"Off-host URL was fetched: {[r.url for r in all_requests]}"
+    )
+    assert urls == []
+
+
+async def test_discover_urls_rejects_offhost_robots_sitemap_directive(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """A robots.txt Sitemap: directive pointing off-host MUST NOT be fetched."""
+    httpx_mock.add_response(url="https://example.com/sitemap.xml", status_code=404)
+    httpx_mock.add_response(
+        url="https://example.com/robots.txt",
+        status_code=200,
+        text="User-agent: *\nDisallow:\nSitemap: http://internal.corp/x.xml\n",
+        headers={"content-type": "text/plain"},
+    )
+    # Tier 3 BFS root — also 404 so nothing leaks
+    httpx_mock.add_response(url="https://example.com/", status_code=404)
+
+    urls = await discover_urls("https://example.com/", max_urls=100)
+
+    all_requests = httpx_mock.get_requests()
+    assert not any("internal.corp" in str(r.url) for r in all_requests), (
+        f"Off-host directive was fetched: {[r.url for r in all_requests]}"
+    )
+    assert urls == []
