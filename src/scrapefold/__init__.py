@@ -59,9 +59,17 @@ async def scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     return await _walk(url, opts)
 
 
-async def crawl_site(url: str, opts: ScrapeOptions | None = None, **kwargs: object) -> str:
+async def crawl_site(
+    url: str,
+    opts: ScrapeOptions | None = None,
+    output: object | None = None,
+) -> object:
     """Whole-site crawl → single markdown file.
 
-    Scaffold stub — crawler module lands in S8.
+    Discovers URLs from ``url`` (sitemap → robots → BFS), scrapes each
+    via ``scrape()``, and writes a stitched .md file at ``output``
+    (defaults to ``<tmp>/scrapefold-crawl.md``). Returns the output Path.
     """
-    raise NotImplementedError("crawl_site() lands in S8 (crawler module).")
+    from scrapefold.crawler import crawl
+
+    return await crawl(url, opts=opts, output=output)  # type: ignore[arg-type]
