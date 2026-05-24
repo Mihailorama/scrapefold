@@ -100,23 +100,43 @@ async def _fetch(
     return None
 
 
+def _local_name(tag: str) -> str:
+    """Strip Clark-notation namespace prefix from an XML tag name.
+
+    ``{http://www.sitemaps.org/schemas/sitemap/0.9}loc`` → ``loc``
+    ``loc`` → ``loc``
+    """
+    return tag.rpartition("}")[2] if "}" in tag else tag
+
+
 def _parse_sitemap(xml_text: str) -> tuple[list[str], list[str]]:
-    """Return (page_urls, nested_sitemap_urls) from a sitemap XML body."""
+    """Return (page_urls, nested_sitemap_urls) from a sitemap XML body.
+
+    Handles both namespace-qualified XML (``xmlns="http://www.sitemaps.org/…"``)
+    and namespace-less XML — matching is done by local element name so both
+    forms are accepted transparently.
+    """
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
         logger.debug("sitemap: XML parse failed: %s", exc)
         return [], []
 
-    if root.tag.endswith("sitemapindex"):
+    root_local = _local_name(root.tag)
+
+    if root_local == "sitemapindex":
         nested = [
-            el.text.strip() for el in root.iter(f"{_SITEMAP_NS}loc") if isinstance(el.text, str)
+            el.text.strip()
+            for el in root.iter()
+            if _local_name(el.tag) == "loc" and isinstance(el.text, str)
         ]
         return [], nested
 
-    if root.tag.endswith("urlset"):
+    if root_local == "urlset":
         pages = [
-            el.text.strip() for el in root.iter(f"{_SITEMAP_NS}loc") if isinstance(el.text, str)
+            el.text.strip()
+            for el in root.iter()
+            if _local_name(el.tag) == "loc" and isinstance(el.text, str)
         ]
         return pages, []
 

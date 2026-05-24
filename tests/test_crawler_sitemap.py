@@ -478,3 +478,29 @@ async def test_bfs_fallback_skips_non_crawlable_links(httpx_mock: HTTPXMock) -> 
     assert not any("/logout" in u for u in fetched), f"/logout was fetched: {fetched}"
     assert not any("file.pdf" in u for u in fetched), f"PDF was fetched: {fetched}"
     assert "https://example.com/good" in urls
+
+
+# ---------------------------------------------------------------------------
+# Finding 4 (Codex P3 round-3): namespace-less sitemap XML
+# ---------------------------------------------------------------------------
+
+
+async def test_parse_sitemap_handles_namespace_less_xml(httpx_mock: HTTPXMock) -> None:
+    """Sitemaps without the xmlns declaration still yield URLs."""
+    bare = (
+        '<?xml version="1.0"?>'
+        "<urlset>"
+        "<url><loc>https://example.com/a</loc></url>"
+        "<url><loc>https://example.com/b</loc></url>"
+        "</urlset>"
+    )
+    httpx_mock.add_response(
+        url="https://example.com/sitemap.xml",
+        status_code=200,
+        text=bare,
+        headers={"content-type": "application/xml"},
+    )
+
+    urls = await discover_urls("https://example.com")
+    assert "https://example.com/a" in urls
+    assert "https://example.com/b" in urls
