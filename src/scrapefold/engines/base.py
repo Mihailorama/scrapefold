@@ -138,7 +138,7 @@ class ScrapeEngine(ABC):
             elapsed = int((time.monotonic() - started) * 1000)
             logger.warning("%s failed for %s: %s", self.NAME, url, exc)
             if exc.elapsed_ms == 0:
-                raise EngineError(exc.engine, exc.message, elapsed, exc.cause) from exc.__cause__
+                raise replace(exc, elapsed_ms=elapsed) from exc.__cause__
             raise
         except Exception as exc:
             elapsed = int((time.monotonic() - started) * 1000)

@@ -1373,6 +1373,60 @@ async def test_router_terminates_walk_on_redirect_scope_violation(
 
 
 # ---------------------------------------------------------------------------
+# 41. EngineError subclass type is preserved when base class rewraps elapsed_ms
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_redirect_scope_violation_type_preserved_through_base_class() -> None:
+    """RedirectScopeViolation subclass type survives the base class elapsed_ms rewrap.
+
+    Regression test for the P1 type-erasure bug: base class ScrapeEngine.scrape()
+    used to re-raise ``EngineError(...)`` (the base type) instead of preserving
+    the concrete subclass, causing the router's ``except RedirectScopeViolation``
+    handler to miss the exception and incorrectly escalate.
+    """
+    from scrapefold.engines.base import (
+        EngineCapabilities,
+        EngineError,
+        RedirectScopeViolation,
+        ScrapeEngine,
+    )
+    from scrapefold.options import ScrapeOptions
+
+    class _Bomb(ScrapeEngine):
+        NAME = "bomb"
+        CAPABILITIES = EngineCapabilities(requires_api_key=False)
+        SUPPORTED_OPTIONS: frozenset[str] = frozenset()
+
+        async def _fetch(self, url: str, opts: ScrapeOptions) -> None:  # type: ignore[return]
+            raise RedirectScopeViolation(
+                engine="bomb",
+                message="off-host",
+                elapsed_ms=0,
+                target="http://internal/",
+            )
+
+    with pytest.raises(EngineError) as exc_info:
+        await _Bomb().scrape("https://example.com", ScrapeOptions())
+
+    # Concrete subclass type must be preserved — not downgraded to EngineError.
+    assert type(exc_info.value) is RedirectScopeViolation, (
+        f"expected RedirectScopeViolation, got {type(exc_info.value)}"
+    )
+    # elapsed_ms must be a non-negative integer (the base class rewrap sets it
+    # from the actual measured wall time, which may be 0ms for a pure-Python mock
+    # but must never be the sentinel -1 / some invalid value).
+    assert exc_info.value.elapsed_ms >= 0, (
+        f"elapsed_ms must be >= 0 after rewrap; got {exc_info.value.elapsed_ms}"
+    )
+    # The target field must survive the replace() call.
+    assert exc_info.value.target == "http://internal/", (
+        f"target field must survive; got {exc_info.value.target!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # 33 (budget). _attempt_engine credits cost on EngineError (budget tracking)
 # ---------------------------------------------------------------------------
 
