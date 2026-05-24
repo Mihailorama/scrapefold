@@ -1698,7 +1698,11 @@ async def test_router_uses_engine_avg_response_mb_override(
         from scrapefold.result import ScrapeResult
 
         return ScrapeResult(
-            url=url, text="ok", markdown="# ok", html=None, engine="big_browser",
+            url=url,
+            text="ok",
+            markdown="# ok",
+            html=None,
+            engine="big_browser",
             elapsed_ms=1,
         )
 
@@ -1707,7 +1711,9 @@ async def test_router_uses_engine_avg_response_mb_override(
         (ScrapeEngine,),
         {
             "NAME": "big_browser",
-            "CAPABILITIES": EngineCapabilities(avg_response_mb_estimate=20.0, requires_api_key=False),
+            "CAPABILITIES": EngineCapabilities(
+                avg_response_mb_estimate=20.0, requires_api_key=False
+            ),
             "SUPPORTED_OPTIONS": frozenset(),
             "_fetch": _fetch,
         },
@@ -1726,6 +1732,7 @@ async def test_router_uses_engine_avg_response_mb_override(
     monkeypatch.setattr(ladders_mod, "estimate_step_cost", _spy)
     # Also patch the import inside router
     import scrapefold.router as router_mod
+
     monkeypatch.setattr(router_mod, "estimate_step_cost", _spy)
 
     stub_ladder((SequentialStep(engine="big_browser", estimated_cost_usd=0.01),))
@@ -1733,9 +1740,7 @@ async def test_router_uses_engine_avg_response_mb_override(
     await walk("https://example.com/")
 
     assert captured_mb, "estimate_step_cost was never called"
-    assert captured_mb[0] == 20.0, (
-        f"expected per-engine override 20.0, got {captured_mb[0]}"
-    )
+    assert captured_mb[0] == 20.0, f"expected per-engine override 20.0, got {captured_mb[0]}"
 
 
 # ---------------------------------------------------------------------------
@@ -1764,8 +1769,12 @@ async def test_router_caches_per_domain_probe_across_urls(
 
     async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions):
         return ScrapeResult(
-            url=url, text="ok", markdown="# ok", html=None,
-            engine="probe_engine", elapsed_ms=1,
+            url=url,
+            text="ok",
+            markdown="# ok",
+            html=None,
+            engine="probe_engine",
+            elapsed_ms=1,
         )
 
     cached_engine = type(

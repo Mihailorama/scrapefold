@@ -102,7 +102,9 @@ def filter_urls(
     *follow_subdomains* to ``True`` to keep all subdomains of the same
     registered domain (original behaviour).
     """
-    root_host = urlparse(root).netloc.lower().lstrip("www.") if not follow_subdomains else None
+    root_host = (
+        urlparse(root).netloc.lower().removeprefix("www.") if not follow_subdomains else None
+    )
     root_domain = _registered_domain(root)
 
     seen: set[str] = set()
@@ -114,7 +116,7 @@ def filter_urls(
             if _registered_domain(raw) != root_domain:
                 continue
         else:
-            url_host = urlparse(raw).netloc.lower().lstrip("www.")
+            url_host = urlparse(raw).netloc.lower().removeprefix("www.")
             if url_host != root_host:
                 continue
         cleaned = strip_tracking_params(raw)
