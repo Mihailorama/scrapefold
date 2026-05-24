@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 import httpx
 
 import scrapefold.crawler.sitemap as sitemap
-from scrapefold.crawler.sitemap import _same_host
+from scrapefold._host_utils import same_host as _same_host
 from scrapefold.crawler.stitcher import write_stitched
 from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
@@ -87,7 +87,17 @@ async def crawl(
 
     Pass an explicit ``output=`` for a predictable output path; omitting it
     allocates a unique temp file via :func:`_default_output_path`.
+
+    **SSRF protection** — ``crawl`` injects ``opts.extra["same_host_redirect_scope"]``
+    into the per-URL options so the ``requests`` engine rejects off-host redirects
+    encountered during the actual GET (not only on the HEAD pre-flight).  **Vendor
+    engines** (firecrawl, scrapingbee, cloudflare, jina, brightdata) handle redirects
+    on their own backends and the scope is NOT enforced through them.  For
+    SSRF-sensitive deployments either constrain engine selection to ``requests`` or
+    add network-layer egress controls.
     """
+    from dataclasses import replace as _replace
+
     from scrapefold import scrape  # local import — avoids circular
 
     opts = opts or ScrapeOptions()
@@ -108,6 +118,17 @@ async def crawl(
     if not urls:
         urls = [root]  # at least try the root
 
+    # Build a derived options object that carries the redirect-scope guard.
+    # We do NOT mutate the caller's opts — use dataclasses.replace to fork.
+    crawl_extra = {
+        **opts.extra,
+        "same_host_redirect_scope": {
+            "root": root,
+            "follow_subdomains": opts.follow_subdomains,
+        },
+    }
+    crawl_opts = _replace(opts, extra=crawl_extra)
+
     results: list[ScrapeResult] = []
     follow_subdomains = opts.follow_subdomains
     async with httpx.AsyncClient(timeout=10.0) as head_client:
@@ -116,7 +137,7 @@ async def crawl(
                 logger.info("crawler: url skipped (redirect_offhost) url=%s", url)
                 continue
             try:
-                results.append(await scrape(url, opts))
+                results.append(await scrape(url, crawl_opts))
             except Exception as exc:  # broad — per-URL failures must not abort the crawl
                 logger.warning("crawler: scrape failed url=%s err=%s", url, exc)
 

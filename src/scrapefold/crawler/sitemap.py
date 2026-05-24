@@ -13,44 +13,15 @@ from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree as ET
 
 import httpx
-import tldextract
 from bs4 import BeautifulSoup
 
+from scrapefold._host_utils import same_host as _same_host
 from scrapefold.crawler.filters import filter_urls, is_crawlable
 
 logger = logging.getLogger(__name__)
 
 _SITEMAP_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 _ROBOTS_SITEMAP_RE = re.compile(r"^\s*Sitemap:\s*(\S+)\s*$", re.IGNORECASE | re.MULTILINE)
-
-
-def _same_host(url: str, root: str, follow_subdomains: bool) -> bool:
-    """Return True if *url* is on the same host as *root*.
-
-    Mirrors the host comparison used by :func:`~scrapefold.crawler.filters.filter_urls`.
-    When *follow_subdomains* is ``False``, only exact host (www/apex-normalised)
-    matches pass.  When ``True``, all subdomains of the same registered domain pass.
-    """
-    try:
-        url_parsed = urlparse(url)
-        root_parsed = urlparse(root)
-    except Exception:
-        return False
-
-    if url_parsed.scheme not in ("http", "https"):
-        return False
-
-    if follow_subdomains:
-
-        def _reg_domain(u: str) -> str:
-            ext = tldextract.extract(u)
-            return f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
-
-        return _reg_domain(url) == _reg_domain(root)
-    else:
-        url_host = url_parsed.netloc.lower().removeprefix("www.")
-        root_host = root_parsed.netloc.lower().removeprefix("www.")
-        return url_host == root_host
 
 
 _REDIRECT_STATUS = frozenset({301, 302, 303, 307, 308})
