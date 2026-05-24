@@ -36,6 +36,7 @@ async def crawl(
     urls = await sitemap.discover_urls(
         root,
         max_urls=max_pages,
+        max_depth=opts.max_depth,
         follow_subdomains=opts.follow_subdomains,
     )
     logger.info("crawler: discovered %d urls from %s", len(urls), root)

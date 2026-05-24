@@ -105,6 +105,7 @@ async def discover_urls(
     root: str,
     *,
     max_urls: int = 100,
+    max_depth: int = 3,
     follow_subdomains: bool = False,
 ) -> list[str]:
     """Discover same-host crawlable URLs from *root*, capped at *max_urls*.
@@ -116,6 +117,8 @@ async def discover_urls(
     *follow_subdomains* is forwarded to :func:`~scrapefold.crawler.filters.filter_urls`.
     When ``False`` (default) only the root host (www/apex-equivalent) is
     accepted; when ``True`` all subdomains of the registered domain pass.
+
+    *max_depth* controls how deep the BFS fallback walks (default 3).
     """
     if max_urls <= 0:
         return []
@@ -168,11 +171,13 @@ async def discover_urls(
 
         # Tier 3 — BFS from root page
         if not found:
-            root_resp = await _fetch(client, root)
-            if root_resp is not None and root_resp.status_code == 200:
-                ct = root_resp.headers.get("content-type", "").lower()
-                if "html" in ct or "<html" in root_resp.text[:512].lower():
-                    found = _bfs_links_from_html(root_resp.text, base_url=root)
+            found = await _bfs_crawl(
+                client,
+                root,
+                max_urls=max_urls,
+                max_depth=max_depth,
+                follow_subdomains=follow_subdomains,
+            )
 
     filtered = filter_urls(found, root=root, follow_subdomains=follow_subdomains)
     return filtered[:max_urls]
@@ -238,6 +243,57 @@ async def _walk_sitemap(
         out.extend(more)
 
     return out
+
+
+async def _bfs_crawl(
+    client: httpx.AsyncClient,
+    root: str,
+    *,
+    max_urls: int,
+    max_depth: int,
+    follow_subdomains: bool,
+) -> list[str]:
+    """BFS crawl starting from *root*, collecting URLs up to *max_urls*.
+
+    Fetches each page in queue order (breadth-first), extracts ``<a href>``
+    links, validates them against the same-host rule, and enqueues them at
+    depth+1 until the budget or depth cap is reached.
+
+    Returns an unfiltered list — caller passes through
+    :func:`~scrapefold.crawler.filters.filter_urls`.
+    """
+    # queue items: (url, depth)
+    queue: list[tuple[str, int]] = [(root, 0)]
+    visited: set[str] = set()
+    found: list[str] = []
+
+    while queue and len(found) < max_urls:
+        url, depth = queue.pop(0)
+
+        if url in visited:
+            continue
+        if depth > max_depth:
+            continue
+
+        visited.add(url)
+
+        resp = await _fetch(client, url)
+        if resp is None or resp.status_code != 200:
+            continue
+
+        ct = resp.headers.get("content-type", "").lower()
+        if "html" not in ct and "<html" not in resp.text[:512].lower():
+            continue
+
+        found.append(url)
+
+        if depth < max_depth:
+            links = _bfs_links_from_html(resp.text, base_url=url)
+            for link in links:
+                if link not in visited and _same_host(link, root, follow_subdomains):
+                    queue.append((link, depth + 1))
+
+    return found
 
 
 __all__ = ["discover_urls"]

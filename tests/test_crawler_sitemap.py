@@ -91,6 +91,19 @@ async def test_bfs_fallback_when_no_sitemap(httpx_mock: HTTPXMock) -> None:
         ),
         headers={"content-type": "text/html"},
     )
+    # BFS now fetches linked pages too — provide minimal responses.
+    httpx_mock.add_response(
+        url="https://example.com/about",
+        status_code=200,
+        html="<html><body>About page</body></html>",
+        headers={"content-type": "text/html"},
+    )
+    httpx_mock.add_response(
+        url="https://example.com/blog/post-1",
+        status_code=200,
+        html="<html><body>Post 1</body></html>",
+        headers={"content-type": "text/html"},
+    )
 
     urls = await discover_urls("https://example.com/", max_urls=100)
 
@@ -211,10 +224,7 @@ async def test_walk_sitemap_caps_index_traversal_at_max_urls(httpx_mock: HTTPXMo
 
     def _urlset(n: int) -> str:
         """Return a urlset with *n* page URLs."""
-        locs = "".join(
-            f"<url><loc>https://example.com/page-{n}-{i}</loc></url>"
-            for i in range(n)
-        )
+        locs = "".join(f"<url><loc>https://example.com/page-{n}-{i}</loc></url>" for i in range(n))
         return (
             '<?xml version="1.0"?>'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
@@ -300,3 +310,102 @@ async def test_discover_urls_rejects_offhost_robots_sitemap_directive(
         f"Off-host directive was fetched: {[r.url for r in all_requests]}"
     )
     assert urls == []
+
+
+# ---------------------------------------------------------------------------
+# Finding 2 (Codex P2): True BFS up to max_depth
+# ---------------------------------------------------------------------------
+
+
+async def test_bfs_fallback_walks_to_max_depth(httpx_mock: HTTPXMock) -> None:
+    """When no sitemap exists, BFS walks the link graph up to max_depth."""
+    httpx_mock.add_response(url="https://example.com/sitemap.xml", status_code=404)
+    httpx_mock.add_response(url="https://example.com/robots.txt", status_code=404)
+    # depth 0 — root
+    httpx_mock.add_response(
+        url="https://example.com/",
+        status_code=200,
+        html='<html><body><a href="/docs">Docs</a></body></html>',
+        headers={"content-type": "text/html"},
+    )
+    # depth 1
+    httpx_mock.add_response(
+        url="https://example.com/docs",
+        status_code=200,
+        html='<html><body><a href="/docs/getting-started">Getting Started</a></body></html>',
+        headers={"content-type": "text/html"},
+    )
+    # depth 2
+    httpx_mock.add_response(
+        url="https://example.com/docs/getting-started",
+        status_code=200,
+        html="<html><body>Getting started content</body></html>",
+        headers={"content-type": "text/html"},
+    )
+
+    urls = await discover_urls("https://example.com/", max_urls=100, max_depth=3)
+
+    assert "https://example.com/" in urls
+    assert "https://example.com/docs" in urls
+    assert "https://example.com/docs/getting-started" in urls
+
+
+async def test_bfs_fallback_respects_max_urls_cap(httpx_mock: HTTPXMock) -> None:
+    """BFS stops once max_urls is reached, even mid-level."""
+    httpx_mock.add_response(url="https://example.com/sitemap.xml", status_code=404)
+    httpx_mock.add_response(url="https://example.com/robots.txt", status_code=404)
+    # root links to 5 pages; only the first 2 need to be fetched for max_urls=3
+    # (root itself counts as 1, then page-0 and page-1 bring it to 3).
+    links_html = "".join(f'<a href="/page-{i}">P{i}</a>' for i in range(5))
+    httpx_mock.add_response(
+        url="https://example.com/",
+        status_code=200,
+        html=f"<html><body>{links_html}</body></html>",
+        headers={"content-type": "text/html"},
+    )
+    httpx_mock.add_response(
+        url="https://example.com/page-0",
+        status_code=200,
+        html="<html><body>page 0</body></html>",
+        headers={"content-type": "text/html"},
+    )
+    httpx_mock.add_response(
+        url="https://example.com/page-1",
+        status_code=200,
+        html="<html><body>page 1</body></html>",
+        headers={"content-type": "text/html"},
+    )
+
+    urls = await discover_urls("https://example.com/", max_urls=3, max_depth=3)
+
+    assert len(urls) <= 3
+
+
+async def test_bfs_fallback_off_host_links_excluded(httpx_mock: HTTPXMock) -> None:
+    """BFS does not queue off-host links."""
+    httpx_mock.add_response(url="https://example.com/sitemap.xml", status_code=404)
+    httpx_mock.add_response(url="https://example.com/robots.txt", status_code=404)
+    httpx_mock.add_response(
+        url="https://example.com/",
+        status_code=200,
+        html=(
+            '<html><body><a href="/a">A</a><a href="https://other.com/x">External</a></body></html>'
+        ),
+        headers={"content-type": "text/html"},
+    )
+    httpx_mock.add_response(
+        url="https://example.com/a",
+        status_code=200,
+        html="<html><body>Page A</body></html>",
+        headers={"content-type": "text/html"},
+    )
+
+    urls = await discover_urls("https://example.com/", max_urls=100, max_depth=3)
+
+    assert "https://example.com/a" in urls
+    assert "https://other.com/x" not in urls
+
+    all_requests = httpx_mock.get_requests()
+    assert not any("other.com" in str(r.url) for r in all_requests), (
+        f"Off-host URL was fetched: {[r.url for r in all_requests]}"
+    )
