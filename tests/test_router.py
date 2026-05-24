@@ -1451,6 +1451,97 @@ async def test_walk_helper_increments_budget_on_engine_error(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# 41. Budget credits actual cost when engine reports cost_usd > estimate
+# ---------------------------------------------------------------------------
+
+
+async def test_walk_credits_actual_cost_not_just_estimate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If engine reports cost_usd > estimate, budget uses the higher value.
+
+    FakeEngine has estimated_cost_usd=0.001 but returns cost_usd=0.01.
+    max_cost_usd=0.005.
+    Pre-check: 0.001 < 0.005, so engine is invoked.
+    Post-call actual cost = max(0.001, 0.01) = 0.01 > 0.005.
+    A second engine attempt must be blocked with budget:cost.
+    """
+    from scrapefold.router import walk
+
+    second_called: list[bool] = []
+
+    async def _fetch_overcharge(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        # Return empty so the walk tries a second engine, but with a high actual cost.
+        return ScrapeResult(
+            url=url,
+            text="",
+            markdown="",
+            html=None,
+            engine=self.NAME,
+            elapsed_ms=1,
+            cost_usd=0.01,  # actual cost far exceeds the 0.001 estimate
+        )
+
+    async def _fetch_second(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        second_called.append(True)
+        return ScrapeResult(
+            url=url,
+            text=_GOOD_TEXT,
+            markdown=f"# {_GOOD_TEXT}",
+            html=None,
+            engine=self.NAME,
+            elapsed_ms=1,
+        )
+
+    overcharge_engine = type(
+        "_StubOvercharge",
+        (ScrapeEngine,),
+        {
+            "NAME": "ac_overcharge",
+            # estimate is low -> passes pre-check; actual will be 10x higher.
+            # requires_api_key=False so is_available() returns True without a key.
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False, estimated_cost_usd=0.001),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_overcharge,
+        },
+    )
+
+    second_engine = type(
+        "_StubSecond",
+        (ScrapeEngine,),
+        {
+            "NAME": "ac_second",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False, estimated_cost_usd=0.001),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch_second,
+        },
+    )
+
+    monkeypatch.setitem(_REGISTRY, "ac_overcharge", lambda: overcharge_engine)
+    monkeypatch.setitem(_REGISTRY, "ac_second", lambda: second_engine)
+
+    # max_cost_usd=0.005 — pre-check on overcharge_engine passes (0.001 < 0.005),
+    # but after the call actual cost is 0.01, which exhausts the budget.
+    # The second engine (cost=0.001) must be blocked with budget:cost.
+    opts = ScrapeOptions(
+        engines=("ac_overcharge", "ac_second"),
+        extra={"max_cost_usd": 0.005},
+    )
+
+    with pytest.raises(AllEnginesFailed) as exc_info:
+        await walk("https://example.com/", opts)
+
+    # Second engine must NOT have been invoked — budget was exhausted by the actual cost.
+    assert second_called == [], (
+        "second engine must not be called when actual cost from first engine exceeds max_cost_usd"
+    )
+    failures = exc_info.value.failures
+    assert any("ac_second" in f and "budget:cost" in f for f in failures), (
+        f"expected budget:cost skip for second engine; got {failures}"
+    )
+
+
 async def test_walk_timeout_boundary_halts_walk(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

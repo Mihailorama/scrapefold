@@ -203,12 +203,18 @@ async def _attempt_engine(
         )
 
     # 8. Quality checks
+    # Post-call accounting uses the higher of estimated vs reported cost so that
+    # engines that overspend (e.g. ScrapingBee extra credits, Cloudflare 2-request
+    # fallback) actually deplete the budget.  The estimate was the pre-call ceiling;
+    # the actual is authoritative once the call has been made.
+    actual_cost = max(engine_cost, float(result.cost_usd or 0.0))
+
     if result.is_empty():
         failures.append(f"{canonical}:empty")
         return _AttemptResult(
             result=None,
             keep_walking=True,
-            cost_delta=engine_cost,
+            cost_delta=actual_cost,
             elapsed_delta=float(result.elapsed_ms),
         )
     if is_suspicious(result):
@@ -216,7 +222,7 @@ async def _attempt_engine(
         return _AttemptResult(
             result=None,
             keep_walking=True,
-            cost_delta=engine_cost,
+            cost_delta=actual_cost,
             elapsed_delta=float(result.elapsed_ms),
         )
 
@@ -224,7 +230,7 @@ async def _attempt_engine(
     return _AttemptResult(
         result=result,
         keep_walking=False,
-        cost_delta=engine_cost,
+        cost_delta=actual_cost,
         elapsed_delta=float(result.elapsed_ms),
     )
 
