@@ -66,8 +66,12 @@ def is_suspicious(
        raw HTML length after stripping noscript tags.
     4. **Script domination** — the ratio of non-script visible text to total HTML
        is below 0.1 (script tags make up more than 90 % of the document).
-    5. **Error status + empty text** — ``meta["status_code"]`` is 403 or 503 AND
-       ``result.text`` is empty / whitespace-only.
+    5. **Block-status code** — ``meta["status_code"]`` is 403, 429, or 503,
+       regardless of body length. These codes always indicate a bot block or
+       rate limit; the body is a synthetic error page, not real content, so the
+       router should escalate to a different engine. (404 / 401 / 410 are NOT
+       suspicious — they are legitimate protocol responses where escalation
+       would not change the outcome.)
     """
     text: str = result.text or ""
     html: str | None = result.html
@@ -119,8 +123,8 @@ def is_suspicious(
                 return True
 
     status_code = result.status_code
-    if status_code in (403, 503) and not text.strip():
-        logger.debug("is_suspicious: status_code=%d with empty text", status_code)
+    if status_code in (403, 429, 503):
+        logger.debug("is_suspicious: block-status status_code=%d", status_code)
         return True
 
     return False
