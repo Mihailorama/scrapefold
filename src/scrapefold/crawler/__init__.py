@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 import httpx
 
 import scrapefold.crawler.sitemap as sitemap
-from scrapefold._host_utils import same_host as _same_host
+from scrapefold._host_utils import _is_invalid_location_error, same_host as _same_host
 from scrapefold.crawler.stitcher import write_stitched
 from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
@@ -53,6 +53,19 @@ async def _preflight_head(
     """
     try:
         resp = await client.head(url, follow_redirects=False)
+    except httpx.RemoteProtocolError as exc:
+        # httpx parses the Location header even on follow_redirects=False;
+        # a malformed Location (e.g. unterminated IPv6 bracket) raises
+        # RemoteProtocolError BEFORE we can inspect the response.
+        if _is_invalid_location_error(exc):
+            logger.debug(
+                "crawler: preflight HEAD raised malformed-Location error for %s — skipping url: %s",
+                url,
+                exc,
+            )
+            return False  # URL is unsafe to crawl — malformed redirect Location
+        logger.debug("crawler: preflight HEAD transient protocol error url=%s err=%s", url, exc)
+        return True  # transient protocol failure — let the engine layer try
     except httpx.HTTPError as exc:
         logger.debug("crawler: preflight HEAD failed url=%s err=%s", url, exc)
         # Cannot confirm safety; let the scrape engine decide

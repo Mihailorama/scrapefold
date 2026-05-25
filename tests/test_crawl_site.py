@@ -420,3 +420,68 @@ async def test_crawl_site_preflight_skips_url_with_malformed_location(
         "URL with malformed Location header must be skipped"
     )
     assert "https://example.com/safe" in scraped_urls, "safe URL must still be scraped"
+
+
+# ---------------------------------------------------------------------------
+# Codex round-10 P2: _preflight_head — RemoteProtocolError narrowing
+# ---------------------------------------------------------------------------
+
+
+async def test_preflight_head_returns_false_on_invalid_location_protocol_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_preflight_head returns False when httpx raises RemoteProtocolError with
+    'Invalid URL in location header' — the malformed-Location case from httpx."""
+    import httpx
+
+    from scrapefold.crawler import _preflight_head
+
+    async def _fake_head(
+        self: httpx.AsyncClient,
+        url: str,
+        **kwargs: object,
+    ) -> httpx.Response:
+        raise httpx.RemoteProtocolError(
+            "Invalid URL in location header: Invalid port: ':1'.",
+            request=httpx.Request("HEAD", url),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "head", _fake_head)
+
+    async with httpx.AsyncClient() as client:
+        result = await _preflight_head(client, "https://example.com/page", "https://example.com", False)
+
+    assert result is False, (
+        "_preflight_head must return False (skip URL) for malformed-Location RemoteProtocolError"
+    )
+
+
+async def test_preflight_head_returns_true_on_transient_protocol_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_preflight_head returns True when httpx raises RemoteProtocolError with
+    'Server disconnected without sending a response.' — a transient failure
+    that should NOT block the URL from being attempted by the engine layer."""
+    import httpx
+
+    from scrapefold.crawler import _preflight_head
+
+    async def _fake_head(
+        self: httpx.AsyncClient,
+        url: str,
+        **kwargs: object,
+    ) -> httpx.Response:
+        raise httpx.RemoteProtocolError(
+            "Server disconnected without sending a response.",
+            request=httpx.Request("HEAD", url),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "head", _fake_head)
+
+    async with httpx.AsyncClient() as client:
+        result = await _preflight_head(client, "https://example.com/page", "https://example.com", False)
+
+    assert result is True, (
+        "_preflight_head must return True (proceed) for transient RemoteProtocolError "
+        "(server disconnect is not a malformed Location)"
+    )

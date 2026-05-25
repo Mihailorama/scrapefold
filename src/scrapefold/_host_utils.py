@@ -10,7 +10,18 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
+import httpx
 import tldextract
+
+
+def _is_invalid_location_error(exc: httpx.RemoteProtocolError) -> bool:
+    """Return True if a RemoteProtocolError came from a malformed Location header.
+
+    httpx's message for this case is stable across versions tested:
+    'Invalid URL in location header: ...'. Any other RemoteProtocolError
+    (server disconnects, malformed response bodies) returns False.
+    """
+    return "Invalid URL in location header" in str(exc)
 
 
 def same_host(url: str, root: str, follow_subdomains: bool) -> bool:
@@ -44,4 +55,4 @@ def same_host(url: str, root: str, follow_subdomains: bool) -> bool:
         return url_host == root_host
 
 
-__all__ = ["same_host"]
+__all__ = ["_is_invalid_location_error", "same_host"]

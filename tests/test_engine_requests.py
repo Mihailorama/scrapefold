@@ -510,3 +510,45 @@ async def test_requests_engine_malformed_location_raises_redirect_scope_violatio
     # terminates the walk instead of escalating.
     with pytest.raises(RedirectScopeViolation):
         await _engine().scrape("https://example.com/page", opts)
+
+
+# ---------------------------------------------------------------------------
+# Codex round-10 P2: transient RemoteProtocolError must NOT raise RedirectScopeViolation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_requests_engine_transient_protocol_error_does_not_raise_redirect_scope_violation(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """A RemoteProtocolError('Server disconnected without sending a response.')
+    must NOT raise RedirectScopeViolation — it should fall through to EngineError
+    so the router can escalate to the next engine rather than terminating the walk.
+    """
+    import httpx as _httpx
+
+    httpx_mock.add_exception(
+        _httpx.RemoteProtocolError(
+            "Server disconnected without sending a response.",
+            request=_httpx.Request("GET", "https://example.com/page"),
+        ),
+        url="https://example.com/page",
+    )
+
+    opts = ScrapeOptions(
+        extra={
+            "same_host_redirect_scope": {
+                "root": "https://example.com",
+                "follow_subdomains": False,
+            }
+        }
+    )
+
+    with pytest.raises(EngineError) as exc_info:
+        await _engine().scrape("https://example.com/page", opts)
+
+    # Must be EngineError, NOT RedirectScopeViolation
+    assert type(exc_info.value) is not RedirectScopeViolation, (
+        "transient RemoteProtocolError must not be treated as a scope violation"
+    )
+    assert exc_info.value.engine == "requests"
