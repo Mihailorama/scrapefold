@@ -91,11 +91,12 @@ async def crawl_site(
     :class:`CrawlResult` with the per-URL pages, the stitched markdown
     path, and per-URL failure strings.
 
-    Pass ``opts.extra["cache_dir"]`` to enable disk caching. Set
-    ``opts.skip_cache=True`` to bypass the cache for both reads and writes.
+    Pass ``opts.extra["cache_dir"]`` to enable disk caching. The cache
+    TTL is read from ``opts.extra["cache_ttl_days"]`` (default: 7 days).
+    Set ``opts.skip_cache=True`` to bypass the cache for both reads and writes.
 
-    Unknown keyword arguments (e.g. ``cache_ttl_hours``) are accepted and
-    silently ignored for forward compatibility.
+    Unknown keyword arguments are accepted and silently ignored for
+    forward compatibility (logged at DEBUG).
     """
     import logging as _logging
 
