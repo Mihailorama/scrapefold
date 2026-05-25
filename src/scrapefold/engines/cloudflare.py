@@ -1,6 +1,5 @@
 """CloudflareEngine — Cloudflare Browser Rendering API scrape engine.
 
-Ported from downstream-consumer/services/url_to_text_service.py:get_content_cloudflare.
 Two endpoints: /markdown (preferred — clean markdown extraction) and
 /content (raw HTML fallback when /markdown returns empty or non-200).
 

@@ -53,7 +53,7 @@ scrapefold crawl https://docs.example.com --output site.md --per-page-dir ./page
 scrapefold crawl https://docs.example.com --output site.md --json
 ```
 
-`--per-page-dir DIR`: writes `<sha256(url)[:16]>.md` for each page; prints one `wrote <path> (<url>)` line to stderr per file. Designed for feeding per-URL markdown into downstream parsers (e.g. sponsorship/role-pair detection).
+`--per-page-dir DIR`: writes `<sha256(url)[:16]>.md` for each page; prints one `wrote <path> (<url>)` line to stderr per file. Designed for feeding per-URL markdown into downstream parsers.
 
 ### `scrapefold list-engines`
 

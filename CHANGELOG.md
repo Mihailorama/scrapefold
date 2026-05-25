@@ -8,35 +8,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [0.1.0rc1] - 2026-05-25
 
-First release candidate for v0.1.0. API surface is frozen pending consumer
-validation (downstream-consumer migration). No new functionality vs. 0.1.0a4 — this RC
-bundles the simplify pass, the live-smoke detection fix, and the QA harness.
+First release candidate for v0.1.0. API surface is frozen pending downstream
+consumer validation. No new functionality vs. 0.1.0a4 — this RC bundles the
+simplify pass, the live-smoke detection fix, and the QA harness.
 
 ### Added
 
-- `scripts/downstream-consumer_smoke.py --llm-qa` — opt-in flag that asks Claude
+- `scripts/live_smoke.py --llm-qa` — opt-in flag that asks Claude
   (`claude-sonnet-4-6`, per the explicit-model audit rule) to classify each
   scraped page as REAL / BLOCK / THIN with a 0–10 confidence score. Verdicts
   surface in the markdown report. Scraped content is treated as untrusted
   data in the prompt.
 - `docs/TECH_DEBT.md` ticket #10 — sitemap / robots / BFS discovery does not
-  escalate engines (P2, deferred to v0.2). Surfaced by live smoke: example-site/example-site
-  homepages succeed via `scrapling_stealth` but their sitemap.xml fetch uses
-  hard-coded httpx and returns block pages, so the crawl collapses to
-  `{root}` and produces 1 page instead of N.
+  escalate engines (P2, deferred to v0.2). Surfaced by live smoke: a
+  Cloudflare-protected homepage succeeds via `scrapling_stealth`, but the
+  sitemap.xml fetch uses hard-coded httpx and returns a block page, so the
+  crawl collapses to `{root}` and produces 1 page instead of N.
 - `docs/TECH_DEBT.md` ticket #11 — no residential-proxy engine for
-  IP-geofenced targets (P2, deferred to v0.2). example-site.ru is unreachable from
-  US/EU IPs at the TCP layer; stealth doesn't help. Reinstate
-  `brightdata_unlocker` as a real engine for `russia_geofenced`.
+  IP-geofenced targets (P2, deferred to v0.2). A subset of targets are
+  unreachable from US/EU IPs at the TCP layer; stealth doesn't help.
+  Reinstate `brightdata_unlocker` as a real engine for geofenced site
+  classes.
 
 ### Changed
 
 - `scrapefold.detection.is_suspicious` — 403 / 429 / 503 status codes now
-  flag suspicious regardless of body length. example-site's 528-byte Russian
-  "access denied" block page was previously accepted as success because
-  text > 200 chars; the router now correctly escalates to `scrapling_stealth`
-  and serves real content (independently verified at 9/10 by the LLM QA pass).
-  404 / 401 / 410 remain non-suspicious (legitimate protocol responses).
+  flag suspicious regardless of body length. A live target was found
+  returning a ~500-byte localised block page on 403 that was previously
+  accepted as success because text > 200 chars; the router now correctly
+  escalates to `scrapling_stealth` and serves real content (independently
+  verified at 9/10 by the LLM QA pass). 404 / 401 / 410 remain non-suspicious
+  (legitimate protocol responses).
 - Simplify pass on Pack 5 + 6 — no functional change. Folded
   `path.exists`/`stat`/`read_text` into a single `_stat_and_read_sync` so
   `Cache.get_text` issues one `asyncio.to_thread` call instead of three.
@@ -46,10 +48,11 @@ bundles the simplify pass, the live-smoke detection fix, and the QA harness.
 
 ### Validated
 
-- Live smoke against six downstream-consumer targets (example-site, example-site, example-site, example-site,
-  example-site, example-site). 5/6 reachable; all reachable targets verified REAL by an
-  independent LLM. example-site and example-site — both Cloudflare-protected — escalate to
-  `scrapling_stealth` and produce real homepage content (REAL 8–9/10).
+- Live smoke against six real-world targets covering static HTML, SPA,
+  Cloudflare-protected, and IP-geofenced architectures. 5/6 reachable;
+  all reachable targets verified REAL by an independent LLM. Cloudflare-
+  protected targets escalate to `scrapling_stealth` and produce real
+  homepage content (REAL 8–9/10).
 
 ## [0.1.0a4] - 2026-05-25
 
@@ -66,9 +69,9 @@ Pack 6 — Minimal Typer CLI with four subcommands (`scrape`, `crawl`, `list-eng
   - All errors fatal: `AllEnginesFailed` → exit 1; invalid options → exit 2 (Typer default).
 - `tests/test_cli.py` — 16 tests via `typer.testing.CliRunner` covering all four subcommands, `--json` variants, `--output`, `--engines`, `AllEnginesFailed` exit code, `--version`, `--help` subcommand listing, and four `--per-page-dir` tests (file count, sha256 filename, stderr output, stitched + per-page coexistence).
 
-### Added — `--per-page-dir` (downstream-consumer integration)
+### Added — `--per-page-dir` (per-URL markdown output)
 
-The `crawl` subcommand's `--per-page-dir DIR` flag writes each `CrawlResult.pages[*].markdown` to `DIR/<sha256(url)[:16]>.md` and prints `wrote <path> (<url>)` to stderr. This is the load-bearing output path for downstream-consumer's sponsorship/role-pair parser which consumes per-URL `.md` files.
+The `crawl` subcommand's `--per-page-dir DIR` flag writes each `CrawlResult.pages[*].markdown` to `DIR/<sha256(url)[:16]>.md` and prints `wrote <path> (<url>)` to stderr. This is the load-bearing output path for downstream consumers that ingest one markdown file per URL.
 
 ### Changed — `__version__` bumped to `0.1.0a4`
 
@@ -122,8 +125,8 @@ Pack 3 — sequential router shell + Cloudflare Browser Rendering engine + compr
   Consumers no longer need to parse the exception message. The
   `failures` list shape is `"<engine>:<reason>:<detail>"` (e.g.
   `"firecrawl:error:404 Not Found"`, `"jina:empty"`,
-  `"scrapingbee:unavailable"`, `"budget:cost"`). Pack 7 consumer
-  migrations (downstream-consumer + downstream-consumer) target this contract directly.
+  `"scrapingbee:unavailable"`, `"budget:cost"`). Downstream consumer
+  migrations target this contract directly.
 
 ### Fixed — golden-rule violation: router now consults detection.is_suspicious
 
@@ -146,11 +149,10 @@ Pack 3 — sequential router shell + Cloudflare Browser Rendering engine + compr
 
 ### Added — Pack 3 cloudflare engine
 
-- `src/scrapefold/engines/cloudflare.py` — port of downstream-consumer
-  `get_content_cloudflare` to scrapefold's `ScrapeEngine` ABC. Calls
-  Cloudflare Browser Rendering `/markdown` first (native markdown), falls
-  back to `/content` (raw HTML → html_to_text). Env: `CLOUDFLARE_API_TOKEN`
-  + `CLOUDFLARE_ACCOUNT_ID`.
+- `src/scrapefold/engines/cloudflare.py` — wraps Cloudflare Browser
+  Rendering into scrapefold's `ScrapeEngine` ABC. Calls `/markdown` first
+  (native markdown), falls back to `/content` (raw HTML → html_to_text).
+  Env: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
 - `tests/test_engine_cloudflare.py` — 13 tests covering both endpoints,
   fallback paths, auth headers, body shape, is_available gating,
   registry registration.

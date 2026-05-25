@@ -3,9 +3,8 @@
 All tests use the httpx_mock fixture from pytest-httpx so no real network
 calls are made. Follows the offline-by-default golden rule.
 
-Ported from downstream-consumer/services/url_to_text_service.py:get_content_cloudflare
-(lines 1452-1568). Two endpoints: /markdown (preferred) and /content (HTML
-fallback when /markdown returns empty or non-200).
+Two endpoints: /markdown (preferred) and /content (HTML fallback when
+/markdown returns empty or non-200).
 """
 
 from __future__ import annotations

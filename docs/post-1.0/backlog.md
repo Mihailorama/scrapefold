@@ -1,8 +1,6 @@
 ---
 purpose: "Engines + features intentionally deferred from v0.1.0."
 updated: "2026-05-23"
-related:
-  - ../superpowers/specs/2026-05-23-v0.1.0-stable-roadmap-design.md
 ---
 
 # Post-v0.1.0 backlog
