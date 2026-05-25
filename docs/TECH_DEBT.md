@@ -99,6 +99,23 @@ and downstream-consumer only need sequential walks at v0.1.0 ship time.
 - **Fix sketch:** cache the SDK instance on `self` after first `_fetch`. Outscraper's `requests.Session` is also a candidate for `aclose()`-style cleanup at walk shutdown.
 - **Land:** S7 router work or sooner if benchmarks show it.
 
+### 10. Sitemap / robots / BFS discovery does not escalate
+
+- **Where:** `src/scrapefold/crawler/sitemap.py`, `src/scrapefold/crawler/__init__.py`.
+- **Status:** `crawl_site()` correctly escalates engines on **per-URL scrapes**, but the upstream **URL discovery** (sitemap.xml, robots.txt, BFS link-extraction) uses an internal `httpx.AsyncClient` — same path as the `requests` engine. On a Cloudflare/anti-bot protected site, the homepage scrape succeeds via `scrapling_stealth` but the sitemap fetch fails with a block page → discovery returns `[root]` only → crawl_site produces 1 page instead of N.
+- **Symptom (found via smoke test on 2026-05-25):** crawl on example.com / example.com returns 1 page (homepage only) even though the per-page ladder works. Sitemap.xml fetch returns the same 403 / block content as the homepage but is parsed as empty XML → BFS fallback fires but can't even reach the root document.
+- **Fix sketch:** route sitemap.xml / robots.txt / BFS-discovery fetches through `scrapefold.scrape(url, opts)` instead of a hard-coded `httpx.AsyncClient.get()`. The result's `markdown`/`html` can be parsed for sitemap XML or BFS links. Costs more (BFS discovery now goes through ladder for every discovered page) but is the only way to crawl protected sites.
+- **Test:** `test_crawl_site_uses_engine_ladder_for_sitemap_fetch` — mock the requests engine to return 403, mock scrapling_stealth to return valid sitemap.xml; assert sitemap.xml URLs are discovered.
+- **Priority:** P2 (deferred to v0.2 alongside parallel fan-out). Pack 7 downstream-consumer migration can work around by passing pre-discovered URL lists for protected targets.
+
+### 11. No residential-proxy engine for IP-geofenced targets
+
+- **Where:** `src/scrapefold/engines/`.
+- **Status:** `example.com` is unreachable from US/EU IPs at the network layer (TCP timeout, not bot detection). No amount of stealth / JS rendering / fingerprint randomisation helps — the connection never completes. To scrape such targets, scrapefold needs a residential-proxy engine that routes requests through a geo-matched exit node.
+- **Originally scoped, never shipped:** `brightdata_unlocker` and `brightdata_browser` were listed in the early README's 16-engine table; the placeholder pyproject extras were removed in `0.1.0a2` (CHANGELOG).
+- **Fix sketch:** implement `engines/brightdata_unlocker.py` against Bright Data's Web Unlocker API (`https://api.brightdata.com/datacenter/zone/unlock` or equivalent). Capability: `proxy_type="residential"`, `geography=("ru",)` and other country codes. Wire into ladders for `russia_geofenced` site class.
+- **Priority:** P2 — needed for full downstream-consumer coverage but workable around for v0.1.0 (90% of targets are reachable without).
+
 ## How to add an item
 
 1. Open a row here with **P-priority**, **where** (file/function), **status**, **fix sketch**, **test**.
