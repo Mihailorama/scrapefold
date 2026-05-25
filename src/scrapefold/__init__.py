@@ -30,6 +30,7 @@ from scrapefold.ladders import (
     get_ladder,
 )
 from scrapefold.options import ScrapeOptions
+from scrapefold.pool import EnginePool
 from scrapefold.result import ScrapeResult
 from scrapefold.router import walk as _walk
 
@@ -41,6 +42,7 @@ __all__ = [
     "CrawlResult",
     "EngineCapabilities",
     "EngineError",
+    "EnginePool",
     "Policy",
     "RaceStep",
     "RedirectScopeViolation",
@@ -58,13 +60,21 @@ __all__ = [
 ]
 
 
-async def scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+async def scrape(
+    url: str,
+    opts: ScrapeOptions | None = None,
+    pool: EnginePool | None = None,
+) -> ScrapeResult:
     """Single-URL scrape with engine auto-selection.
 
     Walks the per-site-class ladder via ``scrapefold.router.walk``. Raises
     ``AllEnginesFailed`` if no step in the ladder succeeds.
+
+    Pass a caller-owned ``pool`` to reuse engine instances across scrape calls
+    (e.g. during a ``crawl_site`` run). When ``None`` (default), an ephemeral
+    pool is created and closed for each call.
     """
-    return await _walk(url, opts)
+    return await _walk(url, opts, pool=pool)
 
 
 async def crawl_site(

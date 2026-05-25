@@ -33,6 +33,7 @@ from scrapefold.ladders import (
     get_ladder,
 )
 from scrapefold.options import ScrapeOptions
+from scrapefold.pool import EnginePool
 from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
@@ -321,7 +322,11 @@ async def _attempt_engine(
 # ---------------------------------------------------------------------------
 
 
-async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+async def walk(
+    url: str,
+    opts: ScrapeOptions | None = None,
+    pool: EnginePool | None = None,
+) -> ScrapeResult:
     """Walk the resolved ladder and return the first non-empty result.
 
     If ``opts.engines`` is non-empty, those engine names are tried in order
@@ -333,8 +338,32 @@ async def walk(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
     v0.1 ladder walk: both ``SequentialStep`` and ``RaceStep`` entries are
     walked sequentially (one engine at a time).  Concurrent fan-out with
     first-good-wins cancellation is deferred to v0.2.
+
+    Parameters
+    ----------
+    pool:
+        Caller-owned :class:`~scrapefold.pool.EnginePool`.  When ``None``
+        (default), an ephemeral pool is created and closed after the walk
+        regardless of outcome.  When provided, the caller is responsible for
+        calling ``pool.aclose()``.
     """
+    _caller_owns_pool = pool is not None
+    if pool is None:
+        pool = EnginePool()
     opts = opts or ScrapeOptions()
+    try:
+        return await _walk_inner(url, opts, pool)
+    finally:
+        if not _caller_owns_pool:
+            await pool.aclose()
+
+
+async def _walk_inner(
+    url: str,
+    opts: ScrapeOptions,
+    pool: EnginePool,
+) -> ScrapeResult:
+    """Internal walk implementation; pool lifecycle managed by caller (``walk``)."""
     failures: list[str] = []
 
     # -----------------------------------------------------------------------

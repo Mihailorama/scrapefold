@@ -1931,3 +1931,111 @@ async def test_router_caches_per_domain_probe_across_urls(
     await walk("https://example.com/page2")
 
     assert len(probe_calls) == 1, f"expected 1 probe per domain, got {len(probe_calls)}"
+
+
+# ---------------------------------------------------------------------------
+# G — EnginePool optional parameter on walk() (Pack 5 rescue Step 4)
+# ---------------------------------------------------------------------------
+
+
+async def test_router_walk_accepts_caller_owned_pool(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """walk() must accept an optional pool= argument without raising."""
+    from scrapefold.pool import EnginePool
+    from scrapefold.router import walk
+
+    stub_ladder((SequentialStep(engine="stub_good"),))
+
+    pool = EnginePool()
+    try:
+        result = await walk("https://example.com/", pool=pool)
+        assert result.engine == "stub_good"
+    finally:
+        await pool.aclose()
+
+
+async def test_router_walk_does_not_close_caller_owned_pool(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When the caller passes pool=, walk() must NOT call aclose() on it."""
+    from scrapefold.pool import EnginePool
+    from scrapefold.router import walk
+
+    stub_ladder((SequentialStep(engine="stub_good"),))
+
+    pool = EnginePool()
+    close_calls: list[str] = []
+    original_aclose = pool.aclose
+
+    async def _spy_aclose() -> None:
+        close_calls.append("aclose")
+        await original_aclose()
+
+    monkeypatch.setattr(pool, "aclose", _spy_aclose)
+
+    await walk("https://example.com/", pool=pool)
+    await pool.aclose()  # caller closes it
+    assert close_calls == ["aclose"], "pool.aclose must be called exactly once (by caller)"
+
+
+async def test_router_walk_closes_ephemeral_pool_on_completion(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """When pool=None (default), walk() creates and closes an ephemeral pool."""
+    from unittest.mock import patch
+
+    import scrapefold.router as router_mod
+
+    stub_ladder((SequentialStep(engine="stub_good"),))
+
+    close_calls: list[str] = []
+
+    original_pool_cls = router_mod.EnginePool  # type: ignore[attr-defined]
+
+    class _SpyPool(original_pool_cls):  # type: ignore[misc]
+        async def aclose(self) -> None:
+            close_calls.append("aclose")
+            await super().aclose()
+
+    with patch.object(router_mod, "EnginePool", _SpyPool):
+        from scrapefold.router import walk
+
+        await walk("https://example.com/")
+
+    assert close_calls == ["aclose"], "ephemeral pool must be closed after walk"
+
+
+async def test_router_walk_closes_ephemeral_pool_on_exception(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """When pool=None and walk raises, the ephemeral pool is still closed."""
+    import scrapefold.router as router_mod
+
+    # Use an empty ladder to force AllEnginesFailed
+    stub_ladder(())
+
+    close_calls: list[str] = []
+    original_pool_cls = router_mod.EnginePool  # type: ignore[attr-defined]
+
+    class _SpyPool(original_pool_cls):  # type: ignore[misc]
+        async def aclose(self) -> None:
+            close_calls.append("aclose")
+            await super().aclose()
+
+    from unittest.mock import patch as _patch
+
+    with (
+        pytest.raises(scrapefold.AllEnginesFailed),
+        _patch.object(router_mod, "EnginePool", _SpyPool),
+    ):
+        from scrapefold.router import walk
+
+        await walk("https://example.com/")
+
+    assert close_calls == ["aclose"], "ephemeral pool must be closed even on exception"
