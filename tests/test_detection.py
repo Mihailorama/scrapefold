@@ -175,12 +175,23 @@ class TestIsSuspiciousStatusCode:
         result = _result(text="", meta={"status_code": 503})
         assert is_suspicious(result) is True
 
-    def test_403_with_rich_text_not_suspicious_via_status(self) -> None:
-        # 403 + rich text: still caught by short-text? No — text is long enough,
-        # no phrase match, so the status-code-alone path is tested:
-        # status_code 403 AND empty text → suspicious.
-        # Here text is rich so it passes length check — status alone doesn't block.
+    def test_403_with_rich_text_is_suspicious_via_block_status(self) -> None:
+        # Block-status codes (403, 429, 503) always flag suspicious regardless
+        # of body length — the body is a synthetic error page, never real
+        # content. Found via live downstream-consumer smoke test on example.com which returns
+        # 403 + a 528-char "access denied" page that was previously silently
+        # accepted as success.
         result = _result(text="A" * 300, meta={"status_code": 403})
+        assert is_suspicious(result) is True
+
+    def test_429_rate_limit_is_suspicious(self) -> None:
+        result = _result(text="Too Many Requests" + "A" * 300, meta={"status_code": 429})
+        assert is_suspicious(result) is True
+
+    def test_404_with_rich_text_is_not_suspicious(self) -> None:
+        # 404 is a legitimate protocol response — escalation will not help, so
+        # the router must NOT flag it suspicious.
+        result = _result(text="Page not found" + "A" * 300, meta={"status_code": 404})
         assert is_suspicious(result) is False
 
     def test_200_with_empty_text_still_suspicious_via_length(self) -> None:
