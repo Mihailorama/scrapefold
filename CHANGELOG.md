@@ -6,6 +6,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.1.0rc1] - 2026-05-25
+
+First release candidate for v0.1.0. API surface is frozen pending consumer
+validation (downstream-consumer migration). No new functionality vs. 0.1.0a4 — this RC
+bundles the simplify pass, the live-smoke detection fix, and the QA harness.
+
+### Added
+
+- `scripts/downstream-consumer_smoke.py --llm-qa` — opt-in flag that asks Claude
+  (`claude-sonnet-4-6`, per the explicit-model audit rule) to classify each
+  scraped page as REAL / BLOCK / THIN with a 0–10 confidence score. Verdicts
+  surface in the markdown report. Scraped content is treated as untrusted
+  data in the prompt.
+- `docs/TECH_DEBT.md` ticket #10 — sitemap / robots / BFS discovery does not
+  escalate engines (P2, deferred to v0.2). Surfaced by live smoke: example-site/example-site
+  homepages succeed via `scrapling_stealth` but their sitemap.xml fetch uses
+  hard-coded httpx and returns block pages, so the crawl collapses to
+  `{root}` and produces 1 page instead of N.
+- `docs/TECH_DEBT.md` ticket #11 — no residential-proxy engine for
+  IP-geofenced targets (P2, deferred to v0.2). example-site.ru is unreachable from
+  US/EU IPs at the TCP layer; stealth doesn't help. Reinstate
+  `brightdata_unlocker` as a real engine for `russia_geofenced`.
+
+### Changed
+
+- `scrapefold.detection.is_suspicious` — 403 / 429 / 503 status codes now
+  flag suspicious regardless of body length. example-site's 528-byte Russian
+  "access denied" block page was previously accepted as success because
+  text > 200 chars; the router now correctly escalates to `scrapling_stealth`
+  and serves real content (independently verified at 9/10 by the LLM QA pass).
+  404 / 401 / 410 remain non-suspicious (legitimate protocol responses).
+- Simplify pass on Pack 5 + 6 — no functional change. Folded
+  `path.exists`/`stat`/`read_text` into a single `_stat_and_read_sync` so
+  `Cache.get_text` issues one `asyncio.to_thread` call instead of three.
+  `EnginePool.aclose` now closes engines in parallel via `asyncio.gather`.
+  `CrawlResult.failures` default switched from `field(default_factory=tuple)`
+  to `= ()` (immutable, no factory needed).
+
+### Validated
+
+- Live smoke against six downstream-consumer targets (example-site, example-site, example-site, example-site,
+  example-site, example-site). 5/6 reachable; all reachable targets verified REAL by an
+  independent LLM. example-site and example-site — both Cloudflare-protected — escalate to
+  `scrapling_stealth` and produce real homepage content (REAL 8–9/10).
+
 ## [0.1.0a4] - 2026-05-25
 
 Pack 6 — Minimal Typer CLI with four subcommands (`scrape`, `crawl`, `list-engines`, `classify`), `--json` everywhere, and `--per-page-dir` for per-URL markdown output.
