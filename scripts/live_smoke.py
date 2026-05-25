@@ -1,14 +1,14 @@
-"""Live network smoke test of scrapefold against real downstream-consumer targets.
+"""Live network smoke test of scrapefold against real-world targets.
 
-Runs single-URL scrape() and crawl_site() against a curated set of Russian
-sports federation / club websites of varying complexity. Writes a markdown
-report to /tmp/downstream-consumer_smoke_report.md.
+Runs single-URL scrape() and crawl_site() against a curated set of websites
+of varying architecture and anti-bot complexity. Writes a markdown report to
+/tmp/live_smoke_report.md.
 
 Costs money if engines beyond `requests` get triggered (Firecrawl, ScrapingBee,
 etc.). Pass --free-only to constrain to free engines.
 
 Usage:
-    python scripts/downstream-consumer_smoke.py [--free-only] [--max-pages N] [--target URL ...]
+    python scripts/live_smoke.py [--free-only] [--max-pages N] [--target URL ...]
 """
 
 from __future__ import annotations
@@ -29,15 +29,16 @@ from scrapefold import ScrapeOptions
 # always pass --model explicitly; never rely on session defaults.
 LLM_QA_MODEL = "claude-sonnet-4-6"
 
-# Targets chosen for architecture/complexity diversity from downstream-consumer's real workload.
+# Default targets cover architecture / anti-bot diversity (static HTML, SPA,
+# Cloudflare-protected, large JS site). Override at the CLI with --target URL.
 TARGETS = [
     # (root_url, label, notes)
-    ("https://example.com/", "example-site", "Mid-size football club, likely static CMS"),
-    ("https://example.com/", "example-site", "Major hockey league, Cloudflare-protected"),
-    ("https://example.com/", "example-site", "Major football club, heavy site"),
-    ("https://example.com/", "example-site", "Basketball league, modern SPA"),
-    ("https://example.com/", "example-site", "federation"),
-    ("https://example.com/", "example-site", "Volleyball federation, well-structured"),
+    ("https://example.com/", "example-com", "RFC-2606 reserved test domain"),
+    ("https://news.ycombinator.com/", "hn", "Static HTML, predictable structure"),
+    ("https://www.python.org/", "python-org", "Mid-size static CMS"),
+    ("https://github.com/", "github", "Heavy JS site behind a CDN"),
+    ("https://www.reddit.com/r/python/", "reddit-python", "Cloudflare-protected subreddit"),
+    ("https://httpbin.org/html", "httpbin-html", "Tiny stable HTML for sanity check"),
 ]
 
 
@@ -187,7 +188,7 @@ def _fmt_qa(s: Step) -> str:
 
 def write_report(steps: list[Step], path: Path) -> None:
     lines = [
-        "# scrapefold ↔ downstream-consumer smoke test",
+        "# scrapefold live smoke test",
         "",
         f"Run at {time.strftime('%Y-%m-%d %H:%M:%S')}.",
         "",
@@ -252,7 +253,7 @@ async def main() -> int:
     ap.add_argument(
         "--out",
         type=Path,
-        default=Path("/tmp/downstream-consumer_smoke_report.md"),
+        default=Path("/tmp/live_smoke_report.md"),
         help="Markdown report path",
     )
     ap.add_argument(

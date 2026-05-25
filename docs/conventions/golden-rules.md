@@ -99,8 +99,8 @@ These are the non-negotiable invariants of scrapefold. Read before touching code
 - **Don't:** Hit `https://example.com` from a default-marker test.
 
 ### Rule: Two Dockerfile pins (downstream consumers) stay in sync
-- **What:** If a downstream like downstream-consumer pins scrapefold in multiple Dockerfiles, those pins must match. A `scripts/check.sh` lint enforces this on the downstream side.
-- **Why:** Drift between OCR-worker and web-server caused real prod incidents in sibling projects. We avoid the same trap from the start.
+- **What:** If a downstream consumer pins scrapefold in multiple Dockerfiles, those pins must match. A `scripts/check.sh` lint can enforce this on the downstream side.
+- **Why:** Drift between worker and web-server image pins causes real prod incidents. We surface this as a convention to spare downstream consumers the same trap.
 
 ### Rule: Never push without tests + lint passing
 - **What:** `./scripts/check.sh` exit 0 is a precondition for `git push`.

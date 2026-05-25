@@ -178,9 +178,9 @@ class TestIsSuspiciousStatusCode:
     def test_403_with_rich_text_is_suspicious_via_block_status(self) -> None:
         # Block-status codes (403, 429, 503) always flag suspicious regardless
         # of body length — the body is a synthetic error page, never real
-        # content. Found via live downstream-consumer smoke test on example.com which returns
-        # 403 + a 528-char "access denied" page that was previously silently
-        # accepted as success.
+        # content. Found via live smoke: a Cloudflare-protected target
+        # returned a ~500-byte localised "access denied" page on 403 that
+        # was previously silently accepted as success.
         result = _result(text="A" * 300, meta={"status_code": 403})
         assert is_suspicious(result) is True
 
