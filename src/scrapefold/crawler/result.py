@@ -1,8 +1,8 @@
-"""CrawlResult dataclass — returned by crawl_site() (Pack 5 Phase G)."""
+"""CrawlResult dataclass — returned by crawl_site() / crawl()."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from scrapefold.result import ScrapeResult
@@ -27,7 +27,7 @@ class CrawlResult:
 
     pages: tuple[ScrapeResult, ...]
     stitched_path: Path | None
-    failures: tuple[str, ...] = field(default_factory=tuple)
+    failures: tuple[str, ...] = ()
 
 
 __all__ = ["CrawlResult"]

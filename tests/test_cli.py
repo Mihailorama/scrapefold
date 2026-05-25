@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
@@ -13,6 +12,7 @@ import pytest
 from typer.testing import CliRunner
 
 from scrapefold.cli import app
+from scrapefold.crawler.result import CrawlResult
 
 
 @pytest.fixture
@@ -43,18 +43,6 @@ def stub_scrape(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
     return captured
-
-
-# ---------------------------------------------------------------------------
-# Minimal CrawlResult stub (Pack 5 lands before this merges; use stub here)
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class _CrawlResultStub:
-    pages: tuple
-    stitched_path: Path | None
-    failures: tuple = ()
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +164,7 @@ def test_crawl_command(runner: CliRunner, monkeypatch: pytest.MonkeyPatch, tmp_p
     out = tmp_path / "site.md"
     out.write_text("crawled content")
 
-    crawl_result = _CrawlResultStub(
+    crawl_result = CrawlResult(
         pages=(),
         stitched_path=out,
         failures=(),
@@ -247,7 +235,7 @@ def test_crawl_per_page_dir_writes_one_file_per_page(
             elapsed_ms=1,
         ),
     )
-    crawl_result = _CrawlResultStub(pages=pages, stitched_path=None)
+    crawl_result = CrawlResult(pages=pages, stitched_path=None)
     mock_crawl = AsyncMock(return_value=crawl_result)
     monkeypatch.setattr("scrapefold.crawl_site", mock_crawl)
 
@@ -274,7 +262,7 @@ def test_crawl_per_page_dir_uses_sha256_url_prefix_filename(
             url=url, text="body", markdown="# body", html=None, engine="stub", elapsed_ms=1
         ),
     )
-    crawl_result = _CrawlResultStub(pages=pages, stitched_path=None)
+    crawl_result = CrawlResult(pages=pages, stitched_path=None)
     mock_crawl = AsyncMock(return_value=crawl_result)
     monkeypatch.setattr("scrapefold.crawl_site", mock_crawl)
 
@@ -303,7 +291,7 @@ def test_crawl_per_page_dir_prints_each_path_to_stderr(
             elapsed_ms=1,
         ),
     )
-    crawl_result = _CrawlResultStub(pages=pages, stitched_path=None)
+    crawl_result = CrawlResult(pages=pages, stitched_path=None)
     mock_crawl = AsyncMock(return_value=crawl_result)
     monkeypatch.setattr("scrapefold.crawl_site", mock_crawl)
 
@@ -336,7 +324,7 @@ def test_crawl_per_page_dir_works_alongside_stitched_output(
             elapsed_ms=1,
         ),
     )
-    crawl_result = _CrawlResultStub(pages=pages, stitched_path=stitched)
+    crawl_result = CrawlResult(pages=pages, stitched_path=stitched)
     mock_crawl = AsyncMock(return_value=crawl_result)
     monkeypatch.setattr("scrapefold.crawl_site", mock_crawl)
 

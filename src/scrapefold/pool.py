@@ -10,7 +10,10 @@ constructed once and aclose()d once.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Awaitable
+from typing import Any
 
 from scrapefold.engines import get_engine, resolve_alias
 from scrapefold.engines.base import ScrapeEngine
@@ -40,17 +43,22 @@ class EnginePool:
         return self._engines[canonical]
 
     async def aclose(self) -> None:
-        """Close every constructed engine. Idempotent."""
+        """Close every constructed engine in parallel. Idempotent."""
         if self._closed:
             return
         self._closed = True
+        names: list[str] = []
+        tasks: list[Awaitable[Any]] = []
         for name, engine in self._engines.items():
-            try:
-                aclose = getattr(engine, "aclose", None)
-                if callable(aclose):
-                    await aclose()
-            except Exception as exc:
-                logger.debug("pool: aclose engine=%s failed: %s", name, exc)
+            aclose = getattr(engine, "aclose", None)
+            if callable(aclose):
+                names.append(name)
+                tasks.append(aclose())
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for name, outcome in zip(names, results, strict=True):
+                if isinstance(outcome, BaseException):
+                    logger.debug("pool: aclose engine=%s failed: %s", name, outcome)
         self._engines.clear()
 
 

@@ -90,6 +90,15 @@ def _read_text_sync(path: Path) -> str:
     return path.read_text()
 
 
+def _stat_and_read_sync(path: Path) -> tuple[float, str] | None:
+    """Stat + read in one syscall pair. Returns ``None`` if the file is gone."""
+    try:
+        mtime = path.stat().st_mtime
+        return mtime, path.read_text()
+    except FileNotFoundError:
+        return None
+
+
 def _write_atomic_sync(tmp: Path, path: Path, content: str) -> None:
     """Synchronous atomic write — intended for use via asyncio.to_thread."""
     tmp.write_text(content)
@@ -118,18 +127,20 @@ class Cache:
             return None
 
         path = self._path_for(key)
-        if not path.exists():
+        try:
+            stat_read = await asyncio.to_thread(_stat_and_read_sync, path)
+        except OSError as exc:
+            logger.debug("cache: read failed %s (%s)", path, exc)
             return None
-
-        # TTL via mtime
-        age_s = time.time() - path.stat().st_mtime
-        if age_s > self.ttl_days * 86400:
+        if stat_read is None:
+            return None
+        mtime, raw = stat_read
+        if time.time() - mtime > self.ttl_days * 86400:
             return None
 
         try:
-            raw = await asyncio.to_thread(_read_text_sync, path)
             data = json.loads(raw)
-        except (json.JSONDecodeError, OSError) as exc:
+        except json.JSONDecodeError as exc:
             logger.debug("cache: corrupt file %s (%s); removing", path, exc)
             with contextlib.suppress(OSError):
                 path.unlink(missing_ok=True)

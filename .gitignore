@@ -36,6 +36,9 @@ htmlcov/
 *.swo
 .DS_Store
 
+# Claude Code worktrees
+.claude/worktrees/
+
 # Project-specific
 .scrapefold/
 ~/.scrapefold/
