@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.1.0a3] - 2026-05-25
+
+Pack 5 rescue — disk cache, EnginePool, and CrawlResult return type. All Pack 4 SSRF protections preserved. New modules are additive; existing engine/router/crawler SSRF contract is intact.
+
+### Added — disk-backed TTL cache (`scrapefold.cache`)
+
+- `src/scrapefold/cache.py` — SHA-256-keyed disk cache for `ScrapeResult`, TTL via file mtime, atomic writes, sharded directory layout, strict opts canonicalization. `Cache.get()` and `Cache.set()` accept `opts: ScrapeOptions` to honour `opts.skip_cache=True`. Disk I/O is non-blocking via `asyncio.to_thread`.
+- `crawl_site()` / `crawl()` consult the cache when `opts.extra["cache_dir"]` is set; `opts.skip_cache=True` bypasses both read and write.
+
+### Added — engine instance pool (`scrapefold.pool`)
+
+- `src/scrapefold/pool.py` — `EnginePool` caches engine instances across the lifetime of a crawl, avoiding repeated TLS handshakes and SDK init costs. Idempotent `aclose()`, raises `RuntimeError` when accessed after close.
+- `router.walk()` accepts an optional `pool: EnginePool | None` parameter. When `None` (default), an ephemeral pool is created and closed in a `finally` block. Caller-owned pools are never closed by the router.
+- `crawl()` creates one `EnginePool` spanning all per-URL scrape calls and closes it in `finally`.
+
+### Added — `CrawlResult` return type (`scrapefold.crawler.result`)
+
+- `src/scrapefold/crawler/result.py` — `CrawlResult(pages, stitched_path, failures)` frozen dataclass. `crawl_site()` now returns `CrawlResult` instead of `Path`.
+- `pages: tuple[ScrapeResult, ...]` — successfully scraped pages in discovery order.
+- `stitched_path: Path | None` — where the stitched markdown was written.
+- `failures: tuple[str, ...]` — per-URL failure strings formatted `"<url>:<ExcClass>:<msg>"`.
+- `CrawlResult` and `EnginePool` re-exported from `scrapefold` top-level.
+
 ## [0.1.0a2] - 2026-05-24
 
 Pack 3 — sequential router shell + Cloudflare Browser Rendering engine + comprehensive cost/policy/timeout enforcement. The public `scrape()` path is live for sequential ladders and explicit `opts.engines` overrides; the router now walks `RaceStep` members sequentially (parallel fan-out remains deferred to v0.2). `AllEnginesFailed` is now a structured exception with `.url` and `.failures` attributes. Release mechanics scaffolded: dynamic version from `__init__.py`, dep-freshness audit script, CHANGELOG gate.
@@ -141,7 +164,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a2...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a3...HEAD
+[0.1.0a3]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a2...v0.1.0a3
 [0.1.0a2]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a1...v0.1.0a2
 [0.1.0a1]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a0...v0.1.0a1
 [0.1.0a0]: https://github.com/mihailorama/scrapefold/releases/tag/v0.1.0a0
