@@ -192,3 +192,86 @@ async def test_cache_set_type_check(tmp_path: Path) -> None:
     cache = Cache(dir=tmp_path)
     with pytest.raises(TypeError):
         await cache.set("k", {"not": "a ScrapeResult"})  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# 9. skip_cache — get returns None and set is a no-op (Pack 5 rescue bug fix)
+# ---------------------------------------------------------------------------
+
+
+async def test_cache_get_returns_none_when_skip_cache_true(tmp_path: Path) -> None:
+    """Cache.get must return None immediately when opts.skip_cache=True."""
+    from scrapefold.options import ScrapeOptions
+
+    cache = Cache(dir=tmp_path, ttl_days=7)
+    # Pre-populate via a normal set so the file IS on disk.
+    key = "sk_get"
+    await cache.set(key, _result("https://x/"))
+
+    opts_skip = ScrapeOptions(skip_cache=True)
+    # get should bypass the disk and return None even though the file exists.
+    got = await cache.get(key, opts=opts_skip)
+    assert got is None, "Cache.get must return None when skip_cache=True"
+
+
+async def test_cache_set_is_noop_when_skip_cache_true(tmp_path: Path) -> None:
+    """Cache.set must not write to disk when opts.skip_cache=True."""
+    from scrapefold.options import ScrapeOptions
+
+    cache = Cache(dir=tmp_path, ttl_days=7)
+    key = "sk_set"
+    opts_skip = ScrapeOptions(skip_cache=True)
+
+    await cache.set(key, _result("https://x/"), opts=opts_skip)
+
+    # File must NOT have been written.
+    path = cache._path_for(key)
+    assert not path.exists(), "Cache.set must not write to disk when skip_cache=True"
+
+
+# ---------------------------------------------------------------------------
+# 10. asyncio.to_thread — disk I/O must not block the event loop (Pack 5 rescue bug fix)
+# ---------------------------------------------------------------------------
+
+
+async def test_cache_get_uses_to_thread_for_disk_read(tmp_path: Path) -> None:
+    """Cache.get must delegate file read to asyncio.to_thread (non-blocking)."""
+    import asyncio
+    from unittest.mock import patch, AsyncMock
+
+    cache = Cache(dir=tmp_path, ttl_days=7)
+    key = "thread_read"
+    # Pre-populate via a normal set so the file IS on disk.
+    await cache.set(key, _result("https://x/"))
+
+    # Patch asyncio.to_thread to track calls while still executing the function.
+    original_to_thread = asyncio.to_thread
+    calls: list[str] = []
+
+    async def _spy_to_thread(func: object, *args: object, **kwargs: object) -> object:
+        calls.append("to_thread")
+        return await original_to_thread(func, *args, **kwargs)  # type: ignore[arg-type]
+
+    with patch("asyncio.to_thread", side_effect=_spy_to_thread):
+        # Import the module-level reference used inside cache.get
+        import scrapefold.cache as cache_mod
+        with patch.object(cache_mod, "asyncio") as mock_asyncio:
+            mock_asyncio.to_thread = AsyncMock(wraps=_spy_to_thread)
+            await cache.get(key)
+            assert mock_asyncio.to_thread.called, "Cache.get must call asyncio.to_thread for file read"
+
+
+async def test_cache_set_uses_to_thread_for_disk_write(tmp_path: Path) -> None:
+    """Cache.set must delegate file write to asyncio.to_thread (non-blocking)."""
+    import scrapefold.cache as cache_mod
+    from unittest.mock import AsyncMock, patch
+
+    cache = Cache(dir=tmp_path, ttl_days=7)
+
+    with patch.object(cache_mod, "asyncio") as mock_asyncio:
+        # to_thread should be called — make it a real async operation.
+        import asyncio
+
+        mock_asyncio.to_thread = AsyncMock(wraps=asyncio.to_thread)
+        await cache.set("thread_write", _result("https://x/"))
+        assert mock_asyncio.to_thread.called, "Cache.set must call asyncio.to_thread for file write"

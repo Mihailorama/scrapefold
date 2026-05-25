@@ -8,6 +8,7 @@ as misses and removed.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import hashlib
 import json
@@ -84,6 +85,17 @@ def make_key(url: str, opts: ScrapeOptions) -> str | None:
     return h.hexdigest()
 
 
+def _read_text_sync(path: Path) -> str:
+    """Synchronous file read — intended for use via asyncio.to_thread."""
+    return path.read_text()
+
+
+def _write_atomic_sync(tmp: Path, path: Path, content: str) -> None:
+    """Synchronous atomic write — intended for use via asyncio.to_thread."""
+    tmp.write_text(content)
+    os.replace(tmp, path)
+
+
 class Cache:
     """sha256-keyed disk cache for ScrapeResult, TTL'd via file mtime."""
 
@@ -96,7 +108,15 @@ class Cache:
         # Sharded by first two hex chars to avoid one giant flat directory.
         return self.dir / key[:2] / f"{key[2:]}.json"
 
-    async def get(self, key: str) -> ScrapeResult | None:
+    async def get(self, key: str, opts: ScrapeOptions | None = None) -> ScrapeResult | None:
+        """Return cached result for *key*, or ``None`` on miss / expiry / skip.
+
+        Pass *opts* to honour ``opts.skip_cache=True`` — in that case this
+        method always returns ``None`` without touching the disk.
+        """
+        if opts is not None and opts.skip_cache:
+            return None
+
         path = self._path_for(key)
         if not path.exists():
             return None
@@ -107,7 +127,8 @@ class Cache:
             return None
 
         try:
-            data = json.loads(path.read_text())
+            raw = await asyncio.to_thread(_read_text_sync, path)
+            data = json.loads(raw)
         except (json.JSONDecodeError, OSError) as exc:
             logger.debug("cache: corrupt file %s (%s); removing", path, exc)
             with contextlib.suppress(OSError):
@@ -121,7 +142,17 @@ class Cache:
             path.unlink(missing_ok=True)
             return None
 
-    async def set(self, key: str, result: ScrapeResult) -> None:
+    async def set(
+        self, key: str, result: ScrapeResult, opts: ScrapeOptions | None = None
+    ) -> None:
+        """Store *result* under *key*.
+
+        Pass *opts* to honour ``opts.skip_cache=True`` — in that case this
+        method is a no-op and does **not** write to disk.
+        """
+        if opts is not None and opts.skip_cache:
+            return
+
         if not isinstance(result, ScrapeResult):
             raise TypeError(f"Cache.set expects ScrapeResult, got {type(result).__name__}")
 
@@ -129,8 +160,8 @@ class Cache:
         path.parent.mkdir(parents=True, exist_ok=True)
 
         tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(_result_to_dict(result), default=str))
-        os.replace(tmp, path)  # atomic rename
+        content = json.dumps(_result_to_dict(result), default=str)
+        await asyncio.to_thread(_write_atomic_sync, tmp, path, content)
 
 
 def _result_to_dict(r: ScrapeResult) -> dict[str, Any]:
