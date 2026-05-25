@@ -11,6 +11,7 @@ Public API (v0.1 — scaffold; engines land in later PRs):
 
 from __future__ import annotations
 
+from scrapefold.crawler.result import CrawlResult
 from scrapefold.engines.base import (
     EngineCapabilities,
     EngineError,
@@ -37,6 +38,7 @@ __version__ = "0.1.0a2"
 __all__ = [
     "AllEnginesFailed",
     "BudgetExceeded",
+    "CrawlResult",
     "EngineCapabilities",
     "EngineError",
     "Policy",
@@ -70,15 +72,20 @@ async def crawl_site(
     opts: ScrapeOptions | None = None,
     output: object | None = None,
     **_unused: object,
-) -> object:
+) -> CrawlResult:
     """Whole-site crawl → single markdown file.
 
     Discovers URLs from ``url`` (sitemap → robots → BFS), scrapes each
     via ``scrape()``, and writes a stitched .md file at ``output``
-    (defaults to ``<tmp>/scrapefold-crawl.md``). Returns the output Path.
+    (defaults to a unique temp path under ``/tmp``). Returns a
+    :class:`CrawlResult` with the per-URL pages, the stitched markdown
+    path, and per-URL failure strings.
 
-    Unknown keyword arguments (e.g. ``cache_dir``, ``cache_ttl_hours``) are
-    accepted and silently ignored — they are planned for a future pack.
+    Pass ``opts.extra["cache_dir"]`` to enable disk caching. Set
+    ``opts.skip_cache=True`` to bypass the cache for both reads and writes.
+
+    Unknown keyword arguments (e.g. ``cache_ttl_hours``) are accepted and
+    silently ignored for forward compatibility.
     """
     import logging as _logging
 

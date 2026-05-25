@@ -46,7 +46,9 @@ class EnginePool:
         self._closed = True
         for name, engine in self._engines.items():
             try:
-                await engine.aclose()
+                aclose = getattr(engine, "aclose", None)
+                if callable(aclose):
+                    await aclose()
             except Exception as exc:
                 logger.debug("pool: aclose engine=%s failed: %s", name, exc)
         self._engines.clear()

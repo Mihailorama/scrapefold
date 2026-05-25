@@ -142,9 +142,7 @@ class Cache:
             path.unlink(missing_ok=True)
             return None
 
-    async def set(
-        self, key: str, result: ScrapeResult, opts: ScrapeOptions | None = None
-    ) -> None:
+    async def set(self, key: str, result: ScrapeResult, opts: ScrapeOptions | None = None) -> None:
         """Store *result* under *key*.
 
         Pass *opts* to honour ``opts.skip_cache=True`` — in that case this

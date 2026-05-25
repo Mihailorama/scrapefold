@@ -13,7 +13,8 @@ from urllib.parse import urljoin
 
 import httpx
 
-from scrapefold._host_utils import _is_invalid_location_error, same_host as _same_host
+from scrapefold._host_utils import _is_invalid_location_error
+from scrapefold._host_utils import same_host as _same_host
 from scrapefold.engines.base import (
     EngineCapabilities,
     RedirectScopeViolation,

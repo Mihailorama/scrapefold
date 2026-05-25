@@ -1,6 +1,6 @@
 """crawler — sitemap discovery + filtering + stitching.
 
-Public entry point: ``async def crawl(root, opts, output) -> Path``.
+Public entry point: ``async def crawl(root, opts, output) -> CrawlResult``.
 """
 
 from __future__ import annotations
@@ -14,7 +14,9 @@ from urllib.parse import urljoin
 import httpx
 
 import scrapefold.crawler.sitemap as sitemap
-from scrapefold._host_utils import _is_invalid_location_error, same_host as _same_host
+from scrapefold._host_utils import _is_invalid_location_error
+from scrapefold._host_utils import same_host as _same_host
+from scrapefold.crawler.result import CrawlResult
 from scrapefold.crawler.stitcher import write_stitched
 from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
@@ -98,7 +100,7 @@ async def crawl(
     root: str,
     opts: ScrapeOptions | None = None,
     output: Path | str | None = None,
-) -> Path:
+) -> CrawlResult:
     """Walk a site → produce one stitched markdown file.
 
     Discovery: sitemap → robots → BFS (see ``crawler.sitemap``).
@@ -108,6 +110,9 @@ async def crawl(
 
     Pass an explicit ``output=`` for a predictable output path; omitting it
     allocates a unique temp file via :func:`_default_output_path`.
+
+    Returns a :class:`~scrapefold.crawler.result.CrawlResult` with the
+    per-URL pages, the stitched markdown path, and per-URL failure strings.
 
     **SSRF protection**
 
@@ -128,6 +133,12 @@ async def crawl(
     For SSRF-sensitive deployments embedded in services, restrict engine
     selection with ``opts.engines=("requests",)`` in ``crawl_site`` calls, or
     add network-layer egress controls.
+
+    **Cache integration**
+
+    If ``opts.extra["cache_dir"]`` is set, a :class:`~scrapefold.cache.Cache`
+    is consulted before each per-URL scrape and populated after each success.
+    ``opts.skip_cache=True`` bypasses both read and write.
     """
     from dataclasses import replace as _replace
 
@@ -138,7 +149,9 @@ async def crawl(
     if max_pages <= 0:
         if output is None:
             output = _default_output_path()
-        return write_stitched([], Path(output))
+        output_path = Path(output)
+        write_stitched([], output_path)
+        return CrawlResult(pages=(), stitched_path=output_path, failures=())
 
     urls = await sitemap.discover_urls(
         root,
@@ -162,23 +175,64 @@ async def crawl(
     }
     crawl_opts = _replace(opts, extra=crawl_extra)
 
+    # Cache setup: consult opts.extra for cache_dir.
+    cache = None
+    cache_dir_raw = opts.extra.get("cache_dir")
+    if cache_dir_raw is not None:
+        from scrapefold.cache import Cache
+        from scrapefold.cache import make_key as _make_key
+
+        ttl_days = int(opts.extra.get("cache_ttl_days", 7))
+        cache = Cache(dir=Path(str(cache_dir_raw)), ttl_days=ttl_days)
+
     results: list[ScrapeResult] = []
+    failures: list[str] = []
     follow_subdomains = opts.follow_subdomains
     async with httpx.AsyncClient(timeout=10.0) as head_client:
         for url in urls:
             if not await _preflight_head(head_client, url, root, follow_subdomains):
                 logger.info("crawler: url skipped (redirect_offhost) url=%s", url)
                 continue
+
+            # Cache lookup
+            if cache is not None:
+                from scrapefold.cache import make_key as _make_key
+
+                cache_key = _make_key(url, crawl_opts)
+                if cache_key is not None:
+                    cached = await cache.get(cache_key, opts=opts)
+                    if cached is not None:
+                        logger.debug("crawler: cache hit url=%s", url)
+                        results.append(cached)
+                        continue
+
             try:
-                results.append(await scrape(url, crawl_opts))
+                result = await scrape(url, crawl_opts)
             except Exception as exc:  # broad — per-URL failures must not abort the crawl
                 logger.warning("crawler: scrape failed url=%s err=%s", url, exc)
+                failures.append(f"{url}:{type(exc).__name__}:{exc}")
+                continue
+
+            results.append(result)
+
+            # Cache store (after success only)
+            if cache is not None:
+                from scrapefold.cache import make_key as _make_key
+
+                cache_key = _make_key(url, crawl_opts)
+                if cache_key is not None:
+                    await cache.set(cache_key, result, opts=opts)
 
     if output is None:
         output = _default_output_path()
-    output = Path(output)
+    output_path = Path(output)
 
-    return write_stitched(results, output)
+    write_stitched(results, output_path)
+    return CrawlResult(
+        pages=tuple(results),
+        stitched_path=output_path,
+        failures=tuple(failures),
+    )
 
 
 __all__ = ["crawl"]

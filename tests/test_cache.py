@@ -237,7 +237,7 @@ async def test_cache_set_is_noop_when_skip_cache_true(tmp_path: Path) -> None:
 async def test_cache_get_uses_to_thread_for_disk_read(tmp_path: Path) -> None:
     """Cache.get must delegate file read to asyncio.to_thread (non-blocking)."""
     import asyncio
-    from unittest.mock import patch, AsyncMock
+    from unittest.mock import AsyncMock, patch
 
     cache = Cache(dir=tmp_path, ttl_days=7)
     key = "thread_read"
@@ -255,16 +255,20 @@ async def test_cache_get_uses_to_thread_for_disk_read(tmp_path: Path) -> None:
     with patch("asyncio.to_thread", side_effect=_spy_to_thread):
         # Import the module-level reference used inside cache.get
         import scrapefold.cache as cache_mod
+
         with patch.object(cache_mod, "asyncio") as mock_asyncio:
             mock_asyncio.to_thread = AsyncMock(wraps=_spy_to_thread)
             await cache.get(key)
-            assert mock_asyncio.to_thread.called, "Cache.get must call asyncio.to_thread for file read"
+            assert mock_asyncio.to_thread.called, (
+                "Cache.get must call asyncio.to_thread for file read"
+            )
 
 
 async def test_cache_set_uses_to_thread_for_disk_write(tmp_path: Path) -> None:
     """Cache.set must delegate file write to asyncio.to_thread (non-blocking)."""
-    import scrapefold.cache as cache_mod
     from unittest.mock import AsyncMock, patch
+
+    import scrapefold.cache as cache_mod
 
     cache = Cache(dir=tmp_path, ttl_days=7)
 
