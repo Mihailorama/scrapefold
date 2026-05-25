@@ -6,6 +6,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.1.0a4] - 2026-05-25
+
+Pack 6 — Minimal Typer CLI with four subcommands (`scrape`, `crawl`, `list-engines`, `classify`), `--json` everywhere, and `--per-page-dir` for per-URL markdown output.
+
+### Added — Pack 6 Typer CLI
+
+- `src/scrapefold/cli.py` — full Typer CLI replacing the S1 stub. Four subcommands:
+  - `scrape <url>` — single-URL scrape; `--json` emits `ScrapeResult` as JSON; `--output PATH` writes markdown to disk; `--engines <comma-list>` overrides engine selection.
+  - `crawl <url>` — site crawl via `crawl_site()`; `--output PATH` writes stitched markdown; `--per-page-dir DIR` writes `<sha256(url)[:16]>.md` per crawled page with one `wrote <path> (<url>)` line to stderr per file; `--max-pages N` sets page limit; `--json` emits `{"output": path}` summary.
+  - `list-engines` — prints sorted engine names; `--json` emits a JSON list.
+  - `classify <url>` — prints the `SiteClass` the router assigns; `--json` emits `{"url": ..., "site_class": ...}`.
+  - `--version` (root flag) — prints `__version__` and exits.
+  - All errors fatal: `AllEnginesFailed` → exit 1; invalid options → exit 2 (Typer default).
+- `tests/test_cli.py` — 16 tests via `typer.testing.CliRunner` covering all four subcommands, `--json` variants, `--output`, `--engines`, `AllEnginesFailed` exit code, `--version`, `--help` subcommand listing, and four `--per-page-dir` tests (file count, sha256 filename, stderr output, stitched + per-page coexistence).
+
+### Added — `--per-page-dir` (downstream-consumer integration)
+
+The `crawl` subcommand's `--per-page-dir DIR` flag writes each `CrawlResult.pages[*].markdown` to `DIR/<sha256(url)[:16]>.md` and prints `wrote <path> (<url>)` to stderr. This is the load-bearing output path for downstream-consumer's sponsorship/role-pair parser which consumes per-URL `.md` files.
+
+### Changed — `__version__` bumped to `0.1.0a4`
+
 ## [0.1.0a3] - 2026-05-25
 
 Pack 5 rescue — disk cache, EnginePool, and CrawlResult return type. All Pack 4 SSRF protections preserved. New modules are additive; existing engine/router/crawler SSRF contract is intact.
@@ -164,7 +185,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a3...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a4...HEAD
+[0.1.0a4]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a3...v0.1.0a4
 [0.1.0a3]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a2...v0.1.0a3
 [0.1.0a2]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a1...v0.1.0a2
 [0.1.0a1]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a0...v0.1.0a1

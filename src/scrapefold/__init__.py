@@ -34,7 +34,7 @@ from scrapefold.pool import EnginePool
 from scrapefold.result import ScrapeResult
 from scrapefold.router import walk as _walk
 
-__version__ = "0.1.0a3"
+__version__ = "0.1.0a4"
 
 __all__ = [
     "AllEnginesFailed",
