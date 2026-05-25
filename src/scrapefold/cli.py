@@ -1,65 +1,182 @@
-"""scrapefold CLI — Typer entry point.
+"""scrapefold — Typer CLI entry point.
 
-Scaffold (S1) — subcommands are stubs. Real implementations land in S9.
-
-Usage examples (post-S9):
-
-    scrapefold scrape https://example.com --engine firecrawl --language ru
-    scrapefold crawl https://docs.example.com --max-pages 50 --output site.md
-    scrapefold list-engines
-    scrapefold inspect-opts firecrawl
+Four subcommands: scrape, crawl, list-engines, classify.
+--json flag everywhere; errors fatal with non-zero exit code.
 """
 
 from __future__ import annotations
 
-import sys
+import asyncio
+import hashlib
+import json
+from dataclasses import asdict
+from pathlib import Path
+from typing import Any
 
 import typer
 
+import scrapefold
+from scrapefold import AllEnginesFailed, ScrapeOptions, classify_url
+from scrapefold.engines import list_engine_names
+from scrapefold.result import ScrapeResult
+
 app = typer.Typer(
-    name="scrapefold",
-    help="Unified web scraping CLI. Single URL or whole-site → markdown.",
+    help="scrapefold — unified web scraping CLI",
     no_args_is_help=True,
     add_completion=False,
 )
 
 
-@app.command()
-def scrape(url: str, engine: str = "auto") -> None:
-    """Scrape a single URL (stub — lands in S9)."""
-    typer.echo(f"[stub] would scrape {url} with engine={engine}", err=True)
-    sys.exit(2)
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(scrapefold.__version__)
+        raise typer.Exit()
+
+
+@app.callback()
+def _root(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Print version and exit.",
+    ),
+) -> None:
+    pass
+
+
+def _engines_arg(engines: str | None) -> tuple[str, ...] | None:
+    if engines is None:
+        return None
+    return tuple(e.strip() for e in engines.split(",") if e.strip())
+
+
+# ---------------------------------------------------------------------------
+# scrape
+# ---------------------------------------------------------------------------
 
 
 @app.command()
-def crawl(url: str, max_pages: int = 50, output: str = "site.md") -> None:
-    """Crawl a whole site → markdown (stub — lands in S9)."""
-    typer.echo(f"[stub] would crawl {url} max_pages={max_pages} output={output}", err=True)
-    sys.exit(2)
+def scrape(
+    url: str = typer.Argument(..., help="URL to scrape."),
+    engines: str | None = typer.Option(
+        None,
+        "--engines",
+        help="Comma-separated engine override (e.g. 'jina,firecrawl').",
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON to stdout."),
+    output: Path | None = typer.Option(  # noqa: B008
+        None, "--output", help="Write markdown to PATH instead of stdout."
+    ),
+) -> None:
+    """Scrape a single URL and print the markdown (or full JSON with --json)."""
+    opts = ScrapeOptions(engines=_engines_arg(engines))
+
+    try:
+        result: ScrapeResult = asyncio.run(scrapefold.scrape(url, opts))
+    except AllEnginesFailed as exc:
+        typer.echo(f"all engines failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_out:
+        typer.echo(json.dumps(asdict(result), default=str))
+        return
+
+    if output is not None:
+        output.write_text(result.markdown)
+        return
+
+    typer.echo(result.markdown)
+
+
+# ---------------------------------------------------------------------------
+# crawl
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def crawl(
+    url: str = typer.Argument(..., help="Root URL to crawl."),
+    max_pages: int = typer.Option(100, "--max-pages", help="Maximum pages to fetch (default 100)."),
+    output: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--output",
+        help="Output .md file path for the stitched crawl result.",
+    ),
+    per_page_dir: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--per-page-dir",
+        help="Write each crawled page as <sha256(url)[:16]>.md into DIR.",
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON summary to stdout."),
+) -> None:
+    """Crawl a site → produce one stitched markdown file and/or per-page files."""
+    opts = ScrapeOptions(max_pages=max_pages)
+
+    try:
+        crawl_result: Any = asyncio.run(scrapefold.crawl_site(url, opts=opts, output=output))
+    except Exception as exc:
+        typer.echo(f"crawl failed for {url}: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    # Write per-page files if requested
+    if per_page_dir is not None:
+        per_page_dir.mkdir(parents=True, exist_ok=True)
+        for page in crawl_result.pages:
+            slug = hashlib.sha256(page.url.encode()).hexdigest()[:16]
+            page_path = per_page_dir / f"{slug}.md"
+            page_path.write_text(page.markdown)
+            typer.echo(f"wrote {page_path} ({page.url})", err=True)
+
+    stitched_path: Path | None = getattr(crawl_result, "stitched_path", None)
+
+    if json_out:
+        typer.echo(json.dumps({"output": str(stitched_path) if stitched_path else None}))
+        return
+
+    if stitched_path is not None:
+        typer.echo(str(stitched_path))
+
+
+# ---------------------------------------------------------------------------
+# list-engines
+# ---------------------------------------------------------------------------
 
 
 @app.command("list-engines")
-def list_engines_cmd() -> None:
-    """List registered engines and their availability (stub — lands in S9)."""
-    from scrapefold.engines import list_engine_names
-
+def list_engines_cmd(
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON list to stdout."),
+) -> None:
+    """Print every engine registered in the lazy registry."""
     names = list_engine_names()
-    if not names:
-        typer.echo("(no engines registered yet — scaffold only)")
-    else:
-        for name in names:
-            typer.echo(name)
+    if json_out:
+        typer.echo(json.dumps(names))
+        return
+    for name in names:
+        typer.echo(name)
 
 
-@app.command("inspect-opts")
-def inspect_opts(engine: str) -> None:
-    """Show which ScrapeOptions an engine supports (stub — lands in S9)."""
-    typer.echo(f"[stub] would inspect opts of {engine}", err=True)
-    sys.exit(2)
+# ---------------------------------------------------------------------------
+# classify
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def classify(
+    url: str = typer.Argument(..., help="URL to classify."),
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON to stdout."),
+) -> None:
+    """Print the SiteClass scrapefold's router would assign to a URL."""
+    site_class = classify_url(url)
+    if json_out:
+        typer.echo(json.dumps({"url": url, "site_class": site_class}))
+        return
+    typer.echo(site_class)
 
 
 def main() -> None:
-    """Console-script entry point for ``scrapefold``."""
+    """Console-script entry point — referenced by pyproject `[project.scripts]`."""
     app()
 
 
