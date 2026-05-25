@@ -1,6 +1,6 @@
 ---
 purpose: "How to use scrapefold from AI agents — machine-parseable output, fatal errors."
-updated: "2026-05-22"
+updated: "2026-05-25"
 related:
   - ../../README.md
   - ../workflows/development.md
@@ -13,20 +13,85 @@ scrapefold is built to be driven by AI agents (Claude Code, Codex, Cursor) as we
 1. **CLI** — `scrapefold` console script, Typer-based, `--json` flag everywhere.
 2. **MCP server** — `scrapefold-mcp` console script, stdio transport by default.
 
+## CLI subcommands (v0.1.0a5)
+
+### `scrapefold scrape <url>`
+
+Scrape a single URL and print its markdown (or JSON with `--json`).
+
+```bash
+# Print markdown to stdout
+scrapefold scrape https://example.com
+
+# Machine-parseable JSON
+scrapefold scrape https://example.com --json | jq '.markdown'
+
+# Force specific engine(s)
+scrapefold scrape https://example.com --engines jina,firecrawl
+
+# Write markdown to file
+scrapefold scrape https://example.com --output page.md
+```
+
+JSON output shape: `ScrapeResult` as dict — `url`, `text`, `markdown`, `html`, `engine`, `elapsed_ms`, `cost_usd`, `json`, `screenshot_b64`, `meta`, `failures`.
+
+### `scrapefold crawl <url>`
+
+Crawl a site (BFS up to `--max-pages`) and optionally write a stitched markdown file.
+
+```bash
+# Stitched output to file
+scrapefold crawl https://docs.example.com --output site.md --max-pages 50
+
+# Per-page .md files in a directory (one file per crawled URL)
+scrapefold crawl https://docs.example.com --per-page-dir ./pages/
+
+# Both: stitched file + per-page dir
+scrapefold crawl https://docs.example.com --output site.md --per-page-dir ./pages/
+
+# JSON summary
+scrapefold crawl https://docs.example.com --output site.md --json
+```
+
+`--per-page-dir DIR`: writes `<sha256(url)[:16]>.md` for each page; prints one `wrote <path> (<url>)` line to stderr per file. Designed for feeding per-URL markdown into downstream parsers (e.g. sponsorship/role-pair detection).
+
+### `scrapefold list-engines`
+
+Print every engine registered in the lazy registry.
+
+```bash
+scrapefold list-engines
+scrapefold list-engines --json | jq '.[]'
+```
+
+### `scrapefold classify <url>`
+
+Print the `SiteClass` the router would assign to a URL.
+
+```bash
+scrapefold classify https://www.linkedin.com/in/someone
+# → linkedin_profile
+
+scrapefold classify https://www.linkedin.com/in/someone --json
+# → {"url": "...", "site_class": "linkedin_profile"}
+```
+
 ## CLI agent flags
 
 | Flag | Behavior |
 |---|---|
 | `--json` | Output is a single JSON document on stdout, no ANSI colors, no spinners |
-| `--quiet` | Suppress non-error logging |
-| `--fail-fast` | Exit on first engine failure rather than walking the fallback chain |
+| `--engines` | Comma-separated engine override for `scrape` (e.g. `jina,firecrawl`) |
+| `--output PATH` | Write markdown / stitched crawl file to disk instead of stdout |
+| `--per-page-dir DIR` | (`crawl` only) Write one `.md` per crawled page; path = `sha256(url)[:16].md` |
+| `--max-pages N` | (`crawl` only) Page limit, default 100 |
 | (default) | Errors are fatal — non-zero exit code + clear message to stderr |
 
-Examples once S9 ships:
+Examples:
 
 ```bash
-scrapefold scrape https://example.com --engine requests --json | jq '.text'
-scrapefold list-engines --json | jq '.[] | select(.available)'
+scrapefold scrape https://example.com --engines requests --json | jq '.text'
+scrapefold list-engines --json
 ```
 
 Exit codes:

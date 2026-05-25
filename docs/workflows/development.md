@@ -36,9 +36,18 @@ pip install -e ".[all]"
 ```bash
 scrapefold --help
 scrapefold list-engines
+scrapefold classify https://www.linkedin.com/in/someone
+
+# Scrape a URL
+scrapefold scrape https://example.com
+scrapefold scrape https://example.com --json | jq '.engine'
+
+# Crawl a site
+scrapefold crawl https://docs.example.com --output site.md --max-pages 50
+scrapefold crawl https://docs.example.com --per-page-dir ./pages/
 ```
 
-(Subcommands are stubs in S1; real behaviour lands in S9.)
+CLI lands in 0.1.0a5; MCP server (`scrapefold-mcp`) slips to v0.2.
 
 ## Run the MCP server
 

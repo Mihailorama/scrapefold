@@ -24,22 +24,18 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 
 ## Project status
 
-**v0.1.0a0 — scaffold.** Engines land incrementally:
+**v0.1.0a5 — CLI landed.** Engines and CLI complete; MCP server next:
 
-| PR | Engines / features |
-|---|---|
-| S1 ✅ | Scaffold: pyproject, base ABC, options/result, CLI/MCP stubs, docs |
-| S2 | `requests` baseline + html_to_text + url_utils |
-| S3 | Jina + Cloudflare + Crawl4AI + Outscraper |
-| S4 | Firecrawl (scrape + extract) |
-| S5 | ScrapingBee + Scrapingdog + Selenium |
-| S6 | Scrapling + Apify-LinkedIn |
-| S7 | Router + parallel + LLM-judge |
-| S8 | Crawler (sitemap → BFS → stitch → cache) |
-| S9 | CLI (Typer) |
-| S10 | MCP server |
-| S11a / S11b | Obscura, Cloakbrowser, AnySite, Bright Data (Unlocker + Browser) |
-| S12 | v0.1.0 release |
+| PR / Pack | Engines / features | Version |
+|---|---|---|
+| S1 ✅ | Scaffold: pyproject, base ABC, options/result, CLI/MCP stubs, docs | 0.1.0a0 |
+| Pack 2A-C ✅ | `requests`, Jina, Cloudflare, Crawl4AI, Firecrawl, ScrapingBee, Scrapingdog, Selenium, Scrapling, Apify-LinkedIn, Outscraper, AnySite, Cloakbrowser | 0.1.0a1 |
+| Pack 3 ✅ | Router + ladders + parallel + detection | 0.1.0a2 |
+| Pack 4 ✅ | html_to_text + vision | 0.1.0a3 |
+| Pack 5 ✅ | Crawler (sitemap → BFS → stitch → cache) + `CrawlResult` | 0.1.0a4 |
+| Pack 6 ✅ | CLI (Typer): `scrape`, `crawl`, `list-engines`, `classify` + `--per-page-dir` | 0.1.0a5 |
+| Pack 7 | MCP server (`scrapefold-mcp`, stdio + HTTP) | 0.2.0 |
+| Pack 8 | v0.1.0 release + PyPI publish | 0.1.0 |
 
 ## Cross-links
 
