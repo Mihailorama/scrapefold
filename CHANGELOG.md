@@ -28,6 +28,14 @@ Patch release: bug fix for `crawl_site()` on anti-bot-protected sites.
   stack). When `fetcher=None`, the legacy httpx-based path is preserved
   for backward compatibility with existing direct callers.
 
+### Filed (not yet implemented)
+
+- `TECH_DEBT.md` #12 — `scrape_sync` / `crawl_site_sync` wrappers robust
+  to leaked event loops in the caller's main thread (common with
+  Playwright Sync API). Sync callers can work around with a 5-line
+  `ThreadPoolExecutor` shim today; promoting that pattern into a public
+  helper is queued for v0.2.
+
 ## [0.1.0] - 2026-05-26
 
 First stable release. Promotes `0.1.0rc1` to stable with no code changes —
