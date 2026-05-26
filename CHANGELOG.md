@@ -6,6 +6,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-05-26
+
+First stable release. Promotes `0.1.0rc1` to stable with no code changes —
+the RC bundle (simplify pass, detection fix, LLM-QA harness, generic
+migration guide) is now the v0.1.0 surface.
+
+### Added
+
+- `docs/migration-guide.md` — generic four-pass migration guide for
+  consumers replacing a hand-rolled fetcher cascade with scrapefold.
+  Frontmatter + Problem / Proposed Solution / Affected Files / Test Plan
+  / Edge Cases / Out of Scope structure.
+
+### Frozen surface
+
+- Public API: `from scrapefold import scrape, crawl_site, ScrapeOptions, ScrapeResult, CrawlResult, ScrapeEngine, EngineCapabilities, EngineError, RedirectScopeViolation, AllEnginesFailed`.
+- CLI: `scrapefold scrape | crawl | list-engines | classify`, all with `--json` and `--per-page-dir` where applicable.
+- MCP server: `scrapefold-mcp` entry point.
+- Disk cache: sha256-keyed, mtime-TTL via `cache_ttl_days`, sharded directory layout.
+- 19 engines registered (subset available by default; lazy import via extras).
+
+### Tested
+
+- 631 unit + integration tests passing offline.
+- Live smoke on six real-world targets covering static HTML, SPA, Cloudflare-protected, and IP-geofenced architectures. 5/6 reachable; all reachable verified REAL (LLM QA score 7–9 / 10).
+
+### Known limitations (tracked in `docs/TECH_DEBT.md`)
+
+- Sitemap / robots / BFS discovery does not escalate engines (ticket #10, deferred to v0.2).
+- No residential-proxy engine for IP-geofenced targets (ticket #11, deferred to v0.2).
+
 ## [0.1.0rc1] - 2026-05-25
 
 First release candidate for v0.1.0. API surface is frozen pending downstream
