@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- `oxylabs` engine — Oxylabs Web Scraper API via the realtime (synchronous)
+  endpoint `https://realtime.oxylabs.io/v1/queries`, using the `universal`
+  source. Supports JS rendering (`render="html"`), screenshots
+  (`render="png"`), geo routing (`country` → `geo_location`), and forwarded
+  headers / cookies via the universal `context`. Credentials from
+  `OXYLABS_USERNAME` / `OXYLABS_PASSWORD`; pure-`httpx`, no extra dependency.
+
 ## [0.1.0rc1] - 2026-05-25
 
 First release candidate for v0.1.0. API surface is frozen pending downstream
