@@ -1,14 +1,22 @@
 """URL discovery — sitemap.xml → robots.txt → BFS fallback.
 
-Public API: ``async def discover_urls(root, *, max_urls) -> list[str]``.
+Public API: ``async def discover_urls(root, *, max_urls, fetcher=None) -> list[str]``.
 Returns filtered (same-host, crawlable, dedup) URLs in discovery order,
 capped at *max_urls*.
+
+When *fetcher* is ``None`` (default), discovery uses an internal
+``httpx.AsyncClient`` — sufficient for unit tests and for sites without
+anti-bot walls.  ``crawler.crawl`` passes an engine-aware fetcher so
+discovery escalates through the full ladder on Cloudflare-protected
+sitemaps (TECH_DEBT #10).
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree as ET
 
@@ -26,6 +34,24 @@ _ROBOTS_SITEMAP_RE = re.compile(r"^\s*Sitemap:\s*(\S+)\s*$", re.IGNORECASE | re.
 
 _REDIRECT_STATUS = frozenset({301, 302, 303, 307, 308})
 _MAX_REDIRECT_HOPS = 5
+
+
+@dataclass(frozen=True, slots=True)
+class FetchedDoc:
+    """Minimal fetch result the discovery code consumes.
+
+    ``status_code`` is checked against 200 in the same way as the legacy
+    ``httpx.Response.status_code`` flow; non-200 short-circuits the tier
+    so the caller's fetcher can simply return ``None`` (or a ``FetchedDoc``
+    with status_code != 200) when the underlying scrape failed.
+    """
+
+    status_code: int
+    text: str
+    headers: dict[str, str] = field(default_factory=dict)
+
+
+DiscoveryFetcher = Callable[[str], Awaitable["FetchedDoc | None"]]
 
 
 async def _fetch(
@@ -148,6 +174,7 @@ async def discover_urls(
     max_urls: int = 100,
     max_depth: int = 3,
     follow_subdomains: bool = False,
+    fetcher: DiscoveryFetcher | None = None,
 ) -> list[str]:
     """Discover same-host crawlable URLs from *root*, capped at *max_urls*.
 
@@ -160,6 +187,15 @@ async def discover_urls(
     accepted; when ``True`` all subdomains of the registered domain pass.
 
     *max_depth* controls how deep the BFS fallback walks (default 3).
+
+    *fetcher* — when provided, each tier asks the supplied callable for a
+    :class:`FetchedDoc` (or ``None`` on failure) instead of using an
+    internal :class:`httpx.AsyncClient`.  ``crawler.crawl`` uses this hook
+    to route discovery through the full scrapefold engine ladder so
+    Cloudflare-protected sitemaps escalate to a stealth engine instead of
+    returning the same 403 page the ``requests`` engine would get
+    (TECH_DEBT #10).  When ``None``, the internal httpx client is used and
+    SSRF guards are applied per-redirect.
     """
     if max_urls <= 0:
         return []
@@ -169,65 +205,120 @@ async def discover_urls(
     sitemap_url = f"{origin}/sitemap.xml"
     robots_url = f"{origin}/robots.txt"
 
-    found: list[str] = []
-
-    visited: set[str] = set()
-
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        # Tier 1 — /sitemap.xml direct
-        found = await _walk_sitemap(
-            client,
-            sitemap_url,
-            visited=visited,
-            max_urls=max_urls,
+    if fetcher is not None:
+        return await _discover_with_fetcher(
+            fetcher,
             root=root,
+            sitemap_url=sitemap_url,
+            robots_url=robots_url,
+            max_urls=max_urls,
+            max_depth=max_depth,
             follow_subdomains=follow_subdomains,
         )
 
-        # Tier 2 — /robots.txt sitemap directives
-        if not found:
-            robots_resp = await _fetch(
-                client, robots_url, root=root, follow_subdomains=follow_subdomains
-            )
-            if robots_resp is not None and robots_resp.status_code == 200:
-                for nested in _parse_robots_for_sitemaps(robots_resp.text):
-                    # SSRF guard: reject off-host Sitemap: directives silently
-                    if not _same_host(nested, root, follow_subdomains):
-                        logger.debug(
-                            "sitemap: robots.txt Sitemap directive points off-host "
-                            "(root=%s directive=%s) — skipping",
-                            root,
-                            nested,
-                        )
-                        continue
-                    more = await _walk_sitemap(
-                        client,
-                        nested,
-                        visited=visited,
-                        max_urls=max_urls - len(found),
-                        root=root,
-                        follow_subdomains=follow_subdomains,
-                    )
-                    found.extend(more)
-                    if len(found) >= max_urls:
-                        break
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        httpx_fetcher = _make_httpx_fetcher(client, root=root, follow_subdomains=follow_subdomains)
+        return await _discover_with_fetcher(
+            httpx_fetcher,
+            root=root,
+            sitemap_url=sitemap_url,
+            robots_url=robots_url,
+            max_urls=max_urls,
+            max_depth=max_depth,
+            follow_subdomains=follow_subdomains,
+        )
 
-        # Tier 3 — BFS from root page
-        if not found:
-            found = await _bfs_crawl(
-                client,
-                root,
-                max_urls=max_urls,
-                max_depth=max_depth,
-                follow_subdomains=follow_subdomains,
-            )
+
+async def _discover_with_fetcher(
+    fetcher: DiscoveryFetcher,
+    *,
+    root: str,
+    sitemap_url: str,
+    robots_url: str,
+    max_urls: int,
+    max_depth: int,
+    follow_subdomains: bool,
+) -> list[str]:
+    visited: set[str] = set()
+
+    # Tier 1 — /sitemap.xml direct
+    found = await _walk_sitemap(
+        fetcher,
+        sitemap_url,
+        visited=visited,
+        max_urls=max_urls,
+        root=root,
+        follow_subdomains=follow_subdomains,
+    )
+
+    # Tier 2 — /robots.txt sitemap directives
+    if not found:
+        robots_doc = await fetcher(robots_url)
+        if robots_doc is not None and robots_doc.status_code == 200:
+            for nested in _parse_robots_for_sitemaps(robots_doc.text):
+                # SSRF guard: reject off-host Sitemap: directives silently
+                if not _same_host(nested, root, follow_subdomains):
+                    logger.debug(
+                        "sitemap: robots.txt Sitemap directive points off-host "
+                        "(root=%s directive=%s) — skipping",
+                        root,
+                        nested,
+                    )
+                    continue
+                more = await _walk_sitemap(
+                    fetcher,
+                    nested,
+                    visited=visited,
+                    max_urls=max_urls - len(found),
+                    root=root,
+                    follow_subdomains=follow_subdomains,
+                )
+                found.extend(more)
+                if len(found) >= max_urls:
+                    break
+
+    # Tier 3 — BFS from root page
+    if not found:
+        found = await _bfs_crawl(
+            fetcher,
+            root,
+            max_urls=max_urls,
+            max_depth=max_depth,
+            follow_subdomains=follow_subdomains,
+        )
 
     filtered = filter_urls(found, root=root, follow_subdomains=follow_subdomains)
     return filtered[:max_urls]
 
 
-async def _walk_sitemap(
+def _make_httpx_fetcher(
     client: httpx.AsyncClient,
+    *,
+    root: str,
+    follow_subdomains: bool,
+) -> DiscoveryFetcher:
+    """Build a :class:`DiscoveryFetcher` backed by an httpx.AsyncClient.
+
+    Used as the default when ``discover_urls(fetcher=None)``.  Wraps the
+    legacy redirect-aware ``_fetch`` helper so SSRF guards on per-hop
+    redirects continue to apply.
+    """
+
+    async def fetch(url: str) -> FetchedDoc | None:
+        resp = await _fetch(client, url, root=root, follow_subdomains=follow_subdomains)
+        if resp is None:
+            return None
+        return FetchedDoc(
+            status_code=resp.status_code,
+            text=resp.text,
+            headers={k.lower(): v for k, v in resp.headers.items()},
+        )
+
+    return fetch
+
+
+async def _walk_sitemap(
+    fetcher: DiscoveryFetcher,
     sitemap_url: str,
     *,
     visited: set[str],
@@ -263,18 +354,18 @@ async def _walk_sitemap(
         return []
     visited.add(sitemap_url)
 
-    resp = await _fetch(client, sitemap_url, root=root, follow_subdomains=follow_subdomains)
-    if resp is None or resp.status_code != 200:
+    doc = await fetcher(sitemap_url)
+    if doc is None or doc.status_code != 200:
         return []
 
-    pages, nested_sitemaps = _parse_sitemap(resp.text)
+    pages, nested_sitemaps = _parse_sitemap(doc.text)
     out: list[str] = list(pages)
 
     for child in nested_sitemaps:
         if len(out) >= max_urls:
             break
         more = await _walk_sitemap(
-            client,
+            fetcher,
             child,
             visited=visited,
             max_urls=max_urls - len(out),
@@ -289,7 +380,7 @@ async def _walk_sitemap(
 
 
 async def _bfs_crawl(
-    client: httpx.AsyncClient,
+    fetcher: DiscoveryFetcher,
     root: str,
     *,
     max_urls: int,
@@ -320,18 +411,18 @@ async def _bfs_crawl(
 
         visited.add(url)
 
-        resp = await _fetch(client, url, root=root, follow_subdomains=follow_subdomains)
-        if resp is None or resp.status_code != 200:
+        doc = await fetcher(url)
+        if doc is None or doc.status_code != 200:
             continue
 
-        ct = resp.headers.get("content-type", "").lower()
-        if "html" not in ct and "<html" not in resp.text[:512].lower():
+        ct = doc.headers.get("content-type", "").lower()
+        if "html" not in ct and "<html" not in doc.text[:512].lower():
             continue
 
         found.append(url)
 
         if depth < max_depth:
-            links = _bfs_links_from_html(resp.text, base_url=url)
+            links = _bfs_links_from_html(doc.text, base_url=url)
             for link in links:
                 if (
                     link not in visited
@@ -343,4 +434,4 @@ async def _bfs_crawl(
     return found
 
 
-__all__ = ["discover_urls"]
+__all__ = ["DiscoveryFetcher", "FetchedDoc", "discover_urls"]

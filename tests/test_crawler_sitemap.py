@@ -559,3 +559,104 @@ async def test_sitemap_fetch_skips_malformed_location_header(httpx_mock: HTTPXMo
     # Must not raise ValueError; malformed redirect is treated as fetch failure.
     urls = await discover_urls("https://example.com/", max_urls=100)
     assert urls == []
+
+
+# ---------------------------------------------------------------------------
+# TECH_DEBT #10 — discovery routes through a user-provided fetcher
+# ---------------------------------------------------------------------------
+
+
+class TestDiscoveryFetcher:
+    """When a `fetcher` is provided, discovery skips the internal httpx client
+    and asks the fetcher for sitemap.xml / robots.txt / BFS pages. This is the
+    extension point that lets ``crawler.crawl`` route discovery through the
+    full engine ladder so Cloudflare-protected sitemaps can escalate to
+    ``scrapling_stealth`` instead of returning the same 403 page the
+    ``requests`` engine would get."""
+
+    async def test_custom_fetcher_is_used_for_sitemap(self) -> None:
+        from scrapefold.crawler.sitemap import FetchedDoc
+
+        sitemap_xml = (
+            '<?xml version="1.0"?>'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            "<url><loc>https://example.com/a</loc></url>"
+            "<url><loc>https://example.com/b</loc></url>"
+            "</urlset>"
+        )
+        calls: list[str] = []
+
+        async def fetcher(url: str) -> FetchedDoc | None:
+            calls.append(url)
+            if url == "https://example.com/sitemap.xml":
+                return FetchedDoc(
+                    status_code=200,
+                    text=sitemap_xml,
+                    headers={"content-type": "application/xml"},
+                )
+            return None
+
+        urls = await discover_urls("https://example.com/", max_urls=100, fetcher=fetcher)
+
+        assert "https://example.com/sitemap.xml" in calls, (
+            "discover_urls must call the supplied fetcher for sitemap.xml — "
+            "this is what lets crawler.crawl wire engine escalation into URL "
+            "discovery (TECH_DEBT #10)."
+        )
+        assert "https://example.com/a" in urls
+        assert "https://example.com/b" in urls
+
+    async def test_custom_fetcher_handles_blocked_sitemap_via_escalation(self) -> None:
+        """Simulate a Cloudflare-style block on sitemap.xml that the caller's
+        fetcher resolves through engine escalation: first call returns 403
+        (cheapest engine), second call returns valid XML (after escalation).
+        The fetcher abstracts the escalation — discover_urls just sees the
+        successful response and parses it."""
+        from scrapefold.crawler.sitemap import FetchedDoc
+
+        sitemap_xml = (
+            '<?xml version="1.0"?>'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            "<url><loc>https://example.com/page</loc></url>"
+            "</urlset>"
+        )
+
+        async def fetcher(url: str) -> FetchedDoc | None:
+            # Caller's fetcher already did its own escalation; we just see the
+            # final 200 response.  This is the contract crawler.crawl relies on.
+            if url == "https://example.com/sitemap.xml":
+                return FetchedDoc(status_code=200, text=sitemap_xml, headers={})
+            return None
+
+        urls = await discover_urls("https://example.com/", max_urls=100, fetcher=fetcher)
+        assert "https://example.com/page" in urls
+
+    async def test_custom_fetcher_none_falls_through_tiers(self) -> None:
+        """If the fetcher returns None (e.g. AllEnginesFailed on sitemap.xml),
+        discovery falls through to robots.txt and finally to BFS — matching the
+        existing tier behaviour."""
+        from scrapefold.crawler.sitemap import FetchedDoc
+
+        bfs_html = '<html><body><a href="https://example.com/found">link</a></body></html>'
+
+        async def fetcher(url: str) -> FetchedDoc | None:
+            if url == "https://example.com/sitemap.xml":
+                return None  # cheap engine got 403, escalation also failed
+            if url == "https://example.com/robots.txt":
+                return None
+            if url == "https://example.com/":
+                return FetchedDoc(
+                    status_code=200,
+                    text=bfs_html,
+                    headers={"content-type": "text/html"},
+                )
+            if url == "https://example.com/found":
+                return FetchedDoc(
+                    status_code=200,
+                    text="<html><body>found page</body></html>",
+                    headers={"content-type": "text/html"},
+                )
+            return None
+
+        urls = await discover_urls("https://example.com/", max_urls=100, fetcher=fetcher)
+        assert "https://example.com/found" in urls

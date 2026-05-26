@@ -36,8 +36,10 @@ htmlcov/
 *.swo
 .DS_Store
 
-# Claude Code worktrees
+# Claude Code worktrees + runtime
 .claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/
 
 # Project-specific
 .scrapefold/

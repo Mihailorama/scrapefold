@@ -761,3 +761,83 @@ async def test_crawl_site_threads_pool_through_to_scrape_calls(
     # the key check is that the crawl succeeded and wrote the file.
     assert result.stitched_path == out
     assert len(result.pages) == 2
+
+
+# ---------------------------------------------------------------------------
+# TECH_DEBT #10 — discovery routes through the engine ladder
+# ---------------------------------------------------------------------------
+
+
+async def test_crawl_site_discovers_via_engine_ladder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Discovery (sitemap.xml fetch) goes through scrapefold.scrape — when the
+    cheap engine would return a 403 block page, the router's escalation gives
+    discovery a chance to succeed on a stealth-capable engine. This is the
+    integration test for TECH_DEBT #10: without the engine-aware fetcher,
+    discover_urls collapsed to ``{root}`` on Cloudflare-protected sitemaps.
+
+    We stub scrapefold.scrape itself and assert it is invoked for
+    ``sitemap.xml`` (proving discovery delegates to the engine ladder rather
+    than to a hardcoded httpx client)."""
+    sitemap_xml = (
+        '<?xml version="1.0"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        "<url><loc>https://example.com/page-a</loc></url>"
+        "<url><loc>https://example.com/page-b</loc></url>"
+        "</urlset>"
+    )
+
+    calls: list[str] = []
+
+    async def _fake_scrape(
+        url: str, opts: ScrapeOptions | None = None, **kw: object
+    ) -> ScrapeResult:
+        calls.append(url)
+        if url == "https://example.com/sitemap.xml":
+            return ScrapeResult(
+                url=url,
+                text=sitemap_xml,
+                markdown=sitemap_xml,
+                html=sitemap_xml,
+                engine="scrapling_stealth",  # simulates a successful escalation
+                elapsed_ms=10,
+                meta={"status_code": 200},
+            )
+        return ScrapeResult(
+            url=url,
+            text=f"page-{url}",
+            markdown=f"# {url}",
+            html=None,
+            engine="stub",
+            elapsed_ms=1,
+            meta={"status_code": 200},
+        )
+
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+    monkeypatch.setattr("scrapefold.crawler.scrape", _fake_scrape, raising=False)
+
+    import httpx
+
+    async def _fake_head(self: httpx.AsyncClient, url: str, **kw: object) -> httpx.Response:
+        return httpx.Response(200, request=httpx.Request("HEAD", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "head", _fake_head)
+
+    out = tmp_path / "out.md"
+    result = await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=5),
+        output=out,
+    )
+
+    assert "https://example.com/sitemap.xml" in calls, (
+        "crawl_site must invoke scrapefold.scrape() for sitemap.xml so "
+        "discovery escalates through the engine ladder (TECH_DEBT #10). "
+        f"Calls actually made: {calls}"
+    )
+    assert len(result.pages) >= 2
+    fetched_urls = [p.url for p in result.pages]
+    assert "https://example.com/page-a" in fetched_urls
+    assert "https://example.com/page-b" in fetched_urls

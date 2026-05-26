@@ -40,6 +40,55 @@ def _default_output_path() -> Path:
     return Path(path)
 
 
+def _make_engine_aware_fetcher(
+    crawl_opts: ScrapeOptions, pool: EnginePool
+) -> sitemap.DiscoveryFetcher:
+    """Build a :class:`~scrapefold.crawler.sitemap.DiscoveryFetcher` that
+    routes sitemap / robots / BFS fetches through the full scrapefold engine
+    ladder (TECH_DEBT #10).
+
+    On a Cloudflare-protected site the cheap ``requests`` engine returns a
+    403 block page for ``/sitemap.xml`` — the router detects it via
+    ``is_suspicious`` and escalates to ``scrapling_stealth``, which returns
+    the real sitemap XML.  Without this hook the discovery walk uses a raw
+    ``httpx.AsyncClient`` and collapses to ``{root}`` on protected sites.
+
+    Returns ``None`` when scrape raises :class:`AllEnginesFailed` — discovery
+    treats that as a missing-resource signal and falls through to the next
+    tier (robots.txt / BFS).
+    """
+    from scrapefold import scrape  # local import to avoid module-load cycle
+
+    async def fetch(url: str) -> sitemap.FetchedDoc | None:
+        try:
+            result = await scrape(url, crawl_opts, pool=pool)
+        except Exception as exc:
+            logger.debug(
+                "crawler: discovery fetch via engine ladder failed url=%s err=%s",
+                url,
+                exc,
+            )
+            return None
+
+        status_code = int(result.meta.get("status_code", 200))
+        # Prefer raw HTML/XML when the engine preserved it (BFS link
+        # extraction and sitemap XML parsing both need the original body).
+        # Fall back to text — for the requests engine that IS the raw body;
+        # for markdown-only engines (jina) it's degraded but still usable
+        # for robots.txt directives.
+        body = result.html if result.html is not None else result.text
+        headers_raw = result.meta.get("headers") or {}
+        if not isinstance(headers_raw, dict):
+            headers_raw = {}
+        return sitemap.FetchedDoc(
+            status_code=status_code,
+            text=body or "",
+            headers={str(k).lower(): str(v) for k, v in headers_raw.items()},
+        )
+
+    return fetch
+
+
 async def _preflight_head(
     client: httpx.AsyncClient,
     url: str,
@@ -155,19 +204,9 @@ async def crawl(
         write_stitched([], output_path)
         return CrawlResult(pages=(), stitched_path=output_path, failures=())
 
-    urls = await sitemap.discover_urls(
-        root,
-        max_urls=max_pages,
-        max_depth=opts.max_depth,
-        follow_subdomains=opts.follow_subdomains,
-    )
-    logger.info("crawler: discovered %d urls from %s", len(urls), root)
-
-    if not urls:
-        urls = [root]  # at least try the root
-
     # Build a derived options object that carries the redirect-scope guard.
     # We do NOT mutate the caller's opts — use dataclasses.replace to fork.
+    # Constructed before discover_urls so the engine-aware fetcher uses it.
     crawl_extra = {
         **opts.extra,
         "same_host_redirect_scope": {
@@ -187,7 +226,22 @@ async def crawl(
     results: list[ScrapeResult] = []
     failures: list[str] = []
     follow_subdomains = opts.follow_subdomains
+
+    discovery_fetcher = _make_engine_aware_fetcher(crawl_opts, pool)
+
     try:
+        urls = await sitemap.discover_urls(
+            root,
+            max_urls=max_pages,
+            max_depth=opts.max_depth,
+            follow_subdomains=opts.follow_subdomains,
+            fetcher=discovery_fetcher,
+        )
+        logger.info("crawler: discovered %d urls from %s", len(urls), root)
+
+        if not urls:
+            urls = [root]  # at least try the root
+
         async with httpx.AsyncClient(timeout=10.0) as head_client:
             for url in urls:
                 if not await _preflight_head(head_client, url, root, follow_subdomains):

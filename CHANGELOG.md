@@ -6,6 +6,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-26
+
+Patch release: bug fix for `crawl_site()` on anti-bot-protected sites.
+
+### Fixed
+
+- `crawl_site()` URL discovery (sitemap.xml / robots.txt / BFS link
+  extraction) now escalates through the full engine ladder instead of
+  using a hardcoded `httpx.AsyncClient`. Previously, on a
+  Cloudflare-protected site the per-URL ladder worked but the upstream
+  sitemap fetch returned the same 403 block page that the cheap
+  `requests` engine would get → discovery collapsed to `{root}` and
+  `crawl_site()` produced 1 page instead of N. (TECH_DEBT #10)
+
+### Added
+
+- `scrapefold.crawler.sitemap.FetchedDoc` and `DiscoveryFetcher` — public
+  extension point for `discover_urls(..., fetcher=...)` so callers can
+  inject custom fetch logic (e.g., to route through their own retry/proxy
+  stack). When `fetcher=None`, the legacy httpx-based path is preserved
+  for backward compatibility with existing direct callers.
+
 ## [0.1.0] - 2026-05-26
 
 First stable release. Promotes `0.1.0rc1` to stable with no code changes —
