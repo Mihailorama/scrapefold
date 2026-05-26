@@ -113,6 +113,31 @@ downstream consumers only need sequential walks at v0.1.0 ship time.
 - **Fix sketch:** implement `engines/brightdata_unlocker.py` against Bright Data's Web Unlocker API (`https://api.brightdata.com/datacenter/zone/unlock` or equivalent). Capability: `proxy_type="residential"`, `geography=(<country_code>,)`. Wire into ladders for the geofenced site class.
 - **Priority:** P2 — needed for full coverage of IP-geofenced targets but workable around for v0.1.0 (the vast majority of targets are reachable without).
 
+### 12. No sync wrapper that's robust to leaked event loops in the caller
+
+- **Where:** `src/scrapefold/__init__.py` (public API surface).
+- **Status:** `scrape()` is async-only; callers in sync codebases write
+  `asyncio.run(scrape(...))` per call. This breaks the moment the caller's
+  process has *any* leaked asyncio loop in its main thread — most common
+  trigger: Playwright Sync API (used by `cloakbrowser`, `playwright-stealth`,
+  etc.) leaks a running loop, after which `asyncio.run` raises
+  `RuntimeError: asyncio.run() cannot be called from a running event loop`.
+- **Found by:** phynder PR 1 smoke test on 2026-05-26 (`Mihailorama/phynder#62`,
+  commit `ed16868`). Phynder's adapter currently works around this by running
+  `asyncio.run(scrape(...))` inside a `ThreadPoolExecutor(max_workers=1)` —
+  the worker thread always has a clean asyncio context regardless of leaks
+  in the main thread.
+- **Fix sketch:** expose `scrape_sync(url, opts=None, pool=None) -> ScrapeResult`
+  alongside `scrape()`. Implementation does the same worker-thread isolation
+  internally so sync callers don't repeat the pattern. Same for `crawl_site_sync`.
+  Document the rationale (leaked loops from Playwright Sync) in the docstring.
+- **Why P2:** sync callers can write the 5-line `ThreadPoolExecutor` workaround
+  themselves (phynder did), so it's an ergonomics improvement, not a blocker.
+  Becomes more valuable as more sync codebases adopt scrapefold.
+- **Test:** `test_scrape_sync_works_inside_running_event_loop` — call
+  `scrape_sync()` from inside `asyncio.run(harness())` and assert it returns
+  a `ScrapeResult` instead of raising.
+
 ## How to add an item
 
 1. Open a row here with **P-priority**, **where** (file/function), **status**, **fix sketch**, **test**.
