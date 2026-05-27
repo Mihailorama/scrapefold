@@ -1,6 +1,6 @@
 ---
 purpose: "Documentation index — start here. Navigate to architecture, workflows, and conventions."
-updated: "2026-05-26"
+updated: "2026-05-27"
 related:
   - architecture/overview.md
   - workflows/development.md
@@ -10,7 +10,7 @@ related:
 
 # scrapefold docs
 
-Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, and LLM-ready output. Wraps 13 vendor APIs + local stealth browsers + a baseline `requests` engine behind one async interface.
+Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, and LLM-ready output. Wraps 14 vendor APIs + local stealth browsers + a baseline `requests` engine behind one async interface.
 
 ## Where to look
 
@@ -40,6 +40,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | Pack 7 ✅ | RC tag + consumer migration guide (`docs/migration-guide.md`) | 0.1.0rc1 |
 | Pack 8 ✅ | First stable release + PyPI publish via trusted publishing | 0.1.0 |
 | Patch ✅ | TECH_DEBT #10 — discovery escalates through engine ladder; sync-wrapper backlog (#12) filed | 0.1.1 |
+| PR #1 ✅ | `oxylabs` engine (Web Scraper API realtime, residential geo, render/screenshot, pure-httpx) | Unreleased |
 
 ## What's next (v0.2)
 

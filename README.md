@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-631%20passed-brightgreen.svg)](#)
 [![PyPI downloads](https://img.shields.io/pypi/dm/scrapefold.svg)](https://pypi.org/project/scrapefold/)
 
-**Turn any URL into clean markdown.** Unified Python toolkit for web scraping — one async interface, 14 engines, automatic anti-bot escalation, built-in disk cache.
+**Turn any URL into clean markdown.** Unified Python toolkit for web scraping — one async interface, 15 engines, automatic anti-bot escalation, built-in disk cache.
 
 Scrapefold is the open-source scraping engine from [Datatera.ai](https://datatera.ai) — extracted from our commercial enterprise AI data platform and battle-tested in production against Cloudflare, Datadome, PerimeterX, and Akamai-protected sites.
 
@@ -31,6 +31,7 @@ Scrapefold is the open-source scraping engine from [Datatera.ai](https://datater
 | [**Outscraper**](https://outscraper.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**Apify (LinkedIn)**](https://apify.com/) | ✅ | SaaS | Paid | ★★☆ | ★★★ | ★★★ | Medium | $$$ |
 | [**Anysite**](https://anysite.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
+| [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 
 **★★★** Excellent **★★☆** Good **★☆☆** Basic **☆☆☆** Not supported — **$** ~$0.1–0.5/1K req **$$** ~$1–3/1K req **$$$** ~$5–15/1K req
 
@@ -46,7 +47,7 @@ Scrapefold is the open-source scraping engine from [Datatera.ai](https://datater
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
 | LinkedIn / niche social | **Apify (LinkedIn)** — vendor-managed actors |
-| IP-geofenced targets | **brightdata_unlocker** (v0.2 — tracked) |
+| IP-geofenced targets | **Oxylabs** (`geo_location` via residential pool) — or **brightdata_unlocker** (v0.2 — tracked) |
 | Self-hosted, all-in-one | **scrapling_stealth** + **crawl4ai** + **requests** ladder |
 | Need MCP server for AI agents | `scrapefold-mcp` — built-in |
 
@@ -112,6 +113,7 @@ asyncio.run(main())
 | [**Outscraper**](https://outscraper.com/) | SaaS | Paid | Niche aggregator scrapes | `pip install scrapefold[outscraper]` |
 | [**Apify (LinkedIn)**](https://apify.com/) | SaaS | Paid | LinkedIn actor runs | `pip install scrapefold[apify]` |
 | [**Anysite**](https://anysite.dev/) | SaaS | Paid | General-purpose vendor | `pip install scrapefold[anysite]` |
+| [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | SaaS | Paid | Web Scraper API (realtime, residential geo) | (built-in — pure httpx) |
 
 > **Adding your own engine?** Implement the `ScrapeEngine` interface — see [Adding a Custom Engine](#adding-a-custom-engine) below and [CONTRIBUTING.md](CONTRIBUTING.md) for the 5-step checklist.
 

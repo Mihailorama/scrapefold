@@ -302,7 +302,9 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a4...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/mihailorama/scrapefold/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a4...v0.1.0
 [0.1.0a4]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a3...v0.1.0a4
 [0.1.0a3]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a2...v0.1.0a3
 [0.1.0a2]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a1...v0.1.0a2
