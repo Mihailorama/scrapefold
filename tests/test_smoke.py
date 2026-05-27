@@ -111,6 +111,11 @@ def test_engine_registry_contains_pack_2a_engines() -> None:
     assert {"requests", "firecrawl", "scrapingbee", "scrapingdog", "jina"}.issubset(names)
 
 
+def test_engine_registry_contains_oxylabs() -> None:
+    """Oxylabs Web Scraper API engine is registered."""
+    assert "oxylabs" in set(list_engine_names())
+
+
 def test_engine_registry_contains_pack_2b_engines() -> None:
     """Pack 2B registers the three LinkedIn-focused engines."""
     names = set(list_engine_names())

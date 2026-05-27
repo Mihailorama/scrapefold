@@ -365,6 +365,48 @@ python scripts/live_smoke.py --max-pages 5
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for engine-addition workflow and [docs/workflows/development.md](docs/workflows/development.md) for the full dev loop.
 
+## Comparison
+
+### Engines — price & features
+
+Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-call estimate (`EngineCapabilities.estimated_cost_usd`) — the figure the router's budget walks against. These are coarse placeholders for routing decisions, **not** official quotes; verify against each vendor's current pricing page before relying on them.
+
+| Engine | Type | JS | Stealth | Screenshot | Native MD | Proxy | Needs key | Free tier | Est. $/1k |
+|---|---|:--:|:--:|:--:|:--:|---|:--:|:--:|--:|
+| `requests` | local | — | — | — | — | none | no | ✓ | $0 |
+| `scrapling_fast` | local | — | — | — | — | datacenter | no | ✓ | $0 |
+| `scrapling_stealth` | local | ✓ | ✓ | — | — | datacenter | no | ✓ | $0 |
+| `crawl4ai` | local | ✓ | — | ✓ | ✓ | datacenter | no | ✓ | $0 |
+| `cloakbrowser` | local | ✓ | ✓ | ✓ | — | residential | no | ✓ | $0 |
+| `selenium` | local | ✓ | — | ✓ | — | datacenter | no | ✓ | $0 |
+| `jina` | SaaS | ✓ | — | ✓ | ✓ | none | optional | ✓ | ~$0 |
+| `scrapingdog` | SaaS | ✓ | — | — | — | datacenter | ✓ | ✓ | $0.50 |
+| `firecrawl` | SaaS | ✓ | ✓ | ✓ | ✓ | datacenter | ✓ | ✓ | $1.00 |
+| `scrapingbee` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | ✓ | $1.00 |
+| `apify_linkedin` | SaaS · site | ✓ | ✓ | — | — | residential | ✓ | ✓ | $1.50 |
+| `cloudflare` | SaaS | ✓ | — | — | ✓ | none | ✓ | — | $1.80 |
+| `anysite` | SaaS | ✓ | ✓ | — | ✓ | residential | ✓ | ✓ | $2.00 |
+| `oxylabs` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | trial | $2.80 |
+| `outscraper` | SaaS · site | ✓ | ✓ | — | — | datacenter | ✓ | ✓ | $3.00 |
+
+`SaaS · site` = ships site-specialized endpoints (LinkedIn, Google Maps, …). `jina` and `cloakbrowser` set `requires_api_key=False`; a key is optional (Jina raises free-tier rate limits).
+
+### SERP APIs
+
+scrapefold does not yet ship dedicated SERP engines — search-results scraping is a planned pack (`oxylabs_serp`, `scrapingdog_serp`, …). Until then, the table below compares the major SERP vendors so the routing/cost model can be extended consistently. Several integrated vendors already expose a SERP endpoint behind their main API (e.g. Oxylabs `source="google_search"`, Bright Data SERP), so wiring them as engines is mostly an adapter + parser.
+
+Prices are **approximate per-1000-search published rates** and move between plan tiers — treat them as ballpark, not quotes.
+
+| SERP API | Engines covered | Structured JSON | Geo / locale | Approx. $/1k |
+|---|---|:--:|:--:|--:|
+| Scrapingdog SERP | Google | ✓ | ✓ | ~$0.20–1 |
+| DataForSEO SERP | Google, Bing | ✓ | ✓ | ~$0.60–3 |
+| Bright Data SERP | Google, Bing, Yandex, … | ✓ | ✓ | ~$1.5 |
+| Oxylabs SERP | Google, Bing, Yandex, … | ✓ | ✓ | ~$2–3.4 |
+| SerpApi | Google, Bing, Baidu, … | ✓ | ✓ | ~$8–15 |
+
+Feature axes that matter when picking a SERP API: native result parsing (titles / links / snippets / ads / PAA as JSON vs. raw HTML), localization (`geo_location` + `locale` + device), supported engines beyond Google, and async batch vs. realtime latency.
+
 ## Documentation
 
 - [docs/README.md](docs/README.md) — full documentation index

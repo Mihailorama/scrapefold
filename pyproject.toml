@@ -49,6 +49,7 @@ dependencies = [
 firecrawl    = ["firecrawl-py>=4.27"]
 scrapingbee  = ["scrapingbee>=2.0"]
 scrapingdog  = []
+oxylabs      = []
 selenium     = ["selenium>=4.44", "webdriver-manager>=4.0"]
 jina         = []
 cloudflare   = []
