@@ -1,0 +1,38 @@
+<svg width="760" height="360" viewBox="0 0 760 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="scrapefold terminal demo">
+  <title>scrapefold terminal demo</title>
+  <style>
+    .mono { font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 15px; }
+    .prompt { fill: #7C6CF0; font-weight: 700; }
+    .cmd    { fill: #E6E6F0; }
+    .ok     { fill: #4ADE80; }
+    .dim    { fill: #8B8BA7; }
+    .md     { fill: #C9C9DE; }
+    .h1     { fill: #FFFFFF; font-weight: 700; }
+  </style>
+
+  <!-- window -->
+  <rect x="8" y="8" width="744" height="344" rx="12" fill="#15131F"/>
+  <rect x="8" y="8" width="744" height="40" rx="12" fill="#221F32"/>
+  <rect x="8" y="36" width="744" height="12" fill="#221F32"/>
+  <!-- traffic lights -->
+  <circle cx="34" cy="28" r="6" fill="#FF5F57"/>
+  <circle cx="56" cy="28" r="6" fill="#FEBC2E"/>
+  <circle cx="78" cy="28" r="6" fill="#28C840"/>
+  <text x="380" y="33" text-anchor="middle" class="mono dim" font-size="13">scrapefold — bash</text>
+
+  <!-- body -->
+  <g class="mono">
+    <text x="28" y="86"><tspan class="prompt">$ </tspan><tspan class="cmd">scrapefold scrape https://example.com</tspan></text>
+
+    <text x="28" y="116"><tspan class="ok">✓ </tspan><tspan class="dim">engine=requests   status=200   142ms   cost=$0.00</tspan></text>
+
+    <text x="28" y="156" class="h1"># Example Domain</text>
+    <text x="28" y="182" class="md">This domain is for use in illustrative examples in documents.</text>
+    <text x="28" y="204" class="md">You may use this domain in literature without prior coordination</text>
+    <text x="28" y="226" class="md">or asking for permission.</text>
+    <text x="28" y="252" class="md">[More information...](https://www.iana.org/domains/example)</text>
+
+    <text x="28" y="292"><tspan class="prompt">$ </tspan><tspan class="cmd">scrapefold scrape https://shop.cf-protected.com </tspan><tspan class="dim">--stealth</tspan></text>
+    <text x="28" y="322"><tspan class="ok">✓ </tspan><tspan class="dim">requests → scrapling_stealth (auto-escalated past Cloudflare)  2.1s</tspan></text>
+  </g>
+</svg>

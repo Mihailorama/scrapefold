@@ -1,0 +1,42 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scrapefold — turn any URL into clean markdown">
+  <title>Scrapefold</title>
+  <defs>
+    <linearGradient id="oc-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1A1730"/>
+      <stop offset="1" stop-color="#2A2348"/>
+    </linearGradient>
+    <linearGradient id="oc-accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8B7CF7"/>
+      <stop offset="1" stop-color="#6A57E8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#oc-bg)"/>
+
+  <!-- decorative stacked ladder, top-right -->
+  <g transform="translate(880 70)" opacity="0.9">
+    <rect x="0"   y="0"   width="200" height="34" rx="7" fill="url(#oc-accent)" opacity="0.30"/>
+    <rect x="26"  y="44"  width="200" height="34" rx="7" fill="url(#oc-accent)" opacity="0.50"/>
+    <rect x="52"  y="88"  width="200" height="34" rx="7" fill="url(#oc-accent)" opacity="0.72"/>
+    <rect x="78"  y="132" width="200" height="34" rx="7" fill="url(#oc-accent)"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="90" y="250" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="104" font-weight="800" letter-spacing="-3">
+    <tspan fill="#FFFFFF">Scrape</tspan><tspan fill="url(#oc-accent)">fold</tspan>
+  </text>
+
+  <!-- tagline -->
+  <text x="94" y="328" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="42" font-weight="600" fill="#D6D2F0">Turn any URL into clean markdown.</text>
+
+  <!-- feature line -->
+  <text x="94" y="392" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="28" fill="#9A93C4">15 engines · automatic anti-bot escalation · LLM-ready output</text>
+
+  <!-- pip chip -->
+  <rect x="94" y="450" width="430" height="68" rx="12" fill="#0E0C18" stroke="#3A3358" stroke-width="1.5"/>
+  <text x="120" y="493" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="28" fill="#8B7CF7">$ </text>
+  <text x="150" y="493" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="28" fill="#E6E6F0">pip install scrapefold</text>
+
+  <!-- footer -->
+  <text x="94" y="572" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" fill="#6E6896">Open source · MIT · github.com/mihailorama/scrapefold · built by Datatera.ai</text>
+</svg>

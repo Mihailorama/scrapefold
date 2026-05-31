@@ -1,15 +1,53 @@
-# Scrapefold
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="Scrapefold" width="420">
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/scrapefold.svg)](https://pypi.org/project/scrapefold/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![CI](https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg)](https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-631%20passed-brightgreen.svg)](#)
-[![PyPI downloads](https://img.shields.io/pypi/dm/scrapefold.svg)](https://pypi.org/project/scrapefold/)
+<p align="center">
+  <strong>Turn any URL into clean markdown.</strong><br>
+  One async Python interface over 15 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+</p>
 
-**Turn any URL into clean markdown.** Unified Python toolkit for web scraping — one async interface, 15 engines, automatic anti-bot escalation, built-in disk cache.
+<p align="center">
+  <img src="docs/assets/demo.svg" alt="scrapefold scrape https://example.com → clean markdown, auto-escalating past Cloudflare" width="680">
+</p>
+
+<p align="center">
+  <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/v/scrapefold.svg" alt="PyPI version"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
+  <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-631%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
+  <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
+</p>
+
+<p align="center">
+  <strong>15 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>631 tests</strong> · <strong>MIT</strong>
+</p>
+
+> ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
 
 Scrapefold is the open-source scraping engine from [Datatera.ai](https://datatera.ai) — extracted from our commercial enterprise AI data platform and battle-tested in production against Cloudflare, Datadome, PerimeterX, and Akamai-protected sites.
+
+## 30-second taste
+
+```python
+import asyncio
+from scrapefold import scrape
+
+async def main():
+    result = await scrape("https://example.com")   # router picks the cheapest engine that works
+    print(result.markdown)                          # always populated — LLM-ready
+    print(result.engine, result.elapsed_ms)         # which engine ran, and how fast
+
+asyncio.run(main())
+```
+
+```bash
+pip install scrapefold
+```
+
+Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scrapefold escalates only as far as it has to. [See the full quickstart →](#why-scrapefold)
 
 ## Engine Comparison
 
@@ -228,6 +266,13 @@ site_class = reclassify_from_response(
 
 ## Architecture
 
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="Scrapefold architecture: the router classifies a URL and walks a per-site-class ladder, escalating from free local engines (T0–T2) to paid vendor APIs (T3) and stopping at the first non-suspicious response." width="780">
+</p>
+
+<details>
+<summary>ASCII fallback (for terminal viewers)</summary>
+
 ```
                         ┌──────────────────────────────┐
                         │      Your Application        │
@@ -258,6 +303,8 @@ site_class = reclassify_from_response(
                   │   html/json)     │
                   └──────────────────┘
 ```
+
+</details>
 
 ## Engine Selection Logic
 
@@ -342,11 +389,18 @@ Scrapefold integrates with these excellent projects:
 
 ### Built by
 
+Scrapefold is built and maintained by **[Mike Sadofyev](https://www.linkedin.com/in/michael-sadofyev/)** (CEO, [Datatera.ai](https://datatera.ai)), alongside a small ecosystem of AI-data tooling:
+
 | Project | Description |
 |---------|-------------|
 | [Datatera.ai](https://datatera.ai) | AI-powered data transformation and document processing platform |
+| [Docfold](https://github.com/mihailorama/docfold) | Sibling open-source project — turn any document into structured data |
 | [Orquesta AI](https://orquestaai.com) | AI orchestration and agent management platform |
 | [AI Agent Labs](https://aiagentlbs.com) | AI agent services and location-based intelligence |
+
+**Connect:** [LinkedIn](https://www.linkedin.com/in/michael-sadofyev/) · [X / Twitter](https://x.com/MikeSadofyev) · [GitHub](https://github.com/Mihailorama)
+
+> ⭐ **Found Scrapefold useful?** [Star it on GitHub](https://github.com/mihailorama/scrapefold) and share it — it genuinely helps the project reach more developers.
 
 ## Development
 
