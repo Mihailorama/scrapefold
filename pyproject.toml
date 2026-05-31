@@ -76,7 +76,7 @@ test = [
 dev = ["scrapefold[test]", "tomli>=2.4; python_version < '3.11'"]
 
 [project.urls]
-Homepage      = "https://mihailorama.github.io/scrapefold/"
+Homepage      = "https://scrapefold.com/"
 Documentation = "https://github.com/mihailorama/scrapefold/tree/main/docs"
 Repository    = "https://github.com/mihailorama/scrapefold"
 Issues        = "https://github.com/mihailorama/scrapefold/issues"
