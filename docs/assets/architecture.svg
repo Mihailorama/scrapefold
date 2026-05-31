@@ -1,0 +1,75 @@
+<svg width="860" height="440" viewBox="0 0 860 440" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scrapefold architecture: router walks a per-site-class escalation ladder">
+  <title>Scrapefold architecture</title>
+  <defs>
+    <linearGradient id="ax-accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C6CF0"/>
+      <stop offset="1" stop-color="#5A48D6"/>
+    </linearGradient>
+    <marker id="ax-arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8B8BA7"/>
+    </marker>
+  </defs>
+  <style>
+    .box   { fill: #FFFFFF; stroke: #DAD7EC; stroke-width: 1.5; }
+    .lbl   { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; fill: #1A1730; font-weight: 600; }
+    .sub   { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11.5px; fill: #6E6B86; }
+    .tier  { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; fill: #5A48D6; font-weight: 700; }
+    .flow  { stroke: #8B8BA7; stroke-width: 1.5; fill: none; }
+    .cost  { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 10.5px; fill: #9A97B0; }
+  </style>
+
+  <!-- App -->
+  <rect class="box" x="330" y="20" width="200" height="44" rx="9"/>
+  <text class="lbl" x="430" y="40" text-anchor="middle">Your application</text>
+  <text class="sub" x="430" y="56" text-anchor="middle">scrape(url) · crawl_site(url)</text>
+
+  <!-- Router -->
+  <rect x="310" y="92" width="240" height="52" rx="10" fill="url(#ax-accent)"/>
+  <text class="lbl" x="430" y="114" text-anchor="middle" fill="#FFFFFF">ScrapeRouter</text>
+  <text x="430" y="132" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="11.5" fill="#E4E0FB">classify URL → walk per-site-class ladder</text>
+
+  <line class="flow" x1="430" y1="64" x2="430" y2="90" marker-end="url(#ax-arrow)"/>
+  <line class="flow" x1="430" y1="144" x2="430" y2="172" marker-end="url(#ax-arrow)"/>
+
+  <!-- Ladder: stop at first non-suspicious response -->
+  <text class="sub" x="40" y="172" font-style="italic">escalate cheap → expensive · stop at first good response</text>
+
+  <!-- Tier rows -->
+  <!-- T0 -->
+  <rect class="box" x="60" y="182" width="740" height="40" rx="8"/>
+  <text class="tier" x="78" y="206">T0</text>
+  <text class="lbl" x="120" y="200">requests</text>
+  <text class="sub" x="120" y="214">static HTML · httpx · ultra-fast</text>
+  <text class="cost" x="784" y="207" text-anchor="end">Free</text>
+
+  <!-- T1 -->
+  <rect class="box" x="60" y="230" width="740" height="40" rx="8"/>
+  <text class="tier" x="78" y="254">T1</text>
+  <text class="lbl" x="120" y="248">scrapling_stealth · crawl4ai</text>
+  <text class="sub" x="120" y="262">free JS render + stealth (local browser)</text>
+  <text class="cost" x="784" y="255" text-anchor="end">Free</text>
+
+  <!-- T2 -->
+  <rect class="box" x="60" y="278" width="740" height="40" rx="8"/>
+  <text class="tier" x="78" y="302">T2</text>
+  <text class="lbl" x="120" y="296">cloakbrowser · selenium</text>
+  <text class="sub" x="120" y="310">hardened fingerprint browsers (local)</text>
+  <text class="cost" x="784" y="303" text-anchor="end">Free</text>
+
+  <!-- T3 -->
+  <rect x="60" y="326" width="740" height="40" rx="8" fill="#F4F2FF" stroke="#C9C2F2" stroke-width="1.5"/>
+  <text class="tier" x="78" y="350">T3</text>
+  <text class="lbl" x="120" y="344">firecrawl · scrapingbee · oxylabs · jina · …</text>
+  <text class="sub" x="120" y="358">paid vendor APIs · residential proxy · budget-gated</text>
+  <text class="cost" x="784" y="351" text-anchor="end">$ / 1k</text>
+
+  <!-- escalation arrows on the left rail -->
+  <line class="flow" x1="46" y1="202" x2="46" y2="346" stroke-dasharray="4 4"/>
+  <path d="M46,346 l-4,-8 h8 z" fill="#8B8BA7"/>
+
+  <!-- Result -->
+  <line class="flow" x1="430" y1="366" x2="430" y2="388" marker-end="url(#ax-arrow)"/>
+  <rect class="box" x="280" y="390" width="300" height="44" rx="9"/>
+  <text class="lbl" x="430" y="410" text-anchor="middle">ScrapeResult</text>
+  <text class="sub" x="430" y="426" text-anchor="middle">text · markdown · html · json</text>
+</svg>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scrapefold — turn any URL into clean markdown</title>
+<meta name="description" content="One async Python interface over 15 web-scraping engines, with automatic anti-bot escalation (Cloudflare, Datadome, PerimeterX, Akamai) and LLM-ready markdown output. Open source, MIT.">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="canonical" href="https://mihailorama.github.io/scrapefold/">
+
+<!-- Open Graph / Twitter -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Scrapefold — turn any URL into clean markdown">
+<meta property="og:description" content="One async Python interface over 15 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
+<meta property="og:url" content="https://mihailorama.github.io/scrapefold/">
+<meta property="og:image" content="https://mihailorama.github.io/scrapefold/assets/social-card.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Scrapefold — turn any URL into clean markdown">
+<meta name="twitter:description" content="One async Python interface over 15 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
+<meta name="twitter:image" content="https://mihailorama.github.io/scrapefold/assets/social-card.svg">
+
+<style>
+  :root {
+    --bg: #0E0C18;
+    --bg-soft: #15131F;
+    --card: #1B1830;
+    --border: #2C2746;
+    --text: #ECEAF6;
+    --muted: #9A93C4;
+    --dim: #6E6896;
+    --accent: #8B7CF7;
+    --accent-2: #6A57E8;
+    --ok: #4ADE80;
+    --maxw: 1040px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  code, pre { font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace; }
+
+  /* Hero */
+  header.hero {
+    text-align: center;
+    padding: 72px 24px 48px;
+    background: radial-gradient(1100px 480px at 50% -10%, #2A2348 0%, var(--bg) 70%);
+  }
+  .hero img.logo { width: min(440px, 80vw); height: auto; }
+  .hero h1 { font-size: clamp(28px, 5vw, 44px); margin: 24px 0 8px; letter-spacing: -1px; }
+  .hero p.tag { font-size: clamp(16px, 2.4vw, 20px); color: var(--muted); margin: 0 auto 28px; max-width: 620px; }
+  .stats { color: var(--dim); font-size: 14px; margin: 18px 0 0; }
+  .stats strong { color: var(--text); }
+
+  .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin: 28px 0 8px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 13px 22px; border-radius: 11px; font-weight: 700; font-size: 16px;
+    border: 1.5px solid var(--border); transition: transform .12s ease, border-color .12s ease;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-2px); }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border-color: transparent; }
+  .btn-ghost { background: var(--bg-soft); color: var(--text); }
+  .pip {
+    display: inline-flex; align-items: center; gap: 10px;
+    margin-top: 22px; padding: 12px 18px; border-radius: 11px;
+    background: var(--bg-soft); border: 1.5px solid var(--border);
+    font-size: 15px; cursor: pointer;
+  }
+  .pip .prompt { color: var(--accent); font-weight: 700; }
+  .pip .copy { color: var(--dim); font-size: 12px; margin-left: 4px; }
+
+  .hero-demo { margin: 44px auto 0; max-width: 720px; }
+  .hero-demo img { width: 100%; height: auto; border-radius: 12px; }
+
+  /* Sections */
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  section h2 { font-size: clamp(22px, 3.4vw, 30px); margin: 0 0 8px; letter-spacing: -0.5px; }
+  section .lead { color: var(--muted); margin: 0 0 32px; max-width: 680px; }
+
+  /* Why cards */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card .before { color: var(--dim); font-size: 14px; }
+  .card .after { color: var(--ok); font-size: 14px; margin-top: 4px; }
+  .card .after code, .card .before code { background: #0E0C18; padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+
+  /* Engine grid */
+  .engines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .engine { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .engine .name { font-weight: 700; font-size: 15px; }
+  .engine .type { font-size: 11.5px; color: var(--dim); text-transform: uppercase; letter-spacing: .5px; }
+  .engine .caps { font-size: 13px; color: var(--muted); margin-top: 7px; }
+  .engine .stars { color: var(--accent); letter-spacing: 1px; }
+
+  /* How to choose */
+  .choose { list-style: none; padding: 0; margin: 0; }
+  .choose li { display: flex; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .choose .sit { flex: 1 1 280px; color: var(--text); }
+  .choose .rec { flex: 1 1 280px; color: var(--muted); }
+  .choose .rec strong { color: var(--accent); }
+
+  /* Code */
+  pre { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; overflow-x: auto; font-size: 14px; color: #D6D2F0; }
+  pre .c { color: var(--dim); }
+  pre .k { color: var(--accent); }
+  pre .s { color: var(--ok); }
+
+  /* Footer */
+  footer { padding: 56px 0 72px; border-top: 1px solid var(--border); text-align: center; }
+  footer .eco { display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; margin: 18px 0 28px; }
+  footer .eco a { color: var(--muted); font-weight: 600; }
+  footer .connect { color: var(--dim); font-size: 14px; margin-top: 14px; }
+  footer .byline { color: var(--dim); font-size: 13px; margin-top: 26px; }
+
+  @media (max-width: 720px) {
+    .grid2, .engines { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <img class="logo" src="assets/logo.svg" alt="Scrapefold">
+  <h1>Turn any URL into clean markdown.</h1>
+  <p class="tag">One async Python interface over <strong>15 scraping engines</strong> — with automatic anti-bot escalation and LLM-ready output. Open source, MIT.</p>
+
+  <div class="cta-row">
+    <a class="btn btn-primary" href="https://github.com/mihailorama/scrapefold">⭐ Star on GitHub</a>
+    <a class="btn btn-ghost" href="https://pypi.org/project/scrapefold/">View on PyPI</a>
+  </div>
+
+  <div>
+    <span class="pip" id="pip" title="Click to copy">
+      <span class="prompt">$</span><span>pip install scrapefold</span><span class="copy" id="copyLabel">copy</span>
+    </span>
+  </div>
+
+  <p class="stats"><strong>15 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>631 tests</strong> · <strong>MIT</strong></p>
+
+  <div class="hero-demo">
+    <img src="assets/demo.svg" alt="scrapefold scrape https://example.com producing clean markdown and auto-escalating past Cloudflare">
+  </div>
+</header>
+
+<main>
+
+<section id="why">
+  <div class="wrap">
+    <h2>Why Scrapefold?</h2>
+    <p class="lead">Every scraping vendor has trade-offs. Scrapefold lets you switch between them with one line — and escalates from free local engines to paid APIs only as far as a site forces it.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Try a new vendor</h3>
+        <div class="before">Before: rewrite your pipeline</div>
+        <div class="after">After: change one string — <code>engines=("firecrawl",)</code></div>
+      </div>
+      <div class="card">
+        <h3>Cascade on block pages</h3>
+        <div class="before">Before: hand-roll try/except chains</div>
+        <div class="after">After: built-in <code>is_suspicious</code> + ladder escalation</div>
+      </div>
+      <div class="card">
+        <h3>Whole-site crawl</h3>
+        <div class="before">Before: build sitemap parser + BFS + dedup</div>
+        <div class="after">After: <code>await crawl_site(root, opts)</code></div>
+      </div>
+      <div class="card">
+        <h3>LLM-ready output</h3>
+        <div class="before">Before: strip HTML by hand</div>
+        <div class="after">After: <code>result.markdown</code> always populated</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="engines">
+  <div class="wrap">
+    <h2>15 engines, one interface</h2>
+    <p class="lead">Local engines are free and fast; SaaS engines add premium proxies and stealth. The router picks the cheapest tier that works. Ratings: ★★★ excellent · ★★☆ good · ★☆☆ basic.</p>
+    <div class="engines">
+      <div class="engine"><span class="name">requests</span> <span class="type">local</span><div class="caps">Static HTML · ultra-fast · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">scrapling_fast</span> <span class="type">local</span><div class="caps">TLS-impersonation HTTP · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">scrapling_stealth</span> <span class="type">local</span><div class="caps">JS render + stealth · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">crawl4ai</span> <span class="type">local</span><div class="caps">JS render · native markdown · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">cloakbrowser</span> <span class="type">local</span><div class="caps">Anti-fingerprint browser · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">selenium</span> <span class="type">local</span><div class="caps">Classic JS rendering · <span class="stars">★★☆</span></div></div>
+      <div class="engine"><span class="name">Jina Reader</span> <span class="type">saas · free tier</span><div class="caps">Direct URL → markdown · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Firecrawl</span> <span class="type">saas</span><div class="caps">LLM-ready markdown + stealth · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">ScrapingBee</span> <span class="type">saas</span><div class="caps">Premium proxy + JS · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Scrapingdog</span> <span class="type">saas</span><div class="caps">Affordable proxy + browser · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Cloudflare BR</span> <span class="type">saas</span><div class="caps">Browser rendering at the edge · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Oxylabs</span> <span class="type">saas</span><div class="caps">Web Scraper API · residential geo · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Anysite</span> <span class="type">saas</span><div class="caps">General-purpose · native markdown · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Apify (LinkedIn)</span> <span class="type">saas · site</span><div class="caps">Vendor-managed actor runs · <span class="stars">★★☆</span></div></div>
+      <div class="engine"><span class="name">Outscraper</span> <span class="type">saas · site</span><div class="caps">Niche aggregator scrapes · <span class="stars">★★☆</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="choose">
+  <div class="wrap">
+    <h2>How to choose</h2>
+    <p class="lead">Or skip the decision entirely — call <code>scrape(url)</code> and let the router pick.</p>
+    <ul class="choose">
+      <li><span class="sit">Static blog or documentation site</span><span class="rec"><strong>requests</strong> — zero deps, sub-second</span></li>
+      <li><span class="sit">JS-rendered SPA, no anti-bot</span><span class="rec"><strong>scrapling_fast</strong> (free) or <strong>Jina Reader</strong> (free tier)</span></li>
+      <li><span class="sit">Cloudflare / Datadome / PerimeterX</span><span class="rec"><strong>scrapling_stealth</strong> (free) → <strong>Firecrawl</strong> / <strong>ScrapingBee</strong> (paid)</span></li>
+      <li><span class="sit">Site that emits clean markdown via API</span><span class="rec"><strong>Jina Reader</strong> — direct markdown, no parsing</span></li>
+      <li><span class="sit">LinkedIn / niche social</span><span class="rec"><strong>Apify (LinkedIn)</strong> — vendor-managed actors</span></li>
+      <li><span class="sit">IP-geofenced targets</span><span class="rec"><strong>Oxylabs</strong> — residential pool + <code>geo_location</code></span></li>
+      <li><span class="sit">Need an MCP server for AI agents</span><span class="rec"><strong>scrapefold-mcp</strong> — built-in</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="quickstart">
+  <div class="wrap">
+    <h2>Quickstart</h2>
+    <p class="lead">Install one extra per vendor, or <code>scrapefold[all]</code> for everything.</p>
+<pre><span class="k">import</span> asyncio
+<span class="k">from</span> scrapefold <span class="k">import</span> scrape, crawl_site, ScrapeOptions
+
+<span class="k">async def</span> main():
+    <span class="c"># Single URL, auto-engine — router picks the cheapest tier that works</span>
+    result = <span class="k">await</span> scrape(<span class="s">"https://example.com"</span>)
+    print(result.markdown)        <span class="c"># always populated</span>
+    print(result.engine)          <span class="c"># which engine actually fetched it</span>
+
+    <span class="c"># Cloudflare-protected site — same call, router auto-escalates</span>
+    result = <span class="k">await</span> scrape(
+        <span class="s">"https://protected.example.com"</span>,
+        opts=ScrapeOptions(render_js=<span class="k">True</span>, stealth=<span class="k">True</span>),
+    )
+
+    <span class="c"># Whole-site crawl with disk cache</span>
+    crawl = <span class="k">await</span> crawl_site(
+        <span class="s">"https://docs.example.com"</span>,
+        opts=ScrapeOptions(max_pages=<span class="s">50</span>, max_depth=<span class="s">3</span>),
+        output=<span class="s">"site.md"</span>,
+    )
+
+asyncio.run(main())</pre>
+
+<pre><span class="c"># CLI</span>
+<span class="k">$</span> scrapefold scrape https://example.com
+<span class="k">$</span> scrapefold crawl https://docs.example.com --max-pages 50 --output site.md
+<span class="k">$</span> scrapefold list-engines</pre>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="btn btn-primary" href="https://github.com/mihailorama/scrapefold">⭐ Star Scrapefold on GitHub</a>
+    <div class="eco">
+      <a href="https://github.com/mihailorama/scrapefold">GitHub</a>
+      <a href="https://pypi.org/project/scrapefold/">PyPI</a>
+      <a href="https://github.com/mihailorama/scrapefold/tree/main/docs">Docs</a>
+      <a href="https://github.com/mihailorama/docfold">Docfold</a>
+      <a href="https://datatera.ai">Datatera.ai</a>
+      <a href="https://orquestaai.com">Orquesta AI</a>
+      <a href="https://aiagentlbs.com">AI Agent Labs</a>
+    </div>
+    <div class="connect">
+      Built by <strong>Mike Sadofyev</strong> ·
+      <a href="https://www.linkedin.com/in/michael-sadofyev/">LinkedIn</a> ·
+      <a href="https://x.com/MikeSadofyev">X</a> ·
+      <a href="https://github.com/Mihailorama">GitHub</a>
+    </div>
+    <div class="byline">Open source · MIT · the scraping engine behind <a href="https://datatera.ai">Datatera.ai</a></div>
+  </div>
+</footer>
+
+<script>
+  // Click-to-copy the pip command (progressive enhancement; page works without JS).
+  (function () {
+    var pip = document.getElementById('pip');
+    var label = document.getElementById('copyLabel');
+    if (!pip || !navigator.clipboard) return;
+    pip.addEventListener('click', function () {
+      navigator.clipboard.writeText('pip install scrapefold').then(function () {
+        label.textContent = 'copied!';
+        setTimeout(function () { label.textContent = 'copy'; }, 1600);
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
