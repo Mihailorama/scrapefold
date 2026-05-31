@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Docs / Project
+
+- **Project website** — published at **[scrapefold.com](https://scrapefold.com)**
+  (GitHub Pages from `/docs`, custom domain with enforced HTTPS / Let's
+  Encrypt). A single self-contained `docs/index.html` landing page (no build
+  step): hero, value-prop cards, 15-engine grid, how-to-choose, quickstart,
+  and an ecosystem footer.
+- **README presentation layer** — hero block (logo + terminal-demo SVG),
+  centered badges incl. a GitHub-stars badge, an at-a-glance stats row, a
+  30-second taste snippet, and two star CTAs. The ASCII architecture diagram
+  is replaced by `docs/assets/architecture.svg` (ASCII kept as a collapsible
+  fallback). All existing technical tables are unchanged. (PR #2)
+- **Brand assets** — hand-authored, self-contained SVGs under `docs/assets/`:
+  `logo.svg` (dark-text, for light backgrounds), `logo-dark.svg` (white
+  wordmark, for the dark landing hero), `demo.svg`, `architecture.svg`,
+  `social-card.svg` (1200×630 OG card), and `favicon.svg`.
+- **Ecosystem cross-links** — README "Built by" + landing footer now link
+  Docfold, Datatera.ai, Orquesta AI, AI Agent Labs, and an author Connect
+  line (LinkedIn / X / GitHub).
+- `pyproject` `Homepage` → `https://scrapefold.com/`; repo topics set
+  (`web-scraping`, `markdown`, `llm`, `anti-bot`, `crawler`, `playwright`,
+  `mcp`, `python`, `firecrawl`, `stealth`).
+
 ### Added
 
 - `oxylabs` engine — Oxylabs Web Scraper API via the realtime (synchronous)

@@ -41,6 +41,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | Pack 8 ✅ | First stable release + PyPI publish via trusted publishing | 0.1.0 |
 | Patch ✅ | TECH_DEBT #10 — discovery escalates through engine ladder; sync-wrapper backlog (#12) filed | 0.1.1 |
 | PR #1 ✅ | `oxylabs` engine (Web Scraper API realtime, residential geo, render/screenshot, pure-httpx) | Unreleased |
+| PR #2 ✅ | Presentation layer: README hero + brand SVGs + landing site; **[scrapefold.com](https://scrapefold.com)** live (GitHub Pages, custom domain, HTTPS) | Unreleased |
 
 ## What's next (v0.2)
 

@@ -1,6 +1,6 @@
 ---
 purpose: "Engines + features intentionally deferred from v0.1.x."
-updated: "2026-05-26"
+updated: "2026-05-31"
 related:
   - ../TECH_DEBT.md
   - ../../CHANGELOG.md
@@ -64,3 +64,27 @@ file is for broader scope items that don't fit the per-PR ticket shape.
   US/EU IPs at the TCP layer; stealth doesn't help.
 - **v0.2.0 plan:** Adds a new ladder tier above the unlocker engines
   for the `geofenced_*` site classes.
+
+## Website / publication
+
+The project site is live at **[scrapefold.com](https://scrapefold.com)**
+(GitHub Pages from `/docs`, custom domain, enforced HTTPS). Follow-ups:
+
+### PNG OG / social card
+
+- **Issue:** `docs/assets/social-card.svg` is referenced by `og:image` /
+  `twitter:image`. Several link-unfurlers (Slack, iMessage, some Twitter/X
+  paths) do **not** render SVG OG images and will show no preview.
+- **Plan:** Rasterize the card to a `social-card.png` (1200×630) and point
+  the meta tags at the PNG; keep the SVG as the editable source. Needs a
+  rasterizer (resvg / headless Chrome screenshot) — not available in the
+  offline test env, so do it on a machine with a browser.
+- **Affected:** `docs/index.html` (`og:image`, `twitter:image`).
+
+### Web analytics
+
+- **Issue:** No traffic analytics on the landing page, so we can't measure
+  whether the publication push converts to installs / stars.
+- **Plan:** Add a privacy-light, cookieless snippet (e.g. Plausible or a
+  self-hosted equivalent) to `docs/index.html`. Confirm consent/footprint
+  expectations before adding any third-party script.
