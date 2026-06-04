@@ -25,14 +25,14 @@ from typing import Any
 import httpx
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
-from scrapefold.html_to_text import html_to_both
+from scrapefold.html_to_text import html_to_both, markdown_to_text
 from scrapefold.options import ScrapeOptions, build_target_headers, strip_extra_prefix
 from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
 
 _ENDPOINT = "https://api.scraperapi.com/"
-_COST_USD = 0.00049
+_CREDIT_USD = 0.00049
 
 
 def _adapt(opts: ScrapeOptions, api_key: str, url: str) -> dict[str, str]:
@@ -53,6 +53,13 @@ def _adapt(opts: ScrapeOptions, api_key: str, url: str) -> dict[str, str]:
         params["premium"] = "true"
     if opts.wait_for_selector:
         params["wait_for_selector"] = opts.wait_for_selector
+    # Fix 3: ScraperAPI only forwards request headers (language, user-agent,
+    # cookies, custom_headers) to the target when keep_headers=true is sent.
+    if opts.language or opts.user_agent or opts.cookies or opts.custom_headers:
+        params["keep_headers"] = "true"
+    # Default output_format is "auto" which takes the HTML path intentionally:
+    # HTML fills text+markdown+html (3 slots), whereas native markdown can only
+    # fill text+markdown (2 slots), so HTML is strictly more informative.
     if opts.output_format == "markdown":
         params["output_format"] = "markdown"
     for key, value in strip_extra_prefix(opts.extra, "scraperapi_").items():
@@ -81,7 +88,7 @@ class ScraperApiEngine(ScrapeEngine):
         js_rendering=True,
         stealth=False,
         screenshot=False,
-        estimated_cost_usd=_COST_USD,
+        estimated_cost_usd=_CREDIT_USD,
         billing_unit="call",
         requires_api_key=True,
         proxy_type="datacenter",
@@ -132,18 +139,45 @@ class ScraperApiEngine(ScrapeEngine):
         elif params.get("output_format") == "markdown":
             # Native markdown — do not re-derive from HTML.
             markdown = raw
-            text = raw
+            # Fix 4: text slot must be plain text, not raw markdown.
+            text = markdown_to_text(raw)
         else:
             text, markdown = html_to_both(raw, base_url=url)
             html = raw
 
-        meta: dict[str, object] = {"status_code": response.status_code}
-        target_status = response.headers.get("sa-statuscode")
-        if target_status is not None:
-            meta["scraperapi_target_status"] = target_status
-        credit_cost = response.headers.get("sa-credit-cost")
-        if credit_cost is not None:
-            meta["scraperapi_credit_cost"] = credit_cost
+        # Fix 1: surface the target site's HTTP status as the canonical
+        # status_code so the escalation ladder can detect blocks (403/429/503).
+        # ScraperAPI's own API status is preserved under scraperapi_api_status.
+        api_status = response.status_code
+        meta: dict[str, object] = {}
+        target_status_header = response.headers.get("sa-statuscode")
+        if target_status_header is not None:
+            meta["scraperapi_target_status"] = target_status_header
+            meta["scraperapi_api_status"] = api_status
+            try:
+                meta["status_code"] = int(target_status_header)
+            except ValueError:
+                meta["status_code"] = api_status
+        else:
+            meta["status_code"] = api_status
+
+        # Fix 2: report the actual credit cost from the response header when
+        # available; otherwise estimate from request params.
+        credit_cost_header = response.headers.get("sa-credit-cost")
+        if credit_cost_header is not None:
+            meta["scraperapi_credit_cost"] = credit_cost_header
+            try:
+                cost_usd = int(credit_cost_header) * _CREDIT_USD
+            except ValueError:
+                cost_usd = _CREDIT_USD
+        else:
+            # Estimate: render adds 10 credits, premium adds 10 credits
+            credits = 1
+            if params.get("render") == "true":
+                credits += 9  # 10 total
+            if params.get("premium") == "true":
+                credits += 10
+            cost_usd = credits * _CREDIT_USD
 
         return ScrapeResult(
             url=url,
@@ -153,7 +187,7 @@ class ScraperApiEngine(ScrapeEngine):
             json=json_data,
             engine=self.NAME,
             elapsed_ms=0,  # base class fills this in
-            cost_usd=_COST_USD,
+            cost_usd=cost_usd,
             meta=meta,
         )
 

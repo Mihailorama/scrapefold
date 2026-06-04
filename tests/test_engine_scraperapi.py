@@ -32,7 +32,8 @@ async def test_html_200_populates_all_slots(httpx_mock: HTTPXMock) -> None:
     assert result.html == _HTML
     assert "Hello" in result.text
     assert "Hello" in result.markdown
-    assert result.cost_usd == 0.00049
+    # Default opts have render_js=True → 10 credits even without sa-credit-cost header
+    assert result.cost_usd == 10 * 0.00049
     assert result.engine == "scraperapi"
     assert result.meta["status_code"] == 200
 
@@ -199,6 +200,124 @@ async def test_unsupported_options_do_not_break_call(httpx_mock: HTTPXMock) -> N
     httpx_mock.add_response(status_code=200, text=_HTML)
     result = await _engine().scrape("https://example.com/", ScrapeOptions(stealth=True))
     assert result.engine == "scraperapi"
+
+
+# ---------------------------------------------------------------------------
+# Fix 1 — Canonical target status_code
+# ---------------------------------------------------------------------------
+
+
+async def test_sa_statuscode_header_becomes_canonical_status(httpx_mock: HTTPXMock) -> None:
+    """sa-statuscode: 403 on a 200 API response → result.status_code == 403."""
+    httpx_mock.add_response(
+        status_code=200,
+        headers={"sa-statuscode": "403"},
+        text=_HTML,
+    )
+    result = await _engine().scrape("https://example.com/")
+    assert result.status_code == 403
+    assert result.meta["scraperapi_api_status"] == 200
+    assert result.meta["scraperapi_target_status"] == "403"
+
+
+async def test_no_sa_statuscode_keeps_api_status(httpx_mock: HTTPXMock) -> None:
+    """When sa-statuscode is absent, status_code == API HTTP status."""
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    result = await _engine().scrape("https://example.com/")
+    assert result.status_code == 200
+    assert "scraperapi_api_status" not in result.meta
+
+
+# ---------------------------------------------------------------------------
+# Fix 2 — Report actual credit cost
+# ---------------------------------------------------------------------------
+
+
+async def test_credit_cost_header_sets_cost_usd(httpx_mock: HTTPXMock) -> None:
+    """sa-credit-cost: 10 header → cost_usd == 10 * 0.00049."""
+    httpx_mock.add_response(
+        status_code=200,
+        headers={"sa-credit-cost": "10"},
+        text=_HTML,
+    )
+    result = await _engine().scrape("https://example.com/")
+    assert result.cost_usd == 10 * 0.00049
+
+
+async def test_no_header_render_js_true_costs_10_credits(httpx_mock: HTTPXMock) -> None:
+    """No sa-credit-cost header + render_js=True → cost = 10 * 0.00049."""
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(render_js=True))
+    assert result.cost_usd == 10 * 0.00049
+
+
+async def test_no_header_render_js_false_no_premium_costs_1_credit(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """No sa-credit-cost header, render_js=False, no premium → cost = 1 * 0.00049."""
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(render_js=False))
+    assert result.cost_usd == 0.00049
+
+
+# ---------------------------------------------------------------------------
+# Fix 3 — keep_headers forwarded when caller headers are set
+# ---------------------------------------------------------------------------
+
+
+async def test_keep_headers_set_when_user_agent_present(httpx_mock: HTTPXMock) -> None:
+    """ScrapeOptions(user_agent=...) → keep_headers=true in query params."""
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    await _engine().scrape("https://example.com/", ScrapeOptions(user_agent="TestBot/1.0"))
+    req = httpx_mock.get_requests()[0]
+    assert req.url.params.get("keep_headers") == "true"
+
+
+async def test_keep_headers_not_set_when_no_caller_headers(httpx_mock: HTTPXMock) -> None:
+    """Plain ScrapeOptions() → keep_headers NOT in query params."""
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    await _engine().scrape("https://example.com/", ScrapeOptions())
+    req = httpx_mock.get_requests()[0]
+    assert "keep_headers" not in req.url.params
+
+
+async def test_keep_headers_set_when_language_present(httpx_mock: HTTPXMock) -> None:
+    """ScrapeOptions(language=...) → keep_headers=true."""
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    await _engine().scrape("https://example.com/", ScrapeOptions(language="fr"))
+    req = httpx_mock.get_requests()[0]
+    assert req.url.params.get("keep_headers") == "true"
+
+
+async def test_keep_headers_set_when_cookies_present(httpx_mock: HTTPXMock) -> None:
+    """ScrapeOptions(cookies=...) → keep_headers=true."""
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    await _engine().scrape("https://example.com/", ScrapeOptions(cookies={"s": "abc"}))
+    req = httpx_mock.get_requests()[0]
+    assert req.url.params.get("keep_headers") == "true"
+
+
+async def test_keep_headers_set_when_custom_headers_present(httpx_mock: HTTPXMock) -> None:
+    """ScrapeOptions(custom_headers=...) → keep_headers=true."""
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    await _engine().scrape("https://example.com/", ScrapeOptions(custom_headers={"X-My": "val"}))
+    req = httpx_mock.get_requests()[0]
+    assert req.url.params.get("keep_headers") == "true"
+
+
+# ---------------------------------------------------------------------------
+# Fix 4 — text slot must be plain text for native markdown
+# ---------------------------------------------------------------------------
+
+
+async def test_output_format_markdown_text_is_plain_text(httpx_mock: HTTPXMock) -> None:
+    """Native markdown: result.markdown keeps raw md; result.text has no '# ' markers."""
+    md = "# Title\n\nbody text"
+    httpx_mock.add_response(status_code=200, headers={"content-type": "text/markdown"}, text=md)
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(output_format="markdown"))
+    assert result.markdown == md
+    assert "# " not in result.text
+    assert "Title" in result.text
 
 
 def test_registered_in_registry() -> None:
