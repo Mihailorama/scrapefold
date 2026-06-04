@@ -129,23 +129,38 @@ class ScraperApiEngine(ScrapeEngine):
         json_data: dict[str, Any] | list[Any] | None = None
         html: str | None = None
 
-        if _is_json_response(response, params):
+        # Determine whether the response is genuinely JSON.
+        # _is_json_response returns True either from content-type or from request
+        # params (autoparse / output_format=json).  If params say JSON but the
+        # server returned HTML/markdown, we fall through to the normal branch so
+        # the html slot is correctly populated (Fix 5 / round-3 Codex P2).
+        ctype = response.headers.get("content-type", "")
+        is_json_ctype = "application/json" in ctype
+        json_requested = _is_json_response(response, params)
+
+        if json_requested:
             try:
                 json_data = response.json()
             except ValueError:
                 json_data = None
+
+        if json_requested and (json_data is not None or is_json_ctype):
+            # Genuine JSON path: body parsed OK, or server explicitly said JSON
+            # (empty / malformed body is still surfaced as text, not HTML).
             pretty = (
                 _json.dumps(json_data, indent=2, ensure_ascii=False)
                 if json_data is not None
                 else raw
             )
             text, markdown = pretty, pretty
-        elif params.get("output_format") == "markdown":
+        elif params.get("output_format") == "markdown" and not json_requested:
             # Native markdown — do not re-derive from HTML.
             markdown = raw
             # Fix 4: text slot must be plain text, not raw markdown.
             text = markdown_to_text(raw)
         else:
+            # HTML path -- includes the case where JSON was requested but the
+            # server returned an HTML fallback (e.g. blocked / unsupported parser).
             text, markdown = html_to_both(raw, base_url=url)
             html = raw
 

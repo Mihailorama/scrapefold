@@ -358,3 +358,38 @@ async def test_bool_extra_autoparse_enables_json_branch(httpx_mock: HTTPXMock) -
     req = httpx_mock.get_requests()[0]
     assert req.url.params.get("autoparse") == "true"
     assert result.json == {"a": 1}
+
+
+# ---------------------------------------------------------------------------
+# Fix 5 -- JSON-requested but non-JSON body falls back to HTML/markdown slot
+# ---------------------------------------------------------------------------
+
+
+async def test_json_requested_but_html_returned_falls_back_to_html(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """output_format='json' + text/html body -> html slot populated, json slot None."""
+    html_body = "<html><body><h1>Blocked</h1></body></html>"
+    httpx_mock.add_response(
+        status_code=200,
+        headers={"content-type": "text/html; charset=utf-8"},
+        text=html_body,
+    )
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(output_format="json"))
+    assert result.json is None
+    assert result.html == html_body
+    assert "Blocked" in result.text
+
+
+async def test_autoparse_bool_but_html_returned_falls_back(httpx_mock: HTTPXMock) -> None:
+    """autoparse=True + text/html body -> html slot populated, json slot None."""
+    html_body = "<html><body><p>nope</p></body></html>"
+    httpx_mock.add_response(
+        status_code=200,
+        headers={"content-type": "text/html; charset=utf-8"},
+        text=html_body,
+    )
+    opts = ScrapeOptions(extra={"scraperapi_autoparse": True})
+    result = await _engine().scrape("https://example.com/", opts)
+    assert result.json is None
+    assert result.html == html_body
