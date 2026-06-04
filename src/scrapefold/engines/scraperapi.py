@@ -20,6 +20,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
+from typing import Any
 
 import httpx
 
@@ -114,7 +115,7 @@ class ScraperApiEngine(ScrapeEngine):
             response = await client.get(_ENDPOINT, params=params, headers=headers)
 
         raw = response.text
-        json_data: object | None = None
+        json_data: dict[str, Any] | list[Any] | None = None
         html: str | None = None
 
         if _is_json_response(response, params):

@@ -39,6 +39,18 @@ file is for broader scope items that don't fit the per-PR ticket shape.
 
 ## Features
 
+### ScraperAPI AI Parser lifecycle
+
+- **Why deferred:** The `scraperapi` engine *uses* a parser by reference
+  (`extra["scraperapi_autoparse"]` for built-in domains, or a custom
+  parser id). It does not create/edit/delete parsers. ScraperAPI's AI
+  Parser went GA 2026-06-04 charging 30,000 credits per parser create
+  **and** per edit (first parser free) — a costly, stateful operation
+  that doesn't fit the stateless per-call engine model.
+- **v0.2.0 plan:** A separate management helper (not a scrape engine) that
+  wraps the AI Parser CRUD API, with credit-cost guards before any
+  create/edit call. Tracked in `docs/competitive-intel.md`.
+
 ### `crawl_site` parallel fan-out
 
 - **Why deferred:** v0.1.x ships sequential-only (`RaceStep` skipped
