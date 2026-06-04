@@ -127,3 +127,42 @@ def test_adapt_ignores_non_scraperapi_extra_keys() -> None:
     params = _adapt(opts, api_key="k", url="https://x.com")
     assert "firecrawl_foo" not in params
     assert "unrelated" not in params
+
+
+async def test_output_format_markdown_sets_native_markdown(httpx_mock: HTTPXMock) -> None:
+    md = "# Title\n\nbody text"
+    httpx_mock.add_response(status_code=200, headers={"content-type": "text/markdown"}, text=md)
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(output_format="markdown"))
+    req = httpx_mock.get_requests()[0]
+    assert req.url.params.get("output_format") == "markdown"
+    assert result.markdown == md  # not re-derived from HTML
+    assert result.html is None
+
+
+async def test_autoparse_json_fills_json_slot(httpx_mock: HTTPXMock) -> None:
+    payload = {"name": "Widget", "price": 9.99}
+    httpx_mock.add_response(
+        status_code=200,
+        headers={"content-type": "application/json"},
+        json=payload,
+    )
+    opts = ScrapeOptions(extra={"scraperapi_autoparse": "true"})
+    result = await _engine().scrape("https://example.com/", opts)
+    req = httpx_mock.get_requests()[0]
+    assert req.url.params.get("autoparse") == "true"
+    assert result.json == payload
+    assert "Widget" in result.markdown  # best-effort pretty JSON
+
+
+async def test_json_content_type_without_autoparse_still_parsed(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        status_code=200, headers={"content-type": "application/json"}, json={"a": 1}
+    )
+    result = await _engine().scrape("https://example.com/")
+    assert result.json == {"a": 1}
+
+
+async def test_credit_cost_header_stored_in_meta(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(status_code=200, headers={"sa-credit-cost": "10"}, text=_HTML)
+    result = await _engine().scrape("https://example.com/")
+    assert result.meta.get("scraperapi_credit_cost") == "10"
