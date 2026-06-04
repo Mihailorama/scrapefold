@@ -166,3 +166,36 @@ async def test_credit_cost_header_stored_in_meta(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(status_code=200, headers={"sa-credit-cost": "10"}, text=_HTML)
     result = await _engine().scrape("https://example.com/")
     assert result.meta.get("scraperapi_credit_cost") == "10"
+
+
+def test_is_available_true_with_key() -> None:
+    assert _engine(api_key="key-abc").is_available() is True
+
+
+def test_is_available_false_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SCRAPERAPI_API_KEY", raising=False)
+    assert ScraperApiEngine(api_key=None).is_available() is False
+
+
+async def test_network_error_raises_engine_error(httpx_mock: HTTPXMock) -> None:
+    import httpx as _httpx
+
+    httpx_mock.add_exception(_httpx.ConnectError("connection refused"))
+    with pytest.raises(EngineError) as exc_info:
+        await _engine().scrape("https://example.com/")
+    assert exc_info.value.engine == "scraperapi"
+
+
+async def test_unsupported_wait_ms_dropped_not_forwarded(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    # wait_ms is NOT in SUPPORTED_OPTIONS — base class strips it, no "wait" param.
+    await _engine().scrape("https://example.com/", ScrapeOptions(wait_ms=9000))
+    req = httpx_mock.get_requests()[0]
+    assert "wait" not in req.url.params
+    assert "wait_ms" not in req.url.params
+
+
+async def test_unsupported_options_do_not_break_call(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(status_code=200, text=_HTML)
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(stealth=True))
+    assert result.engine == "scraperapi"
