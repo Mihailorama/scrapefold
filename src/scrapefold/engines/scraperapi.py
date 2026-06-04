@@ -60,10 +60,14 @@ def _adapt(opts: ScrapeOptions, api_key: str, url: str) -> dict[str, str]:
     # Default output_format is "auto" which takes the HTML path intentionally:
     # HTML fills text+markdown+html (3 slots), whereas native markdown can only
     # fill text+markdown (2 slots), so HTML is strictly more informative.
-    if opts.output_format == "markdown":
-        params["output_format"] = "markdown"
+    # "markdown" and "json" (AI Parser) are forwarded explicitly; "json" also
+    # routes the response through the structured-data branch in _fetch.
+    if opts.output_format in ("markdown", "json"):
+        params["output_format"] = opts.output_format
     for key, value in strip_extra_prefix(opts.extra, "scraperapi_").items():
-        params[key] = str(value)
+        # Normalize Python bools to ScraperAPI's lowercase "true"/"false" — a
+        # raw str(True) -> "True" silently fails autoparse/premium toggles.
+        params[key] = "true" if value is True else "false" if value is False else str(value)
     return params
 
 

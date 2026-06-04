@@ -325,3 +325,36 @@ def test_registered_in_registry() -> None:
 
     cls = get_engine("scraperapi")
     assert cls is ScraperApiEngine
+
+
+async def test_output_format_json_forwarded_and_parsed(httpx_mock: HTTPXMock) -> None:
+    """Unified output_format='json' is forwarded and routes the JSON branch."""
+    payload = {"title": "X"}
+    httpx_mock.add_response(
+        status_code=200, headers={"content-type": "application/json"}, json=payload
+    )
+    result = await _engine().scrape("https://example.com/", ScrapeOptions(output_format="json"))
+    req = httpx_mock.get_requests()[0]
+    assert req.url.params.get("output_format") == "json"
+    assert result.json == payload
+
+
+def test_adapt_normalizes_bool_extra_to_lowercase() -> None:
+    """Python bool extras serialize as lowercase 'true'/'false', not 'True'."""
+    params = _adapt(
+        ScrapeOptions(extra={"scraperapi_autoparse": True, "scraperapi_ultra_premium": False}),
+        api_key="k",
+        url="https://x.com",
+    )
+    assert params["autoparse"] == "true"
+    assert params["ultra_premium"] == "false"
+
+
+async def test_bool_extra_autoparse_enables_json_branch(httpx_mock: HTTPXMock) -> None:
+    """extra={'scraperapi_autoparse': True} (Python bool) still fills the json slot."""
+    httpx_mock.add_response(status_code=200, json={"a": 1})
+    opts = ScrapeOptions(extra={"scraperapi_autoparse": True})
+    result = await _engine().scrape("https://example.com/", opts)
+    req = httpx_mock.get_requests()[0]
+    assert req.url.params.get("autoparse") == "true"
+    assert result.json == {"a": 1}
