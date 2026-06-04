@@ -199,3 +199,10 @@ async def test_unsupported_options_do_not_break_call(httpx_mock: HTTPXMock) -> N
     httpx_mock.add_response(status_code=200, text=_HTML)
     result = await _engine().scrape("https://example.com/", ScrapeOptions(stealth=True))
     assert result.engine == "scraperapi"
+
+
+def test_registered_in_registry() -> None:
+    from scrapefold.engines import get_engine
+
+    cls = get_engine("scraperapi")
+    assert cls is ScraperApiEngine
