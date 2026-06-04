@@ -4,8 +4,11 @@ Pure REST, no SDK. Supports JS rendering, country routing, premium proxies,
 native markdown output, and AI-Parser structured extraction (``json`` slot).
 
 Cost model: 1 credit per base request (~$0.00049 on the entry plan). JS
-``render`` costs ~10 credits and ultra-premium more; ``estimated_cost_usd``
-reflects the base credit and is a floor, not a ceiling.
+``render`` costs ~10 credits and ultra-premium more. ``estimated_cost_usd``
+reflects the typical render-on call (~$0.0049 / 10 credits) for budget
+pre-flight, since ``ScrapeOptions`` defaults to ``render_js=True``. The base
+is 1 credit (~$0.00049) and the actual reported ``cost_usd`` is computed per
+call from the ``sa-credit-cost`` response header.
 
 AI Parser:
 - ``extra["scraperapi_autoparse"] = "true"`` enables ScraperAPI's built-in
@@ -33,6 +36,11 @@ logger = logging.getLogger(__name__)
 
 _ENDPOINT = "https://api.scraperapi.com/"
 _CREDIT_USD = 0.00049
+# Default ScrapeOptions has render_js=True, which ScraperAPI bills at ~10
+# credits. The pre-call budget gate reads estimated_cost_usd, so estimate the
+# common (render-on) call rather than the 1-credit floor. Actual cost_usd
+# stays dynamic (sa-credit-cost header / per-call param estimate) in _fetch.
+_DEFAULT_CALL_USD = 10 * _CREDIT_USD
 
 
 def _adapt(opts: ScrapeOptions, api_key: str, url: str) -> dict[str, str]:
@@ -92,7 +100,7 @@ class ScraperApiEngine(ScrapeEngine):
         js_rendering=True,
         stealth=False,
         screenshot=False,
-        estimated_cost_usd=_CREDIT_USD,
+        estimated_cost_usd=_DEFAULT_CALL_USD,
         billing_unit="call",
         requires_api_key=True,
         proxy_type="datacenter",
