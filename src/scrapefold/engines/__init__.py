@@ -33,6 +33,9 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
             "scrapefold.engines.scrapingdog", fromlist=["ScrapingdogEngine"]
         ).ScrapingdogEngine
     ),
+    "scraperapi": lambda: (
+        __import__("scrapefold.engines.scraperapi", fromlist=["ScraperApiEngine"]).ScraperApiEngine
+    ),
     "jina": lambda: __import__("scrapefold.engines.jina", fromlist=["JinaEngine"]).JinaEngine,
     "oxylabs": lambda: (
         __import__("scrapefold.engines.oxylabs", fromlist=["OxylabsEngine"]).OxylabsEngine

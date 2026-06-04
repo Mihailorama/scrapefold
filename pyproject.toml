@@ -49,6 +49,7 @@ dependencies = [
 firecrawl    = ["firecrawl-py>=4.27"]
 scrapingbee  = ["scrapingbee>=2.0"]
 scrapingdog  = []
+scraperapi   = []
 oxylabs      = []
 selenium     = ["selenium>=4.44", "webdriver-manager>=4.0"]
 jina         = []
@@ -64,7 +65,7 @@ anysite      = []
 mcp          = ["mcp>=1.27"]
 # --- meta ---
 all = [
-    "scrapefold[firecrawl,scrapingbee,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,mcp]",
+    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,mcp]",
 ]
 test = [
     "pytest>=9.0",
