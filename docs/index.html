@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scrapefold — turn any URL into clean markdown</title>
-<meta name="description" content="One async Python interface over 15 web-scraping engines, with automatic anti-bot escalation (Cloudflare, Datadome, PerimeterX, Akamai) and LLM-ready markdown output. Open source, MIT.">
+<meta name="description" content="One async Python interface over 16 web-scraping engines, with automatic anti-bot escalation (Cloudflare, Datadome, PerimeterX, Akamai) and LLM-ready markdown output. Open source, MIT.">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="canonical" href="https://scrapefold.com/">
 
 <!-- Open Graph / Twitter -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Scrapefold — turn any URL into clean markdown">
-<meta property="og:description" content="One async Python interface over 15 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
+<meta property="og:description" content="One async Python interface over 16 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
 <meta property="og:url" content="https://scrapefold.com/">
 <meta property="og:image" content="https://scrapefold.com/assets/social-card.svg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Scrapefold — turn any URL into clean markdown">
-<meta name="twitter:description" content="One async Python interface over 15 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
+<meta name="twitter:description" content="One async Python interface over 16 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
 <meta name="twitter:image" content="https://scrapefold.com/assets/social-card.svg">
 
 <style>
@@ -185,7 +185,7 @@
 
 <section id="engines">
   <div class="wrap">
-    <h2>15 engines, one interface</h2>
+    <h2>16 engines, one interface</h2>
     <p class="lead">Local engines are free and fast; SaaS engines add premium proxies and stealth. The router picks the cheapest tier that works. Ratings: ★★★ excellent · ★★☆ good · ★☆☆ basic.</p>
     <div class="engines">
       <div class="engine"><span class="name">requests</span> <span class="type">local</span><div class="caps">Static HTML · ultra-fast · <span class="stars">★★★</span></div></div>
@@ -198,6 +198,7 @@
       <div class="engine"><span class="name">Firecrawl</span> <span class="type">saas</span><div class="caps">LLM-ready markdown + stealth · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">ScrapingBee</span> <span class="type">saas</span><div class="caps">Premium proxy + JS · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Scrapingdog</span> <span class="type">saas</span><div class="caps">Affordable proxy + browser · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">ScraperAPI</span> <span class="type">saas</span><div class="caps">Proxy + JS render · native markdown · AI Parser → JSON · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Cloudflare BR</span> <span class="type">saas</span><div class="caps">Browser rendering at the edge · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Oxylabs</span> <span class="type">saas</span><div class="caps">Web Scraper API · residential geo · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Anysite</span> <span class="type">saas</span><div class="caps">General-purpose · native markdown · <span class="stars">★★★</span></div></div>
@@ -217,6 +218,7 @@
       <li><span class="sit">Cloudflare / Datadome / PerimeterX</span><span class="rec"><strong>scrapling_stealth</strong> (free) → <strong>Firecrawl</strong> / <strong>ScrapingBee</strong> (paid)</span></li>
       <li><span class="sit">Site that emits clean markdown via API</span><span class="rec"><strong>Jina Reader</strong> — direct markdown, no parsing</span></li>
       <li><span class="sit">LinkedIn / niche social</span><span class="rec"><strong>Apify (LinkedIn)</strong> — vendor-managed actors</span></li>
+      <li><span class="sit">Structured fields straight from a page</span><span class="rec"><strong>ScraperAPI</strong> — AI Parser fills the <code>json</code> slot</span></li>
       <li><span class="sit">IP-geofenced targets</span><span class="rec"><strong>Oxylabs</strong> — residential pool + <code>geo_location</code></span></li>
       <li><span class="sit">Need an MCP server for AI agents</span><span class="rec"><strong>scrapefold-mcp</strong> — built-in</span></li>
     </ul>
@@ -258,6 +260,18 @@ asyncio.run(main())</pre>
   </div>
 </section>
 
+<section id="ecosystem">
+  <div class="wrap">
+    <h2>Built by &amp; ecosystem</h2>
+    <p class="lead">Scrapefold is built and maintained by <a href="https://www.linkedin.com/in/michael-sadofyev/">Mike Sadofyev</a> (CEO, <a href="https://datatera.ai">Datatera.ai</a>) — the scraping engine behind Datatera — alongside a small ecosystem of AI-data tooling. Connect on <a href="https://www.linkedin.com/in/michael-sadofyev/">LinkedIn</a>, <a href="https://x.com/MikeSadofyev">X</a>, or <a href="https://github.com/Mihailorama">GitHub</a>.</p>
+    <div class="engines">
+      <div class="engine"><span class="name">Datatera.ai</span> <span class="type">platform</span><div class="caps"><a href="https://datatera.ai">AI-powered data transformation &amp; document processing</a></div></div>
+      <div class="engine"><span class="name">Docfold</span> <span class="type">open source · sibling</span><div class="caps"><a href="https://github.com/mihailorama/docfold">Turn any document into structured data</a></div></div>
+      <div class="engine"><span class="name">Orquesta AI</span> <span class="type">platform</span><div class="caps"><a href="https://orquestaai.com">AI orchestration &amp; agent management</a></div></div>
+      <div class="engine"><span class="name">AI Agent Labs</span> <span class="type">services</span><div class="caps"><a href="https://aiagentlbs.com">AI agent services &amp; location intelligence</a></div></div>
+    </div>
+  </div>
+</section>
 </main>
 
 <footer>
