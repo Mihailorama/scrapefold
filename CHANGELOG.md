@@ -31,6 +31,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- `scrapecreators` engine — [Scrape Creators API](https://scrapecreators.com/)
+  (`api.scrapecreators.com`) for public social-media data. Site-classified and
+  JSON-native: maps the target URL to the matching `/v1/<platform>/<resource>`
+  endpoint (TikTok, Instagram, YouTube, Twitter/X, Reddit) and returns the
+  payload in `ScrapeResult.json` with post-converted text/markdown. `x-api-key`
+  auth, pure-`httpx`, no extra dependency; key from `SCRAPECREATORS_API_KEY`.
+  Force an endpoint via `extra["scrapecreators_endpoint"]`. Wired in as the
+  lead option for the `twitter` / `instagram` / `reddit` ladders.
 - `oxylabs` engine — Oxylabs Web Scraper API via the realtime (synchronous)
   endpoint `https://realtime.oxylabs.io/v1/queries`, using the `universal`
   source. Supports JS rendering (`render="html"`), screenshots

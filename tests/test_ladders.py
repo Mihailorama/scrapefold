@@ -54,6 +54,7 @@ _VALID_ENGINES = frozenset(
         "cloakbrowser",
         # new paid SaaS
         "anysite",
+        "scrapecreators",
     }
 )
 

@@ -61,6 +61,7 @@ apify        = ["apify-client>=3.0"]
 # --- new engines (5) ---
 cloakbrowser = ["cloakbrowser>=0.3"]
 anysite      = []
+scrapecreators = []
 # --- interfaces ---
 mcp          = ["mcp>=1.27"]
 # --- meta ---

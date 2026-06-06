@@ -387,18 +387,19 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Twitter / X
     "twitter": (
-        _race("scrapingdog", "apify_linkedin", budget_accounting="sum_all"),
+        _race("scrapecreators", "scrapingdog", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     # Other social
     "instagram": (
-        _race("anysite", "apify_linkedin", budget_accounting="sum_all"),
+        _race("scrapecreators", "anysite", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "reddit": (
-        # Reddit has a public JSON API at /.json — try it first.
+        # Reddit has a public JSON API at /.json — try the free path alongside
+        # Scrape Creators' structured endpoint first.
         # PROBE_SCOPE = per_domain on the requests engine validates viability.
-        _race("anysite", "requests", budget_accounting="sum_all"),
+        _race("scrapecreators", "requests", budget_accounting="sum_all"),
         _race("scrapling_stealth", "crawl4ai"),
         _seq("firecrawl", cost=_MED),
     ),
