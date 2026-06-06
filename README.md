@@ -69,6 +69,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Outscraper**](https://outscraper.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**Apify (LinkedIn)**](https://apify.com/) | ✅ | SaaS | Paid | ★★☆ | ★★★ | ★★★ | Medium | $$$ |
 | [**Anysite**](https://anysite.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
+| [**Scrape Creators**](https://scrapecreators.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**ScraperAPI**](https://www.scraperapi.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 
@@ -152,6 +153,7 @@ asyncio.run(main())
 | [**Outscraper**](https://outscraper.com/) | SaaS | Paid | Niche aggregator scrapes | `pip install scrapefold[outscraper]` |
 | [**Apify (LinkedIn)**](https://apify.com/) | SaaS | Paid | LinkedIn actor runs | `pip install scrapefold[apify]` |
 | [**Anysite**](https://anysite.dev/) | SaaS | Paid | General-purpose vendor | `pip install scrapefold[anysite]` |
+| [**Scrape Creators**](https://scrapecreators.com/) | SaaS | Paid | Social-media JSON API (TikTok, IG, YouTube, X, Reddit) | (built-in — pure httpx) |
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | SaaS | Paid | Web Scraper API (realtime, residential geo) | (built-in — pure httpx) |
 | [**ScraperAPI**](https://www.scraperapi.com/) | SaaS | Paid | Proxy + JS render, native markdown, AI Parser (`json`) | `pip install scrapefold[scraperapi]` |
 
@@ -444,6 +446,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `apify_linkedin` | SaaS · site | ✓ | ✓ | — | — | residential | ✓ | ✓ | $1.50 |
 | `cloudflare` | SaaS | ✓ | — | — | ✓ | none | ✓ | — | $1.80 |
 | `anysite` | SaaS | ✓ | ✓ | — | ✓ | residential | ✓ | ✓ | $2.00 |
+| `scrapecreators` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
 | `oxylabs` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | trial | $2.80 |
 | `outscraper` | SaaS · site | ✓ | ✓ | — | — | datacenter | ✓ | ✓ | $3.00 |
 | `scraperapi` | SaaS | ✓ | — | — | ✓ | datacenter | ✓ | ✓ | $0.49–4.90 |

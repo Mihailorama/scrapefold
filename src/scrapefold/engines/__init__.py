@@ -48,6 +48,11 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "anysite": lambda: (
         __import__("scrapefold.engines.anysite", fromlist=["AnySiteEngine"]).AnySiteEngine
     ),
+    "scrapecreators": lambda: (
+        __import__(
+            "scrapefold.engines.scrapecreators", fromlist=["ScrapeCreatorsEngine"]
+        ).ScrapeCreatorsEngine
+    ),
     "outscraper": lambda: (
         __import__("scrapefold.engines.outscraper", fromlist=["OutscraperEngine"]).OutscraperEngine
     ),
