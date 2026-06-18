@@ -221,9 +221,12 @@ def _validate_contents_payload(payload: dict[str, Any]) -> None:
     if payload.get("results"):
         return
     statuses = payload.get("statuses")
-    if isinstance(statuses, list) and statuses:
-        if all(isinstance(s, dict) and s.get("status") != "success" for s in statuses):
-            raise ValueError("exa contents returned no successful contents")
+    if (
+        isinstance(statuses, list)
+        and statuses
+        and all(isinstance(s, dict) and s.get("status") != "success" for s in statuses)
+    ):
+        raise ValueError("exa contents returned no successful contents")
 
 
 def _result_from_payload(url: str, payload: dict[str, Any]) -> ScrapeResult:
