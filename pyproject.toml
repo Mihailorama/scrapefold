@@ -50,6 +50,7 @@ firecrawl    = ["firecrawl-py>=4.27"]
 scrapingbee  = ["scrapingbee>=2.0"]
 scrapingdog  = []
 scraperapi   = []
+exa          = []
 oxylabs      = []
 selenium     = ["selenium>=4.44", "webdriver-manager>=4.0"]
 jina         = []
@@ -66,7 +67,7 @@ scrapecreators = []
 mcp          = ["mcp>=1.27"]
 # --- meta ---
 all = [
-    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,mcp]",
+    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,exa,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,mcp]",
 ]
 test = [
     "pytest>=9.0",
