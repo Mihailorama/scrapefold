@@ -157,13 +157,14 @@ LinkedIn ladders skip plain HTTP and lead with a paid race over vendor-specializ
 
 ```python
 (
-    RaceStep(engines=("apify_linkedin", "anysite", "scrapingdog"),
+    RaceStep(engines=("apify_linkedin", "anysite", "scrapingdog", "exa"),
              budget_accounting="sum_all"),
     SequentialStep(engine="brightdata_unlocker_sync", cost=0.0015),
 )
 ```
 
 `test_linkedin_never_starts_with_requests` enforces the no-plain-HTTP rule across all five LinkedIn classes.
+Exa uses public people/company search defaults for LinkedIn profile/company URLs; Sales Navigator remains outside the automatic Exa path.
 
 ### Difficulty classes
 

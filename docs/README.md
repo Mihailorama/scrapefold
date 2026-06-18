@@ -10,7 +10,7 @@ related:
 
 # scrapefold docs
 
-Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, and LLM-ready output. Wraps 14 vendor APIs + local stealth browsers + a baseline `requests` engine behind one async interface.
+Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, and LLM-ready output. Wraps 15 vendor APIs + local stealth browsers + a baseline `requests` engine behind one async interface.
 
 ## Where to look
 
@@ -42,6 +42,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | Patch ✅ | TECH_DEBT #10 — discovery escalates through engine ladder; sync-wrapper backlog (#12) filed | 0.1.1 |
 | PR #1 ✅ | `oxylabs` engine (Web Scraper API realtime, residential geo, render/screenshot, pure-httpx) | Unreleased |
 | PR #2 ✅ | Presentation layer: README hero + brand SVGs + landing site; **[scrapefold.com](https://scrapefold.com)** live (GitHub Pages, custom domain, HTTPS) | Unreleased |
+| PR #4 ✅ | Exa engine (Search, Contents, Answer, Agent; LinkedIn people/company defaults, pure-httpx) | Unreleased |
 
 ## What's next (v0.2)
 

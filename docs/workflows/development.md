@@ -98,6 +98,7 @@ See [../../CONTRIBUTING.md](../../CONTRIBUTING.md) § "Add an engine". Five-step
 | `APIFY_API_TOKEN` | apify |
 | `ANYSITE_API_KEY` | anysite |
 | `SCRAPECREATORS_API_KEY` | scrapecreators |
+| `EXA_API_KEY` | exa |
 | `BRIGHTDATA_API_KEY` | brightdata |
 
 scrapefold does not call `load_dotenv()`. Set them in your shell or use your own loader.
