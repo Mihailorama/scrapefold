@@ -355,12 +355,13 @@ LADDERS: dict[SiteClass, Ladder] = {
             "apify_linkedin",
             "anysite",
             "scrapingdog",
+            "exa",
             budget_accounting="sum_all",
         ),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "linkedin_company": (
-        _race("apify_linkedin", "anysite", "scrapingdog", budget_accounting="sum_all"),
+        _race("apify_linkedin", "anysite", "scrapingdog", "exa", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "linkedin_post": (

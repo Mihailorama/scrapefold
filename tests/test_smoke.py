@@ -122,6 +122,11 @@ def test_engine_registry_contains_pack_2b_engines() -> None:
     assert {"apify_linkedin", "anysite", "outscraper"}.issubset(names)
 
 
+def test_engine_registry_contains_exa() -> None:
+    """Exa REST engine is registered."""
+    assert "exa" in set(list_engine_names())
+
+
 def test_engine_registry_contains_pack_2c_scrapling() -> None:
     """Pack 2C registers both scrapling modes and the alias resolves correctly."""
     names = set(list_engine_names())

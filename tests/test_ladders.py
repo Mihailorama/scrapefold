@@ -55,6 +55,7 @@ _VALID_ENGINES = frozenset(
         # new paid SaaS
         "anysite",
         "scrapecreators",
+        "exa",
     }
 )
 
@@ -107,6 +108,14 @@ def test_linkedin_never_starts_with_requests() -> None:
         assert "requests" not in step_engines(first), (
             f"{cls} ladder starts with 'requests' — would be blocked"
         )
+
+
+def test_linkedin_profile_and_company_ladders_include_exa() -> None:
+    for cls in ("linkedin_profile", "linkedin_company"):
+        first = get_ladder(cls)
+        step = first[0]
+        assert isinstance(step, RaceStep), f"{cls} first step is not a race"
+        assert "exa" in step_engines(step)
 
 
 def test_difficulty_classes_skip_requests() -> None:
