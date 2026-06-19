@@ -47,13 +47,14 @@ scrapefold crawl https://docs.example.com --output site.md --max-pages 50
 scrapefold crawl https://docs.example.com --per-page-dir ./pages/
 ```
 
-CLI lands in 0.1.0a5; MCP server (`scrapefold-mcp`) slips to v0.2.
+CLI landed in 0.1.0a5; `scrapefold-mcp` is scaffold-only until the S10
+MCP tool/resource implementation lands.
 
 ## Run the MCP server
 
 ```bash
 pip install -e ".[mcp]"
-scrapefold-mcp     # stub in S1; full server in S10
+scrapefold-mcp     # scaffold today; full server tracked as S10
 ```
 
 ## Lint / type-check / test

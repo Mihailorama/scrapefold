@@ -201,16 +201,16 @@ python scripts/live_smoke.py --max-pages 5 --scrape-timeout 90
 
 ## Edge Cases
 
-- **Sitemap-protected sites** — `crawl_site()`'s sitemap fetch currently uses
-  a hardcoded httpx client (no engine escalation). On Cloudflare-protected
-  sites, the homepage scrape succeeds via `scrapling_stealth` but the
-  sitemap returns a block page and the crawl collapses to `{root}`. See
-  [TECH_DEBT.md](TECH_DEBT.md) #10. Workaround: pre-discover URLs via the
-  site's API/RSS/SERP and pass them as `discovery_urls=[...]`.
+- **Sitemap-protected sites** — `crawl_site()` now passes an engine-aware
+  fetcher into discovery, so sitemap / robots / BFS fetches can escalate
+  through the same ladder as page scrapes. Direct `discover_urls(fetcher=None)`
+  still uses the raw httpx fallback; pass a custom fetcher when anti-bot
+  escalation is required outside `crawl_site()`.
 - **IP-geofenced targets** — some targets reject US/EU IPs at the TCP
-  layer (timeout, not bot detection). No engine in the v0.1.0 ladder
-  helps. See [TECH_DEBT.md](TECH_DEBT.md) #11 (residential-proxy engine
-  deferred to v0.2). Workaround: run scrapefold from a geo-matched VPS.
+  layer (timeout, not bot detection). Use `oxylabs` with `ScrapeOptions.country`
+  / `extra["oxylabs_geo_location"]` when credentials are available, or run
+  scrapefold from a geo-matched VPS. Bright Data-family fallback work remains
+  tracked in [TECH_DEBT.md](TECH_DEBT.md) #11.
 - **`AllEnginesFailed` migration** — legacy callers may catch broad
   `Exception`. After migration, use the typed `AllEnginesFailed` with
   `.url` and `.failures` (a list of `"<engine>:<reason>:<detail>"` strings)

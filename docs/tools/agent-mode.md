@@ -105,6 +105,10 @@ Exit codes:
 
 ## MCP server
 
+`scrapefold-mcp` exists today as a console-script scaffold and exits with a
+non-zero status until the S10 MCP implementation lands. The contract below is
+the target implementation.
+
 ```bash
 pip install "scrapefold[mcp]"
 scrapefold-mcp                          # stdio, default

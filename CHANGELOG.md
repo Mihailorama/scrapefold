@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed roadmap / technical-debt docs after the `0.2.0` release so
+  router fan-out, MCP server implementation, sync wrappers, and remaining
+  residential-proxy fallback work are tracked as future follow-ups.
+
 ## [0.2.0] - 2026-06-19
 
 ### Docs / Project

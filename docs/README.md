@@ -1,6 +1,6 @@
 ---
 purpose: "Documentation index — start here. Navigate to architecture, workflows, and conventions."
-updated: "2026-05-27"
+updated: "2026-06-19"
 related:
   - architecture/overview.md
   - workflows/development.md
@@ -52,6 +52,7 @@ Tracked in [TECH_DEBT.md](TECH_DEBT.md) and [post-1.0/backlog.md](post-1.0/backl
 - **P1**: router-coupled items (probe cache, per-engine `avg_response_mb`, race billing) — items #1–#7.
 - **P2 #11**: residential-proxy engine (`brightdata_unlocker`) for IP-geofenced targets.
 - **P2 #12**: `scrape_sync` / `crawl_site_sync` wrappers robust to leaked event loops (Playwright Sync).
+- **MCP S10**: replace the `scrapefold-mcp` scaffold with working stdio tools/resources.
 - **Engines**: `obscura`, `brightdata` family (see [post-1.0/backlog.md](post-1.0/backlog.md)).
 
 ## Cross-links

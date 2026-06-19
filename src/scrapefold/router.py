@@ -6,8 +6,9 @@ policy and cost are enforced uniformly via ``_attempt_engine`` for every
 engine regardless of whether it arrives via the default ladder or
 ``opts.engines`` override.
 
-v0.1 note: ``RaceStep`` members are walked sequentially (one at a time).
-Concurrent fan-out with first-good-wins cancellation is deferred to v0.2.
+Post-0.2 note: ``RaceStep`` members are still walked sequentially (one at a
+time). Concurrent fan-out with first-good-wins cancellation is deferred to a
+future router cycle.
 """
 
 from __future__ import annotations
@@ -335,9 +336,9 @@ async def walk(
 
     Raises ``AllEnginesFailed`` if every step fails or is skipped.
 
-    v0.1 ladder walk: both ``SequentialStep`` and ``RaceStep`` entries are
-    walked sequentially (one engine at a time).  Concurrent fan-out with
-    first-good-wins cancellation is deferred to v0.2.
+    Post-0.2 ladder walk: both ``SequentialStep`` and ``RaceStep`` entries
+    are walked sequentially (one engine at a time). Concurrent fan-out with
+    first-good-wins cancellation is deferred to a future router cycle.
 
     Parameters
     ----------

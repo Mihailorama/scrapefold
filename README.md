@@ -478,7 +478,7 @@ Feature axes that matter when picking a SERP API: native result parsing (titles 
 - [docs/conventions/golden-rules.md](docs/conventions/golden-rules.md) — invariants every engine adheres to
 - [docs/migration-guide.md](docs/migration-guide.md) — migrate from a hand-rolled cascade in four passes
 - [docs/tools/agent-mode.md](docs/tools/agent-mode.md) — CLI + MCP server reference
-- [docs/TECH_DEBT.md](docs/TECH_DEBT.md) — known limitations and v0.2 roadmap
+- [docs/TECH_DEBT.md](docs/TECH_DEBT.md) — known limitations and follow-up roadmap
 
 ## License
 

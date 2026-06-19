@@ -1,6 +1,6 @@
 ---
 purpose: "Prioritized register of known follow-up items deferred from earlier PRs."
-updated: "2026-05-22"
+updated: "2026-06-19"
 related:
   - architecture/overview.md
   - ../CHANGELOG.md
@@ -19,19 +19,18 @@ These seven items came out of Codex round-3 review of the ladders PR
 (Option A); these are implementation pin-downs that belong in code, not
 in the ladders.py file alone.
 
-**v0.1.0 release split:**
+**Post-0.2 status:**
 
-- v0.1.0 ships **sequential-only** — `RaceStep` entries in ladders are
-  skipped with a DEBUG log. Items below tagged "sequential-relevant"
-  land before the v0.1.0 tag (Pack 3 = router shell, Pack 4 = router
-  cost accounting + probe cache, Pack 5 = engine pool + client reuse).
-- Items tagged "RaceStep-coupled" defer to v0.2.0 — they cannot be
-  validated without race fan-out in the router. Item #1
-  (`budget_mode`), #2 (race billing), and #4 (race billing default)
+- v0.2.0 shipped the Oxylabs, ScrapeCreators, Exa, and presentation-site
+  work. The router still walks `RaceStep` entries sequentially.
+- Items tagged "RaceStep-coupled" remain open after v0.2.0 — they cannot
+  be fully validated without concurrent race fan-out in the router. Item
+  #1 (`budget_mode`), #2 (race billing), and #4 (race billing default)
   are RaceStep-coupled.
 
-This split is non-negotiable per consumer-driven scope: known
-downstream consumers only need sequential walks at v0.1.0 ship time.
+Sequential walking is still the consumer-safe default; concurrent fan-out
+needs a focused router cycle with billing and budget tests before it becomes
+public behavior.
 
 ### 1. `budget_mode` wiring in the router
 
@@ -105,13 +104,13 @@ downstream consumers only need sequential walks at v0.1.0 ship time.
 - **Resolution:** `discover_urls()` now accepts a `fetcher: DiscoveryFetcher` parameter. When `None` (the default for direct callers and unit tests), the legacy httpx-based path is used. When called from `crawler.crawl()`, an engine-aware fetcher built by `_make_engine_aware_fetcher(crawl_opts, pool)` wraps `scrapefold.scrape()` so sitemap.xml / robots.txt / BFS pages are fetched through the full engine ladder. A Cloudflare-protected sitemap that returns 403 to the `requests` engine now escalates to `scrapling_stealth` (or higher) and discovery yields real URLs.
 - **Tests:** `tests/test_crawler_sitemap.py::TestDiscoveryFetcher` (three unit tests covering the fetcher contract) and `tests/test_crawl_site.py::test_crawl_site_discovers_via_engine_ladder` (integration test asserting `scrapefold.scrape` is invoked for `sitemap.xml`).
 
-### 11. No residential-proxy engine for IP-geofenced targets
+### 11. Dedicated geofenced fallback tier
 
 - **Where:** `src/scrapefold/engines/`.
-- **Status:** Some geofenced targets are unreachable from US/EU IPs at the network layer (TCP timeout, not bot detection). No amount of stealth / JS rendering / fingerprint randomisation helps — the connection never completes. To scrape such targets, scrapefold needs a residential-proxy engine that routes requests through a geo-matched exit node.
+- **Status:** Some geofenced targets are unreachable from US/EU IPs at the network layer (TCP timeout, not bot detection). No amount of stealth / JS rendering / fingerprint randomisation helps — the connection never completes. v0.2.0 ships `oxylabs` with residential geo routing (`ScrapeOptions.country` → `geo_location`), but the dedicated Bright Data-family fallback tier is still missing.
 - **Originally scoped, never shipped:** `brightdata_unlocker` and `brightdata_browser` were listed in the early README's 16-engine table; the placeholder pyproject extras were removed in `0.1.0a2` (CHANGELOG).
 - **Fix sketch:** implement `engines/brightdata_unlocker.py` against Bright Data's Web Unlocker API (`https://api.brightdata.com/datacenter/zone/unlock` or equivalent). Capability: `proxy_type="residential"`, `geography=(<country_code>,)`. Wire into ladders for the geofenced site class.
-- **Priority:** P2 — needed for full coverage of IP-geofenced targets but workable around for v0.1.0 (the vast majority of targets are reachable without).
+- **Priority:** P2 — needed for provider redundancy and full coverage of IP-geofenced targets; Oxylabs covers the first shipped residential-geo path.
 
 ### 12. No sync wrapper that's robust to leaked event loops in the caller
 
