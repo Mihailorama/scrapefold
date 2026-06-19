@@ -10,7 +10,7 @@ related:
 
 # scrapefold docs
 
-Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, and LLM-ready output. Wraps 15 vendor APIs + local stealth browsers + a baseline `requests` engine behind one async interface.
+Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, and LLM-ready output. Wraps 18 engines across vendor APIs, local stealth browsers, and a baseline `requests` engine behind one async interface.
 
 ## Where to look
 
@@ -27,7 +27,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 
 ## Project status
 
-**v0.1.1 — shipped to PyPI on 2026-05-26.** `pip install scrapefold`.
+**v0.2.0 — shipped to PyPI on 2026-06-19.** `pip install scrapefold`.
 
 | PR / Pack | Engines / features | Version |
 |---|---|---|
@@ -40,11 +40,12 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | Pack 7 ✅ | RC tag + consumer migration guide (`docs/migration-guide.md`) | 0.1.0rc1 |
 | Pack 8 ✅ | First stable release + PyPI publish via trusted publishing | 0.1.0 |
 | Patch ✅ | TECH_DEBT #10 — discovery escalates through engine ladder; sync-wrapper backlog (#12) filed | 0.1.1 |
-| PR #1 ✅ | `oxylabs` engine (Web Scraper API realtime, residential geo, render/screenshot, pure-httpx) | Unreleased |
-| PR #2 ✅ | Presentation layer: README hero + brand SVGs + landing site; **[scrapefold.com](https://scrapefold.com)** live (GitHub Pages, custom domain, HTTPS) | Unreleased |
-| PR #4 ✅ | Exa engine (Search, Contents, Answer, Agent; LinkedIn people/company defaults, pure-httpx) | Unreleased |
+| PR #1 ✅ | `oxylabs` engine (Web Scraper API realtime, residential geo, render/screenshot, pure-httpx) | 0.2.0 |
+| PR #2 ✅ | Presentation layer: README hero + brand SVGs + landing site; **[scrapefold.com](https://scrapefold.com)** live (GitHub Pages, custom domain, HTTPS) | 0.2.0 |
+| PR #3 ✅ | `scrapecreators` engine for public social-media JSON APIs | 0.2.0 |
+| PR #4 ✅ | Exa engine (Search, Contents, Answer, Agent; LinkedIn people/company defaults, pure-httpx) | 0.2.0 |
 
-## What's next (v0.2)
+## What's next
 
 Tracked in [TECH_DEBT.md](TECH_DEBT.md) and [post-1.0/backlog.md](post-1.0/backlog.md):
 

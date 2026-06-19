@@ -1,6 +1,6 @@
 """scrapefold — unified interface for web scraping engines.
 
-Public API (v0.1 — scaffold; engines land in later PRs):
+Public API (v0.2):
 
     from scrapefold import scrape, crawl_site, ScrapeOptions, ScrapeResult, ScrapeEngine
 
@@ -34,7 +34,7 @@ from scrapefold.pool import EnginePool
 from scrapefold.result import ScrapeResult
 from scrapefold.router import walk as _walk
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "AllEnginesFailed",

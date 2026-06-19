@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-19
+
 ### Docs / Project
 
 - **Project website** — published at **[scrapefold.com](https://scrapefold.com)**
@@ -31,6 +33,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- `exa` engine — Exa REST API integration for Search, Contents, Find Similar,
+  Answer, and Agent runs. Pure-`httpx`, no SDK dependency; key from
+  `EXA_API_KEY`. LinkedIn profile/company URLs default to Exa public
+  `people` / `company` search modes and the engine is wired into the
+  `linkedin_profile` and `linkedin_company` ladders.
+- `scraperapi` engine — ScraperAPI REST adapter with JS render, country
+  routing, premium proxies, forwarded headers/cookies, native markdown output,
+  AI Parser JSON output, target status propagation, and dynamic credit-cost
+  reporting from ScraperAPI response headers. Pure-`httpx`, no SDK dependency;
+  key from `SCRAPERAPI_API_KEY`.
 - `scrapecreators` engine — [Scrape Creators API](https://scrapecreators.com/)
   (`api.scrapecreators.com`) for public social-media data. Site-classified and
   JSON-native: maps the target URL to the matching `/v1/<platform>/<resource>`
@@ -333,7 +345,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mihailorama/scrapefold/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mihailorama/scrapefold/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a4...v0.1.0
 [0.1.0a4]: https://github.com/mihailorama/scrapefold/compare/v0.1.0a3...v0.1.0a4

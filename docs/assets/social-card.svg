@@ -30,7 +30,7 @@
   <text x="94" y="328" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="42" font-weight="600" fill="#D6D2F0">Turn any URL into clean markdown.</text>
 
   <!-- feature line -->
-  <text x="94" y="392" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="28" fill="#9A93C4">15 engines · automatic anti-bot escalation · LLM-ready output</text>
+  <text x="94" y="392" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="28" fill="#9A93C4">18 engines · automatic anti-bot escalation · LLM-ready output</text>
 
   <!-- pip chip -->
   <rect x="94" y="450" width="430" height="68" rx="12" fill="#0E0C18" stroke="#3A3358" stroke-width="1.5"/>
