@@ -6,6 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- `pixelrag` engine — local [PixelRAG](https://github.com/StarTrail-org/PixelRAG)
+  `pixelshot` adapter for URL-to-screenshot-tile capture plus an injected
+  VLM/OCR tile reader hook (`extra["pixelrag_reader"]`) that turns the tiles
+  into `ScrapeResult.text`, `ScrapeResult.markdown`, and structured per-tile
+  JSON under `ScrapeResult.json["reader"]`. Without a reader, the engine still
+  returns the capture manifest and file URIs. With `take_screenshot=True`, it
+  also exposes the first tile in `ScrapeResult.screenshot_b64`. The optional
+  `scrapefold[pixelrag]` extra is guarded for Python 3.12+ because PixelRAG's
+  upstream package currently requires Python 3.12; Python 3.10/3.11 callers can
+  set `PIXELRAG_BIN` to a `pixelshot` executable from another environment.
+- `socialcrawl` engine — [SocialCrawl](https://www.socialcrawl.dev/) REST API
+  gateway for public social data. Pure-`httpx`, JSON-native, and keyed by
+  `SOCIALCRAWL_API_KEY`; normal URL scrapes map TikTok, Instagram, YouTube,
+  Facebook, X/Twitter, LinkedIn, and Reddit URLs to matching SocialCrawl
+  endpoints, while `extra["socialcrawl_endpoint"]` exposes arbitrary GET
+  endpoints with prefixed query-param forwarding. Wired into the paid social
+  and LinkedIn ladders.
+
 ### Changed
 
 - Refreshed roadmap / technical-debt docs after the `0.2.0` release so

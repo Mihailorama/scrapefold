@@ -51,3 +51,5 @@ Data/
 *.pem
 *.key
 secrets.json
+
+.serena/

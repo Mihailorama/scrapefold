@@ -37,6 +37,9 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
         __import__("scrapefold.engines.scraperapi", fromlist=["ScraperApiEngine"]).ScraperApiEngine
     ),
     "exa": lambda: __import__("scrapefold.engines.exa", fromlist=["ExaEngine"]).ExaEngine,
+    "pixelrag": lambda: (
+        __import__("scrapefold.engines.pixelrag", fromlist=["PixelRagEngine"]).PixelRagEngine
+    ),
     "jina": lambda: __import__("scrapefold.engines.jina", fromlist=["JinaEngine"]).JinaEngine,
     "oxylabs": lambda: (
         __import__("scrapefold.engines.oxylabs", fromlist=["OxylabsEngine"]).OxylabsEngine
@@ -53,6 +56,11 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
         __import__(
             "scrapefold.engines.scrapecreators", fromlist=["ScrapeCreatorsEngine"]
         ).ScrapeCreatorsEngine
+    ),
+    "socialcrawl": lambda: (
+        __import__(
+            "scrapefold.engines.socialcrawl", fromlist=["SocialCrawlEngine"]
+        ).SocialCrawlEngine
     ),
     "outscraper": lambda: (
         __import__("scrapefold.engines.outscraper", fromlist=["OutscraperEngine"]).OutscraperEngine

@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 18 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 20 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -16,13 +16,13 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-741%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-791%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <strong>18 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>741 tests</strong> · <strong>MIT</strong>
+  <strong>20 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>791 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -59,6 +59,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**scrapling_fast**](https://github.com/D4Vinci/Scrapling) | ✅ | Local | BSD | ★★★ | ☆☆☆ | ★☆☆ | Ultra | Free |
 | [**scrapling_stealth**](https://github.com/D4Vinci/Scrapling) | ✅ | Local | BSD | ★★★ | ★★★ | ★★★ | Medium | Free |
 | [**crawl4ai**](https://github.com/unclecode/crawl4ai) | ✅ | Local | Apache | ★★★ | ★★★ | ★★☆ | Slow | Free |
+| [**PixelRAG**](https://github.com/StarTrail-org/PixelRAG) | ✅ | Local | Apache | ★★☆ | ★★★ | ☆☆☆ | Medium | Free |
 | [**cloakbrowser**](https://github.com/) | ✅ | Local | MIT | ★★☆ | ★★★ | ★★★ | Slow | Free |
 | [**selenium**](https://github.com/SeleniumHQ/selenium) | ✅ | Local | Apache | ★★☆ | ★★★ | ★☆☆ | Slow | Free |
 | [**Jina Reader**](https://jina.ai/reader/) | ✅ | SaaS | Free tier | ★★★ | ★★★ | ★★☆ | Fast | Free / $ |
@@ -70,6 +71,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Apify (LinkedIn)**](https://apify.com/) | ✅ | SaaS | Paid | ★★☆ | ★★★ | ★★★ | Medium | $$$ |
 | [**Anysite**](https://anysite.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**Scrape Creators**](https://scrapecreators.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
+| [**SocialCrawl**](https://www.socialcrawl.dev/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**ScraperAPI**](https://www.scraperapi.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Exa**](https://exa.ai/) | ✅ | SaaS | Paid | ★★★ | ★★☆ | ★★☆ | Fast | $$ |
@@ -86,8 +88,10 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | JS-rendered SPA, no anti-bot | **scrapling_fast** (free) or **Jina Reader** (free tier) |
 | Cloudflare / Datadome / PerimeterX | **scrapling_stealth** (free) → **Firecrawl** / **ScrapingBee** (paid) |
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
+| Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
-| LinkedIn / niche social | **Exa** (`people` / `company` public search) + **Apify (LinkedIn)** actor fallback |
+| Social profiles, posts, channels, comments | **SocialCrawl** gateway + **Scrape Creators** structured JSON |
+| LinkedIn / niche social | **Exa** (`people` / `company` public search) + **Apify (LinkedIn)** + **SocialCrawl** fallback |
 | IP-geofenced targets | **Oxylabs** (`geo_location` via residential pool) — or **brightdata_unlocker** (tracked) |
 | Self-hosted, all-in-one | **scrapling_stealth** + **crawl4ai** + **requests** ladder |
 | Need MCP server for AI agents | `scrapefold-mcp` — built-in |
@@ -144,6 +148,7 @@ asyncio.run(main())
 | [**requests**](https://www.python-httpx.org/) | Local | Apache | Static HTML; ultra-fast | (built-in) |
 | [**scrapling**](https://github.com/D4Vinci/Scrapling) | Local | BSD | Static + stealth modes | `pip install scrapefold[scrapling]` |
 | [**crawl4ai**](https://github.com/unclecode/crawl4ai) | Local | Apache | JS rendering, markdown cleanup | `pip install scrapefold[crawl4ai]` |
+| [**PixelRAG**](https://github.com/StarTrail-org/PixelRAG) | Local | Apache | Visual screenshot-tile capture via `pixelshot`, with injected VLM/OCR reader output in markdown / JSON | `pip install "scrapefold[pixelrag]"` on Python 3.12+, or set `PIXELRAG_BIN` |
 | [**cloakbrowser**](https://github.com/) | Local | MIT | Anti-fingerprint browser | `pip install scrapefold[cloakbrowser]` |
 | [**selenium**](https://github.com/SeleniumHQ/selenium) | Local | Apache | Classic JS rendering (deprecated) | `pip install scrapefold[selenium]` |
 | [**Jina Reader**](https://jina.ai/reader/) | SaaS | Free tier | Direct markdown, no parsing | `pip install scrapefold[jina]` |
@@ -155,6 +160,7 @@ asyncio.run(main())
 | [**Apify (LinkedIn)**](https://apify.com/) | SaaS | Paid | LinkedIn actor runs | `pip install scrapefold[apify]` |
 | [**Anysite**](https://anysite.dev/) | SaaS | Paid | General-purpose vendor | `pip install scrapefold[anysite]` |
 | [**Scrape Creators**](https://scrapecreators.com/) | SaaS | Paid | Social-media JSON API (TikTok, IG, YouTube, X, Reddit) | (built-in — pure httpx) |
+| [**SocialCrawl**](https://www.socialcrawl.dev/) | SaaS | Paid | Social-data JSON gateway (TikTok, IG, YouTube, Facebook, X, LinkedIn, Reddit, plus endpoint overrides) | (built-in — pure httpx) |
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | SaaS | Paid | Web Scraper API (realtime, residential geo) | (built-in — pure httpx) |
 | [**ScraperAPI**](https://www.scraperapi.com/) | SaaS | Paid | Proxy + JS render, native markdown, AI Parser (`json`) | `pip install scrapefold[scraperapi]` |
 | [**Exa**](https://exa.ai/) | SaaS | Paid | Search, Contents, Answer, Agent; LinkedIn people/company defaults | (built-in — pure httpx) |
@@ -170,6 +176,7 @@ pip install scrapefold
 # One specific vendor
 pip install "scrapefold[firecrawl]"
 pip install "scrapefold[scrapling,jina]"
+pip install "scrapefold[pixelrag]"  # PixelRAG upstream requires Python 3.12+
 
 # Everything
 pip install "scrapefold[all]"
@@ -179,6 +186,9 @@ pip install "scrapefold[mcp]"
 ```
 
 Requires **Python 3.10+**.
+
+PixelRAG's upstream package currently requires Python 3.12+. On Python 3.10/3.11,
+run `pixelshot` from a separate environment and point `PIXELRAG_BIN` at that executable.
 
 ## CLI
 
@@ -449,6 +459,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `cloudflare` | SaaS | ✓ | — | — | ✓ | none | ✓ | — | $1.80 |
 | `anysite` | SaaS | ✓ | ✓ | — | ✓ | residential | ✓ | ✓ | $2.00 |
 | `scrapecreators` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
+| `socialcrawl` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
 | `oxylabs` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | trial | $2.80 |
 | `outscraper` | SaaS · site | ✓ | ✓ | — | — | datacenter | ✓ | ✓ | $3.00 |
 | `scraperapi` | SaaS | ✓ | — | — | ✓ | datacenter | ✓ | ✓ | $0.49–4.90 |

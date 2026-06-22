@@ -99,6 +99,7 @@ See [../../CONTRIBUTING.md](../../CONTRIBUTING.md) § "Add an engine". Five-step
 | `APIFY_API_TOKEN` | apify |
 | `ANYSITE_API_KEY` | anysite |
 | `SCRAPECREATORS_API_KEY` | scrapecreators |
+| `SOCIALCRAWL_API_KEY` | socialcrawl |
 | `EXA_API_KEY` | exa |
 | `BRIGHTDATA_API_KEY` | brightdata |
 

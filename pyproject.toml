@@ -51,6 +51,7 @@ scrapingbee  = ["scrapingbee>=2.0"]
 scrapingdog  = []
 scraperapi   = []
 exa          = []
+pixelrag     = ["pixelrag>=0.2.1; python_version >= '3.12'"]
 oxylabs      = []
 selenium     = ["selenium>=4.44", "webdriver-manager>=4.0"]
 jina         = []
@@ -63,11 +64,12 @@ apify        = ["apify-client>=3.0"]
 cloakbrowser = ["cloakbrowser>=0.3"]
 anysite      = []
 scrapecreators = []
+socialcrawl = []
 # --- interfaces ---
 mcp          = ["mcp>=1.27"]
 # --- meta ---
 all = [
-    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,exa,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,mcp]",
+    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,exa,pixelrag,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,socialcrawl,mcp]",
 ]
 test = [
     "pytest>=9.0",

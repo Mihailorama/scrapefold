@@ -55,6 +55,7 @@ _VALID_ENGINES = frozenset(
         # new paid SaaS
         "anysite",
         "scrapecreators",
+        "socialcrawl",
         "exa",
     }
 )
@@ -116,6 +117,23 @@ def test_linkedin_profile_and_company_ladders_include_exa() -> None:
         step = first[0]
         assert isinstance(step, RaceStep), f"{cls} first step is not a race"
         assert "exa" in step_engines(step)
+
+
+def test_socialcrawl_ladders_include_paid_social_gateway() -> None:
+    for cls in (
+        "linkedin_profile",
+        "linkedin_company",
+        "linkedin_post",
+        "twitter",
+        "instagram",
+        "facebook",
+        "youtube",
+        "reddit",
+    ):
+        first = get_ladder(cls)[0]
+        assert isinstance(first, RaceStep), f"{cls} first step is not a race"
+        assert "socialcrawl" in step_engines(first)
+        assert first.budget_accounting == "sum_all"
 
 
 def test_difficulty_classes_skip_requests() -> None:

@@ -132,7 +132,7 @@
 <header class="hero">
   <img class="logo" src="assets/logo-dark.svg" alt="Scrapefold">
   <h1>Turn any URL into clean markdown.</h1>
-  <p class="tag">One async Python interface over <strong>18 scraping engines</strong> — with automatic anti-bot escalation and LLM-ready output. Open source, MIT.</p>
+  <p class="tag">One async Python interface over <strong>20 scraping engines</strong> — with automatic anti-bot escalation and LLM-ready output. Open source, MIT.</p>
 
   <div class="cta-row">
     <a class="btn btn-primary" href="https://github.com/mihailorama/scrapefold">⭐ Star on GitHub</a>
@@ -145,7 +145,7 @@
     </span>
   </div>
 
-  <p class="stats"><strong>18 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>741 tests</strong> · <strong>MIT</strong></p>
+  <p class="stats"><strong>20 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>791 tests</strong> · <strong>MIT</strong></p>
 
   <div class="hero-demo">
     <img src="assets/demo.svg" alt="scrapefold scrape https://example.com producing clean markdown and auto-escalating past Cloudflare">
@@ -185,13 +185,14 @@
 
 <section id="engines">
   <div class="wrap">
-    <h2>18 engines, one interface</h2>
+    <h2>20 engines, one interface</h2>
     <p class="lead">Local engines are free and fast; SaaS engines add premium proxies and stealth. The router picks the cheapest tier that works. Ratings: ★★★ excellent · ★★☆ good · ★☆☆ basic.</p>
     <div class="engines">
       <div class="engine"><span class="name">requests</span> <span class="type">local</span><div class="caps">Static HTML · ultra-fast · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">scrapling_fast</span> <span class="type">local</span><div class="caps">TLS-impersonation HTTP · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">scrapling_stealth</span> <span class="type">local</span><div class="caps">JS render + stealth · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">crawl4ai</span> <span class="type">local</span><div class="caps">JS render · native markdown · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">PixelRAG</span> <span class="type">local · visual</span><div class="caps">pixelshot + VLM/OCR reader · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">cloakbrowser</span> <span class="type">local</span><div class="caps">Anti-fingerprint browser · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">selenium</span> <span class="type">local</span><div class="caps">Classic JS rendering · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Jina Reader</span> <span class="type">saas · free tier</span><div class="caps">Direct URL → markdown · <span class="stars">★★★</span></div></div>
@@ -204,6 +205,7 @@
       <div class="engine"><span class="name">Oxylabs</span> <span class="type">saas</span><div class="caps">Web Scraper API · residential geo · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Anysite</span> <span class="type">saas</span><div class="caps">General-purpose · native markdown · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Scrape Creators</span> <span class="type">saas · site</span><div class="caps">Social-media JSON APIs · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">SocialCrawl</span> <span class="type">saas · site</span><div class="caps">Social-data JSON gateway · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Apify (LinkedIn)</span> <span class="type">saas · site</span><div class="caps">Vendor-managed actor runs · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Outscraper</span> <span class="type">saas · site</span><div class="caps">Niche aggregator scrapes · <span class="stars">★★☆</span></div></div>
     </div>
@@ -219,6 +221,7 @@
       <li><span class="sit">JS-rendered SPA, no anti-bot</span><span class="rec"><strong>scrapling_fast</strong> (free) or <strong>Jina Reader</strong> (free tier)</span></li>
       <li><span class="sit">Cloudflare / Datadome / PerimeterX</span><span class="rec"><strong>scrapling_stealth</strong> (free) → <strong>Firecrawl</strong> / <strong>ScrapingBee</strong> (paid)</span></li>
       <li><span class="sit">Site that emits clean markdown via API</span><span class="rec"><strong>Jina Reader</strong> — direct markdown, no parsing</span></li>
+      <li><span class="sit">Visual layouts, tables, charts, or screenshots</span><span class="rec"><strong>PixelRAG</strong> — local <code>pixelshot</code> tiles + reader markdown / JSON</span></li>
       <li><span class="sit">LinkedIn / niche social</span><span class="rec"><strong>Exa</strong> public people/company search + <strong>Apify (LinkedIn)</strong> actor fallback</span></li>
       <li><span class="sit">Structured fields straight from a page</span><span class="rec"><strong>ScraperAPI</strong> — AI Parser fills the <code>json</code> slot</span></li>
       <li><span class="sit">IP-geofenced targets</span><span class="rec"><strong>Oxylabs</strong> — residential pool + <code>geo_location</code></span></li>

@@ -1,6 +1,6 @@
 ---
 purpose: "Documentation index — start here. Navigate to architecture, workflows, and conventions."
-updated: "2026-06-19"
+updated: "2026-06-22"
 related:
   - architecture/overview.md
   - workflows/development.md
@@ -10,7 +10,7 @@ related:
 
 # scrapefold docs
 
-Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, and LLM-ready output. Wraps 18 engines across vendor APIs, local stealth browsers, and a baseline `requests` engine behind one async interface.
+Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, visual screenshot capture, and LLM-ready output. Wraps 20 engines across vendor APIs, local stealth browsers, visual capture tools, and a baseline `requests` engine behind one async interface.
 
 ## Where to look
 
@@ -44,6 +44,8 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | PR #2 ✅ | Presentation layer: README hero + brand SVGs + landing site; **[scrapefold.com](https://scrapefold.com)** live (GitHub Pages, custom domain, HTTPS) | 0.2.0 |
 | PR #3 ✅ | `scrapecreators` engine for public social-media JSON APIs | 0.2.0 |
 | PR #4 ✅ | Exa engine (Search, Contents, Answer, Agent; LinkedIn people/company defaults, pure-httpx) | 0.2.0 |
+| PR #5 ✅ | PixelRAG engine (local `pixelshot` visual screenshot tiles plus injected VLM/OCR reader for markdown / JSON, optional Python 3.12 extra) | Unreleased |
+| PR #6 ✅ | `socialcrawl` engine for SocialCrawl's social-data JSON gateway plus auto-router coverage for social / LinkedIn classes | Unreleased |
 
 ## What's next
 
