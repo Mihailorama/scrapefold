@@ -56,6 +56,16 @@ class ScrapeResult:
     engines leave this ``None``."""
 
     screenshot_b64: str | None = None
+
+    social: Any = None
+    """Normalized social entity / entities, when an engine recognised the
+    payload as social-media data: a :class:`scrapefold.social.Profile`,
+    :class:`~scrapefold.social.Post`, :class:`~scrapefold.social.Comment`, or a
+    list of them. Best-effort convenience view over ``json`` — the raw vendor
+    payload always remains in ``json`` (and on each entity's ``.raw``).
+    ``None`` for non-social or unrecognised results. Typed ``Any`` to keep
+    ``result`` import-light; see ``scrapefold.social`` for the concrete types."""
+
     meta: dict[str, Any] = field(default_factory=dict)
     """Engine-specific extras (HTTP status, response headers, page title, …)."""
 

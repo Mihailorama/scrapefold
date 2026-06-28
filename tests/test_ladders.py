@@ -43,6 +43,11 @@ _VALID_ENGINES = frozenset(
         "crawl4ai",
         "outscraper",
         "apify_linkedin",
+        "apify_actor",
+        "telegram",
+        "tgstat",
+        "telemetr",
+        "labelup",
         # multi-mode distinct names
         "scrapling_stealth",
         "scrapling_fast",
@@ -126,6 +131,7 @@ def test_socialcrawl_ladders_include_paid_social_gateway() -> None:
         "linkedin_post",
         "twitter",
         "instagram",
+        "tiktok",
         "facebook",
         "youtube",
         "reddit",
@@ -134,6 +140,15 @@ def test_socialcrawl_ladders_include_paid_social_gateway() -> None:
         assert isinstance(first, RaceStep), f"{cls} first step is not a race"
         assert "socialcrawl" in step_engines(first)
         assert first.budget_accounting == "sum_all"
+
+
+def test_social_ladders_include_apify_actor() -> None:
+    """The universal Apify actor engine races in every public-social ladder."""
+    for cls in ("twitter", "instagram", "tiktok", "facebook", "youtube", "reddit"):
+        first = get_ladder(cls)[0]
+        assert "apify_actor" in step_engines(first), (
+            f"{cls} first step omits apify_actor: {step_engines(first)}"
+        )
 
 
 def test_difficulty_classes_skip_requests() -> None:

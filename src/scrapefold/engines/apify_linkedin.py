@@ -21,6 +21,7 @@ from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import json_to_scrape_text
 from scrapefold.options import ScrapeOptions, strip_extra_prefix
 from scrapefold.result import ScrapeResult
+from scrapefold.social import Kind, normalize_social
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,14 @@ def _load_sdk() -> Any:
         ) from exc
     ApifyClientAsync = _ac.ApifyClientAsync
     return ApifyClientAsync
+
+
+def _linkedin_kind(url: str) -> Kind:
+    """LinkedIn URL -> normalized entity kind (posts/pulse are posts, else profile)."""
+    lowered = url.lower()
+    if "/posts/" in lowered or "/pulse/" in lowered:
+        return "post"
+    return "profile"
 
 
 def _build_run_input(url: str, opts: ScrapeOptions) -> dict[str, Any]:
@@ -149,6 +158,7 @@ class ApifyLinkedInEngine(ScrapeEngine):
             elapsed_ms=0,  # base class patches this
             cost_usd=self.CAPABILITIES.estimated_cost_usd,
             json=profile,
+            social=normalize_social(profile, platform="linkedin", kind=_linkedin_kind(url)),
             meta={
                 "actor_run_id": run_id,
                 "dataset_id": dataset_id,

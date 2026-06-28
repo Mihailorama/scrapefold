@@ -92,6 +92,7 @@ Full adapter matrix: see `CONTRIBUTING.md` § "Add an engine" once filled in by 
 | `markdown` | ✅ yes | Always, engine-native or post-converted from HTML |
 | `html` | optional | Only when an engine returned HTML (most browser engines) |
 | `json` | optional | Only when an engine returned **structured data natively** (Firecrawl `/extract`, AnySite endpoints, Apify actors, vendor schema-extract endpoints) |
+| `social` | optional | Best-effort normalized `Profile` / `Post` / `Comment` (see `scrapefold.social`) when a social engine recognised the payload. A convenience view over `json`; the raw payload stays in `json` and on each entity's `.raw`. |
 
 `ScrapeOptions.output_format` is a **hint** to the engine about which native form is cheapest to produce — `auto` lets the engine choose. The hint does not gate which slots are filled: an HTML-returning engine still produces `text` and `markdown` via post-conversion regardless of the hint.
 
@@ -111,7 +112,7 @@ For *structured extraction* (passing a JSON schema and getting native JSON back)
 
 ## Anti-bot escalation — per-site-class ladders
 
-The router does not walk a universal T0-T5 chain. Each `SiteClass` (29 classes: LinkedIn family, Amazon, social, SERP, Cloudflare/Datadome/Akamai/PerimeterX, paywall, government, `static_general`, …) has its own ordered **ladder** of `SequentialStep` and `RaceStep` entries. The mapping lives in `src/scrapefold/ladders.py`; the router (S7) consumes it.
+The router does not walk a universal T0-T5 chain. Each `SiteClass` (33 classes: LinkedIn family, Amazon, social incl. Telegram/VK/Max, SERP, Cloudflare/Datadome/Akamai/PerimeterX, paywall, government, `static_general`, …) has its own ordered **ladder** of `SequentialStep` and `RaceStep` entries. The mapping lives in `src/scrapefold/ladders.py`; the router (S7) consumes it.
 
 ### Data shape
 

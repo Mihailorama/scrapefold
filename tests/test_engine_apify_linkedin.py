@@ -100,6 +100,13 @@ async def test_basic_call_success() -> None:
     assert result.markdown  # non-empty
     assert result.cost_usd == 0.0015
     assert result.engine == "apify_linkedin"
+    # LinkedIn profile payload is normalized into ScrapeResult.social.
+    from scrapefold.social import Profile
+
+    assert isinstance(result.social, Profile)
+    assert result.social.platform == "linkedin"
+    assert result.social.name == "Satya Nadella"  # composed from firstName + lastName
+    assert result.social.bio == _SAMPLE_PROFILE["summary"]
 
 
 # ---------------------------------------------------------------------------

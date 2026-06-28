@@ -8,6 +8,73 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- `telegram` engine + `telegram` / `vk` / `max` site classes. Telegram is a
+  first-class **global** social platform (not lumped under `russian_social`):
+  the free `telegram` engine fetches public-channel HTML previews
+  (`t.me/s/<channel>`, single-message embeds) and parses them into normalized
+  `Post` objects — text, media (photo/video + thumbnail), view count,
+  timestamp, author — with no API key. `vk` (vk.com / vk.ru) and `max` (max.ru)
+  get dedicated classes and stealth-led ladders; their structured path is the
+  `apify_actor` engine — best-effort default Telegram/VK/Max actors added
+  (flagged for verification) and wired into the vk/max ladders, plus
+  host→platform labelling so `.social` is tagged correctly.
+- Telegram-analytics engines `tgstat`, `telemetr`, `labelup` — structured REST
+  adapters that normalize into `ScrapeResult.social` (`platform="telegram"`).
+  `tgstat` follows TGStat's **verified** API contract (channel/posts/post
+  routing, `token` query auth, `{"status":"ok","response":…}` envelope).
+  `telemetr` follows Telemetr.io's **verified** API contract
+  (https://api.telemetr.io/api-docs/openapi.json): `x-api-key` auth, and a
+  two-step resolve — `/channels/search` maps a public `t.me` slug to Telemetr's
+  numeric `internal_id`, then `/channel/info` (profile), `/messages/channel`
+  (feed), or `/messages/by_id` (single post). `telemetr_internal_id` skips the
+  search step; `telemetr_endpoint` forces a raw single-call path.
+  `labelup` follows LabelUp's **verified** API contract
+  (https://help.labelup.ru/article/23384): `GET /api/v2/accounts/statistics`
+  with `Authorization: Bearer` + `X-Requested-With: XMLHttpRequest`. It is
+  genuinely **multi-platform** (Instagram, YouTube, VK, Telegram, TikTok,
+  RUTUBE, Dzen) — `scrape(url)` routes via the universal `?url=` param, with
+  `network_id`/`nickname`/`uid`/`id` lookups and a `labelup_endpoint`
+  raw-gateway escape hatch; the normalized `platform` is inferred from the URL
+  host (or `extra["labelup_platform"]`), never hard-coded. `tgstat` /
+  `telemetr` are raced into the `telegram` ladder behind the free engine.
+- `platform_for_url()` helper in `scrapefold.social` — shared host→platform map
+  (incl. Telegram/VK/Max/OK/Dzen/RuTube/Twitch/Threads/…) used by `apify_actor`
+  and `labelup` to tag `.social` when the platform is known only from the URL.
+- Normalized social entities (`scrapefold.social`) — a thin, best-effort layer
+  that maps the many vendor JSON envelopes onto a stable
+  `Profile` / `Post` / `Comment` shape (with a light `Author`), so callers read
+  `post.like_count` without caring whether the vendor spelled it `likeCount`,
+  `diggCount`, or `favorite_count`. `normalize_social(payload, platform=…,
+  kind=…)` is hint-driven (engines derive `platform`/`kind` from the endpoint
+  via `platform_kind`) and infers the kind from the field signature when no
+  hint is given. `Post` carries a `media` list of `Media` (image/video URL +
+  optional thumbnail), extracted best-effort from single-media posts, carousels
+  / galleries (`media`, `images`, `childPosts`, …), nested media objects, and
+  bare URL lists — de-duplicated, with the post permalink never mistaken for an
+  image. The untouched vendor payload is always kept on each entity's
+  `.raw`. `ScrapeResult` gains an additive `social` slot, populated by every
+  social-structured engine — `scrapecreators`, `socialcrawl`, `apify_actor`,
+  and `apify_linkedin` (LinkedIn profiles, with `firstName`/`lastName` composed
+  into a single `name`). HTML/markdown engines (`anysite`, `firecrawl`, …) and
+  the non-social-structured services (`exa` neural search, `outscraper`
+  business insights) leave `social=None`. The types and `normalize_social` are
+  re-exported from the package root.
+- `apify_actor` engine — universal [Apify](https://apify.com) Actor adapter that
+  generalises the LinkedIn-only `apify_linkedin` engine to any actor. Public
+  social URLs (Instagram, TikTok, X/Twitter, YouTube, Facebook, Reddit,
+  LinkedIn) route to a sensible default actor, while
+  `extra["apify_actor_id"]` reaches any actor in Apify's catalogue and
+  `apify_*` extras pass through into the actor `run_input`. Multi-item runs
+  (post feeds, comment threads) return the full list in `ScrapeResult.json`;
+  single-item runs return the object. Keyed by `APIFY_API_TOKEN`, lazy-imports
+  the existing `scrapefold[apify]` SDK, and is registered under the `apify`
+  alias. Wired into the Twitter/Instagram/TikTok/Facebook/YouTube/Reddit
+  ladders.
+- `tiktok` site class — TikTok URLs were previously unclassified and fell back
+  to the general (plain-HTTP-first) ladder. They now classify to a dedicated
+  `tiktok` class whose ladder leads with a paid social-gateway race
+  (`scrapecreators`, `socialcrawl`, `apify_actor`) and falls back to a stealth
+  unlocker, never plain `requests`.
 - `pixelrag` engine — local [PixelRAG](https://github.com/StarTrail-org/PixelRAG)
   `pixelshot` adapter for URL-to-screenshot-tile capture plus an injected
   VLM/OCR tile reader hook (`extra["pixelrag_reader"]`) that turns the tiles

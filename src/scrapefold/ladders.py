@@ -33,7 +33,7 @@ from scrapefold.engines.base import BillingUnit
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Site classification taxonomy — 29 classes
+# Site classification taxonomy — 33 classes
 # ---------------------------------------------------------------------------
 
 SiteClass = Literal[
@@ -46,12 +46,16 @@ SiteClass = Literal[
     # --- Amazon (2) ---
     "amazon_product",
     "amazon_search",
-    # --- Other social (6) ---
+    # --- Other social (10) ---
     "twitter",
     "instagram",
+    "tiktok",
     "facebook",
     "youtube",
     "reddit",
+    "telegram",
+    "vk",
+    "max",
     "russian_social",
     # --- Search engines (3) ---
     "serp_google",
@@ -212,10 +216,13 @@ URL_PATTERNS: tuple[tuple[re.Pattern[str], SiteClass], ...] = (
     (re.compile(r"amazon\.[a-z.]+/s\?"), "amazon_search"),
     (re.compile(r"(twitter|x)\.com/"), "twitter"),
     (re.compile(r"instagram\.com/"), "instagram"),
+    (re.compile(r"tiktok\.com/"), "tiktok"),
     (re.compile(r"(facebook|fb)\.com/"), "facebook"),
     (re.compile(r"(youtube\.com|youtu\.be)/"), "youtube"),
     (re.compile(r"reddit\.com/"), "reddit"),
-    (re.compile(r"vk\.com/"), "russian_social"),
+    (re.compile(r"(t\.me|telegram\.me|telegram\.dog)/"), "telegram"),
+    (re.compile(r"(vk\.com|vk\.ru)/"), "vk"),
+    (re.compile(r"(//|\.)max\.ru/"), "max"),
     (re.compile(r"(mail|my)\.ru/"), "russian_social"),
     (re.compile(r"google\.[a-z.]+/search"), "serp_google"),
     (re.compile(r"bing\.com/search"), "serp_bing"),
@@ -252,10 +259,18 @@ GOLDEN_CORPUS: tuple[tuple[str, SiteClass], ...] = (
     ("https://twitter.com/elonmusk", "twitter"),
     ("https://x.com/elonmusk/status/1", "twitter"),
     ("https://www.instagram.com/foo/", "instagram"),
+    ("https://www.tiktok.com/@foo", "tiktok"),
+    ("https://www.tiktok.com/@foo/video/123", "tiktok"),
     ("https://www.facebook.com/natgeo", "facebook"),
     ("https://www.youtube.com/watch?v=abc", "youtube"),
     ("https://www.reddit.com/r/python/", "reddit"),
-    ("https://vk.com/foo", "russian_social"),
+    ("https://t.me/s/durov", "telegram"),
+    ("https://t.me/durov/123", "telegram"),
+    ("https://telegram.me/durov", "telegram"),
+    ("https://vk.com/durov", "vk"),
+    ("https://vk.ru/durov", "vk"),
+    ("https://max.ru/u/foo", "max"),
+    ("https://web.max.ru/u/foo", "max"),
     ("https://my.mail.ru/foo", "russian_social"),
     ("https://www.google.com/search?q=foo", "serp_google"),
     ("https://www.bing.com/search?q=foo", "serp_bing"),
@@ -402,33 +417,93 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Twitter / X
     "twitter": (
-        _race("scrapecreators", "socialcrawl", "scrapingdog", budget_accounting="sum_all"),
+        _race(
+            "scrapecreators",
+            "socialcrawl",
+            "apify_actor",
+            "scrapingdog",
+            budget_accounting="sum_all",
+        ),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     # Other social
     "instagram": (
-        _race("scrapecreators", "socialcrawl", "anysite", budget_accounting="sum_all"),
+        _race(
+            "scrapecreators",
+            "socialcrawl",
+            "apify_actor",
+            "anysite",
+            budget_accounting="sum_all",
+        ),
+        _seq("brightdata_unlocker_sync", cost=_HIGH),
+    ),
+    "tiktok": (
+        # TikTok has no plain-HTTP path — lead with structured social gateways
+        # and the Apify TikTok actor, then fall back to a stealth unlocker.
+        _race(
+            "scrapecreators",
+            "socialcrawl",
+            "apify_actor",
+            budget_accounting="sum_all",
+        ),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "facebook": (
-        _race("socialcrawl", "anysite", budget_accounting="sum_all"),
+        _race("socialcrawl", "apify_actor", "anysite", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "youtube": (
-        _race("socialcrawl", "scrapecreators", "anysite", budget_accounting="sum_all"),
+        _race(
+            "socialcrawl",
+            "scrapecreators",
+            "apify_actor",
+            "anysite",
+            budget_accounting="sum_all",
+        ),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "reddit": (
         # Reddit has a public JSON API at /.json — try the free path alongside
         # social structured endpoints first.
         # PROBE_SCOPE = per_domain on the requests engine validates viability.
-        _race("scrapecreators", "socialcrawl", "requests", budget_accounting="sum_all"),
+        _race(
+            "scrapecreators",
+            "socialcrawl",
+            "apify_actor",
+            "requests",
+            budget_accounting="sum_all",
+        ),
         _race("scrapling_stealth", "crawl4ai"),
         _seq("firecrawl", cost=_MED),
     ),
+    # Telegram — public channels render as server-side HTML at t.me/s/<channel>;
+    # the dedicated free engine parses them into normalized posts. Plain HTTP and
+    # stealth are cheap fallbacks if the preview shape changes.
+    "telegram": (
+        # Free t.me preview first; then paid analytics APIs (structured posts +
+        # metrics) and Apify; plain HTTP / stealth as last resorts.
+        _seq("telegram"),
+        _race("tgstat", "telemetr", "apify_actor", budget_accounting="sum_all"),
+        _seq("requests"),
+        _race("scrapling_stealth", "crawl4ai"),
+    ),
+    # VK (vk.com / vk.ru) — structured path is the Apify VK actor; stealth
+    # browsers and a paid unlocker behind it for the public web pages.
+    "vk": (
+        _race("apify_actor", "scrapling_stealth", "cloakbrowser", budget_accounting="sum_all"),
+        _seq("scrapingdog", cost=_LOW),
+        _seq("brightdata_unlocker_sync", cost=_HIGH),
+    ),
+    # Max (max.ru) — VK's newer messenger; JS web app. Apify actor for structured
+    # data, then stealth browsers and a paid unlocker.
+    "max": (
+        _race("apify_actor", "scrapling_stealth", "cloakbrowser", budget_accounting="sum_all"),
+        _seq("firecrawl", cost=_MED),
+        _seq("brightdata_unlocker_sync", cost=_HIGH),
+    ),
     "russian_social": (
-        # vk.com and my.mail.ru — Russian anti-bot needs a stealth browser;
-        # paid options often blocked by Roskomnadzor geofences.
+        # my.mail.ru and other RU social — Russian anti-bot needs a stealth
+        # browser; paid options often blocked by Roskomnadzor geofences.
         _race("scrapling_stealth", "cloakbrowser"),
         _seq("scrapingdog", cost=_LOW),
     ),

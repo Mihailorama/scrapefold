@@ -49,6 +49,9 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
             "scrapefold.engines.apify_linkedin", fromlist=["ApifyLinkedInEngine"]
         ).ApifyLinkedInEngine
     ),
+    "apify_actor": lambda: (
+        __import__("scrapefold.engines.apify_actor", fromlist=["ApifyActorEngine"]).ApifyActorEngine
+    ),
     "anysite": lambda: (
         __import__("scrapefold.engines.anysite", fromlist=["AnySiteEngine"]).AnySiteEngine
     ),
@@ -88,6 +91,18 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     ),
     "selenium": lambda: (
         __import__("scrapefold.engines.selenium", fromlist=["SeleniumEngine"]).SeleniumEngine
+    ),
+    "telegram": lambda: (
+        __import__("scrapefold.engines.telegram", fromlist=["TelegramEngine"]).TelegramEngine
+    ),
+    "tgstat": lambda: (
+        __import__("scrapefold.engines.tgstat", fromlist=["TGStatEngine"]).TGStatEngine
+    ),
+    "telemetr": lambda: (
+        __import__("scrapefold.engines.telemetr", fromlist=["TelemetrEngine"]).TelemetrEngine
+    ),
+    "labelup": lambda: (
+        __import__("scrapefold.engines.labelup", fromlist=["LabelUpEngine"]).LabelUpEngine
     ),
 }
 
@@ -131,6 +146,8 @@ def list_engine_names() -> list[str]:
 # Register user-facing aliases for multi-mode engines.
 # "scrapling" resolves to "scrapling_stealth" (default / most capable mode).
 register_alias("scrapling", "scrapling_stealth")
+# "apify" resolves to the universal actor engine (apify_linkedin stays explicit).
+register_alias("apify", "apify_actor")
 
 
 __all__ = [
