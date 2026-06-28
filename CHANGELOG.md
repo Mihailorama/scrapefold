@@ -8,6 +8,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- `apify_actor` engine — universal [Apify](https://apify.com) Actor adapter that
+  generalises the LinkedIn-only `apify_linkedin` engine to any actor. Public
+  social URLs (Instagram, TikTok, X/Twitter, YouTube, Facebook, Reddit,
+  LinkedIn) route to a sensible default actor, while
+  `extra["apify_actor_id"]` reaches any actor in Apify's catalogue and
+  `apify_*` extras pass through into the actor `run_input`. Multi-item runs
+  (post feeds, comment threads) return the full list in `ScrapeResult.json`;
+  single-item runs return the object. Keyed by `APIFY_API_TOKEN`, lazy-imports
+  the existing `scrapefold[apify]` SDK, and is registered under the `apify`
+  alias. Wired into the Twitter/Instagram/TikTok/Facebook/YouTube/Reddit
+  ladders.
+- `tiktok` site class — TikTok URLs were previously unclassified and fell back
+  to the general (plain-HTTP-first) ladder. They now classify to a dedicated
+  `tiktok` class whose ladder leads with a paid social-gateway race
+  (`scrapecreators`, `socialcrawl`, `apify_actor`) and falls back to a stealth
+  unlocker, never plain `requests`.
 - `pixelrag` engine — local [PixelRAG](https://github.com/StarTrail-org/PixelRAG)
   `pixelshot` adapter for URL-to-screenshot-tile capture plus an injected
   VLM/OCR tile reader hook (`extra["pixelrag_reader"]`) that turns the tiles

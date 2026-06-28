@@ -111,7 +111,7 @@ For *structured extraction* (passing a JSON schema and getting native JSON back)
 
 ## Anti-bot escalation — per-site-class ladders
 
-The router does not walk a universal T0-T5 chain. Each `SiteClass` (29 classes: LinkedIn family, Amazon, social, SERP, Cloudflare/Datadome/Akamai/PerimeterX, paywall, government, `static_general`, …) has its own ordered **ladder** of `SequentialStep` and `RaceStep` entries. The mapping lives in `src/scrapefold/ladders.py`; the router (S7) consumes it.
+The router does not walk a universal T0-T5 chain. Each `SiteClass` (30 classes: LinkedIn family, Amazon, social, SERP, Cloudflare/Datadome/Akamai/PerimeterX, paywall, government, `static_general`, …) has its own ordered **ladder** of `SequentialStep` and `RaceStep` entries. The mapping lives in `src/scrapefold/ladders.py`; the router (S7) consumes it.
 
 ### Data shape
 

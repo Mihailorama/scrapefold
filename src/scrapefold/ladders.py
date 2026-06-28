@@ -33,7 +33,7 @@ from scrapefold.engines.base import BillingUnit
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Site classification taxonomy — 29 classes
+# Site classification taxonomy — 30 classes
 # ---------------------------------------------------------------------------
 
 SiteClass = Literal[
@@ -46,9 +46,10 @@ SiteClass = Literal[
     # --- Amazon (2) ---
     "amazon_product",
     "amazon_search",
-    # --- Other social (6) ---
+    # --- Other social (7) ---
     "twitter",
     "instagram",
+    "tiktok",
     "facebook",
     "youtube",
     "reddit",
@@ -212,6 +213,7 @@ URL_PATTERNS: tuple[tuple[re.Pattern[str], SiteClass], ...] = (
     (re.compile(r"amazon\.[a-z.]+/s\?"), "amazon_search"),
     (re.compile(r"(twitter|x)\.com/"), "twitter"),
     (re.compile(r"instagram\.com/"), "instagram"),
+    (re.compile(r"tiktok\.com/"), "tiktok"),
     (re.compile(r"(facebook|fb)\.com/"), "facebook"),
     (re.compile(r"(youtube\.com|youtu\.be)/"), "youtube"),
     (re.compile(r"reddit\.com/"), "reddit"),
@@ -252,6 +254,8 @@ GOLDEN_CORPUS: tuple[tuple[str, SiteClass], ...] = (
     ("https://twitter.com/elonmusk", "twitter"),
     ("https://x.com/elonmusk/status/1", "twitter"),
     ("https://www.instagram.com/foo/", "instagram"),
+    ("https://www.tiktok.com/@foo", "tiktok"),
+    ("https://www.tiktok.com/@foo/video/123", "tiktok"),
     ("https://www.facebook.com/natgeo", "facebook"),
     ("https://www.youtube.com/watch?v=abc", "youtube"),
     ("https://www.reddit.com/r/python/", "reddit"),
@@ -402,27 +406,62 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Twitter / X
     "twitter": (
-        _race("scrapecreators", "socialcrawl", "scrapingdog", budget_accounting="sum_all"),
+        _race(
+            "scrapecreators",
+            "socialcrawl",
+            "apify_actor",
+            "scrapingdog",
+            budget_accounting="sum_all",
+        ),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     # Other social
     "instagram": (
-        _race("scrapecreators", "socialcrawl", "anysite", budget_accounting="sum_all"),
+        _race(
+            "scrapecreators",
+            "socialcrawl",
+            "apify_actor",
+            "anysite",
+            budget_accounting="sum_all",
+        ),
+        _seq("brightdata_unlocker_sync", cost=_HIGH),
+    ),
+    "tiktok": (
+        # TikTok has no plain-HTTP path — lead with structured social gateways
+        # and the Apify TikTok actor, then fall back to a stealth unlocker.
+        _race(
+            "scrapecreators",
+            "socialcrawl",
+            "apify_actor",
+            budget_accounting="sum_all",
+        ),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "facebook": (
-        _race("socialcrawl", "anysite", budget_accounting="sum_all"),
+        _race("socialcrawl", "apify_actor", "anysite", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "youtube": (
-        _race("socialcrawl", "scrapecreators", "anysite", budget_accounting="sum_all"),
+        _race(
+            "socialcrawl",
+            "scrapecreators",
+            "apify_actor",
+            "anysite",
+            budget_accounting="sum_all",
+        ),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "reddit": (
         # Reddit has a public JSON API at /.json — try the free path alongside
         # social structured endpoints first.
         # PROBE_SCOPE = per_domain on the requests engine validates viability.
-        _race("scrapecreators", "socialcrawl", "requests", budget_accounting="sum_all"),
+        _race(
+            "scrapecreators",
+            "socialcrawl",
+            "apify_actor",
+            "requests",
+            budget_accounting="sum_all",
+        ),
         _race("scrapling_stealth", "crawl4ai"),
         _seq("firecrawl", cost=_MED),
     ),
