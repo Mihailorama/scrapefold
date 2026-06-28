@@ -45,6 +45,9 @@ _VALID_ENGINES = frozenset(
         "apify_linkedin",
         "apify_actor",
         "telegram",
+        "tgstat",
+        "telemetr",
+        "labelup",
         # multi-mode distinct names
         "scrapling_stealth",
         "scrapling_fast",

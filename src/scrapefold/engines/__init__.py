@@ -95,6 +95,15 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "telegram": lambda: (
         __import__("scrapefold.engines.telegram", fromlist=["TelegramEngine"]).TelegramEngine
     ),
+    "tgstat": lambda: (
+        __import__("scrapefold.engines.tgstat", fromlist=["TGStatEngine"]).TGStatEngine
+    ),
+    "telemetr": lambda: (
+        __import__("scrapefold.engines.telemetr", fromlist=["TelemetrEngine"]).TelemetrEngine
+    ),
+    "labelup": lambda: (
+        __import__("scrapefold.engines.labelup", fromlist=["LabelUpEngine"]).LabelUpEngine
+    ),
 }
 
 

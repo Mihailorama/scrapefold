@@ -15,9 +15,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   `Post` objects — text, media (photo/video + thumbnail), view count,
   timestamp, author — with no API key. `vk` (vk.com / vk.ru) and `max` (max.ru)
   get dedicated classes and stealth-led ladders; their structured path is the
-  `apify_actor` engine (host→platform labelling added so `.social` is tagged
-  correctly when an Apify actor is supplied). Telegram analytics vendors
-  (TGStat, Telemetr, LabelUp) are candidate future dedicated engines.
+  `apify_actor` engine — best-effort default Telegram/VK/Max actors added
+  (flagged for verification) and wired into the vk/max ladders, plus
+  host→platform labelling so `.social` is tagged correctly.
+- Telegram-analytics engines `tgstat`, `telemetr`, `labelup` — structured REST
+  adapters that normalize into `ScrapeResult.social` (`platform="telegram"`).
+  `tgstat` follows TGStat's **verified** API contract (channel/posts/post
+  routing, `token` query auth, `{"status":"ok","response":…}` envelope).
+  `telemetr` ships a best-effort, **override-friendly** contract (default
+  routing + `telemetr_endpoint` escape hatch) pending live verification.
+  `labelup` is a **gateway-only** authenticated JSON adapter (explicit
+  `labelup_endpoint` required) until its contract is confirmed. `tgstat` /
+  `telemetr` are raced into the `telegram` ladder behind the free engine.
 - Normalized social entities (`scrapefold.social`) — a thin, best-effort layer
   that maps the many vendor JSON envelopes onto a stable
   `Profile` / `Post` / `Comment` shape (with a light `Author`), so callers read

@@ -79,6 +79,15 @@ DEFAULT_ACTORS: dict[str, str] = {
     "fb.com": "apify/facebook-posts-scraper",
     "reddit.com": "trudax/reddit-scraper",
     "linkedin.com": "apimaestro/linkedin-profile-detail",
+    # BEST-EFFORT defaults for Telegram / VK / Max — picked from the public
+    # catalogue but NOT yet verified against a live run. A wrong slug would bill
+    # the wrong actor, so confirm these (or override per-call via
+    # opts.extra["apify_actor_id"]) before relying on them in production.
+    "t.me": "73h/telegram-channel-scraper",  # verify
+    "telegram.me": "73h/telegram-channel-scraper",  # verify
+    "vk.com": "scrapearchitect/vk-scraper",  # verify
+    "vk.ru": "scrapearchitect/vk-scraper",  # verify
+    "max.ru": "scrapearchitect/max-messenger-scraper",  # verify
 }
 
 

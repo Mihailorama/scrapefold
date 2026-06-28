@@ -480,21 +480,24 @@ LADDERS: dict[SiteClass, Ladder] = {
     # the dedicated free engine parses them into normalized posts. Plain HTTP and
     # stealth are cheap fallbacks if the preview shape changes.
     "telegram": (
+        # Free t.me preview first; then paid analytics APIs (structured posts +
+        # metrics) and Apify; plain HTTP / stealth as last resorts.
         _seq("telegram"),
+        _race("tgstat", "telemetr", "apify_actor", budget_accounting="sum_all"),
         _seq("requests"),
         _race("scrapling_stealth", "crawl4ai"),
     ),
-    # VK (vk.com / vk.ru) — Russian anti-bot needs a stealth browser; structured
-    # data requires the VK API (no free path), so this is HTML-only for now.
+    # VK (vk.com / vk.ru) — structured path is the Apify VK actor; stealth
+    # browsers and a paid unlocker behind it for the public web pages.
     "vk": (
-        _race("scrapling_stealth", "cloakbrowser"),
+        _race("apify_actor", "scrapling_stealth", "cloakbrowser", budget_accounting="sum_all"),
         _seq("scrapingdog", cost=_LOW),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
-    # Max (max.ru) — VK's newer messenger; JS web app, no public scraping API.
-    # Lead with stealth browsers, then paid unlockers.
+    # Max (max.ru) — VK's newer messenger; JS web app. Apify actor for structured
+    # data, then stealth browsers and a paid unlocker.
     "max": (
-        _race("scrapling_stealth", "cloakbrowser"),
+        _race("apify_actor", "scrapling_stealth", "cloakbrowser", budget_accounting="sum_all"),
         _seq("firecrawl", cost=_MED),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),

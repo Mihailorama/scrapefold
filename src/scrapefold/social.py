@@ -57,6 +57,9 @@ _FOLLOWERS = (
     "fan_count",
     "subscriberCount",
     "subscribers",
+    "subscribers_count",
+    "participants_count",
+    "members_count",
 )
 _FOLLOWING = ("followingCount", "following_count", "followsCount", "following")
 _POSTS_COUNT = (
@@ -109,7 +112,15 @@ _SHARES = (
     "repostCount",
     "shares",
 )
-_VIEWS = ("viewCount", "viewsCount", "view_count", "playCount", "play_count", "videoViewCount")
+_VIEWS = (
+    "viewCount",
+    "viewsCount",
+    "view_count",
+    "playCount",
+    "play_count",
+    "videoViewCount",
+    "views",
+)
 
 _COMMENT_TEXT = ("text", "body", "content", "comment", "message")
 _AUTHOR_NESTED = ("author", "user", "owner", "account", "channel")
