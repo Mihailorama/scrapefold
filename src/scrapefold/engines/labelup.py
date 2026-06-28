@@ -1,23 +1,45 @@
-"""LabelUpEngine — multi-platform influencer / social analytics gateway (labelup).
+"""LabelUpEngine — multi-platform influencer / social analytics API (labelup.ru).
 
-LabelUp spans **many** social networks and messengers — Instagram, YouTube,
-TikTok, VK, Telegram, Twitch, and more — not just Telegram. The normalized
-``platform`` is therefore inferred from the target URL's host (or set
+LabelUp (LUP) spans **many** social networks and messengers — Instagram,
+TikTok, VK, YouTube, Telegram, RUTUBE, and Dzen — not just Telegram. The
+normalized ``platform`` is inferred from the target URL's host (or set
 explicitly via ``opts.extra["labelup_platform"]``), never hard-coded.
 
-.. warning::
+Pure REST over ``httpx.AsyncClient`` — there is no official Python SDK.
 
-   **UNVERIFIED CONTRACT — gateway only.** LabelUp's API is not publicly
-   documented, so this engine ships *no default URL routing*. It is a thin
-   authenticated JSON gateway: you supply the endpoint explicitly via
-   ``opts.extra["labelup_endpoint"]`` (and ``labelup_*`` query extras), it
-   GETs ``<base><endpoint>`` with bearer auth, stores the JSON, and normalizes
-   it into ``ScrapeResult.social``. Set the base via ``LABELUP_BASE_URL``, the
-   kind hint via ``opts.extra["labelup_kind"]`` (``profile``/``post``), and the
-   platform via ``opts.extra["labelup_platform"]`` to override host inference.
+Pinned API contract (verified 2026-06, https://help.labelup.ru/article/23384):
+  Method   : GET
+  Base URL : https://labelup.ru/api/v2
+  Endpoint : /accounts/statistics
+  Auth     : Authorization: Bearer <api_key>  +  X-Requested-With: XMLHttpRequest
+  Billing  : per blogger report; API unlocks with a reports-enabled plan.
 
-Once the real contract is known, this can grow URL->endpoint routing like the
-``tgstat`` engine. Until then the gateway keeps it usable and honest.
+The single statistics endpoint accepts one of four parameter shapes:
+  * ``url=<profile url>``                 (the universal route used by default)
+  * ``id=<labelup account id>``
+  * ``network_id=<n>&nickname=<handle>``
+  * ``network_id=<n>&uid=<platform uid>``
+
+``network_id`` maps a platform to LabelUp's numeric id:
+  1 Instagram · 2 YouTube · 3 VK · 4 Telegram · 7 TikTok · 8 RUTUBE · 9 Dzen
+
+The response is a single account object (profile + stats + recent posts), so
+the normalized entity defaults to a ``Profile``.
+
+URL -> endpoint routing
+-----------------------
+``scrape(url)`` GETs ``/accounts/statistics?url=<url>`` — works for every
+supported platform, since LabelUp resolves the profile from the raw URL.
+
+Escape hatches (``labelup_*`` extras)
+-------------------------------------
+  * ``labelup_endpoint``  — force a different path (raw gateway mode).
+  * ``labelup_nickname`` / ``labelup_uid`` / ``labelup_id`` / ``labelup_network_id``
+    — use handle/uid/id lookup instead of the ``url`` route (``network_id`` is
+    derived from the inferred platform when omitted).
+  * ``labelup_platform`` — override host-based platform inference.
+  * ``labelup_kind``     — override the entity kind hint (``profile``/``post``).
+  * any other ``labelup_*`` — stripped of its prefix and merged into the query.
 """
 
 from __future__ import annotations
@@ -35,13 +57,62 @@ from scrapefold.social import Kind, normalize_social, platform_for_url
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_BASE_URL = "https://api.labelup.ru/v1"
+_DEFAULT_BASE_URL = "https://labelup.ru/api/v2"
+_STATISTICS_ENDPOINT = "/accounts/statistics"
 _COST_PER_CALL = 0.002
 _VALID_KINDS = ("profile", "post", "comment")
+
+# Platform -> LabelUp numeric network id (for nickname/uid lookups).
+NETWORK_IDS: dict[str, int] = {
+    "instagram": 1,
+    "youtube": 2,
+    "vk": 3,
+    "telegram": 4,
+    "tiktok": 7,
+    "rutube": 8,
+    "dzen": 9,
+}
+
+# Param shapes that already pin the account, so we must NOT also send ``url``.
+_ROUTING_KEYS = frozenset({"network_id", "nickname", "uid", "id", "url"})
 
 
 def _base_url() -> str:
     return os.getenv("LABELUP_BASE_URL", _DEFAULT_BASE_URL).rstrip("/")
+
+
+def _adapt(opts: ScrapeOptions, url: str) -> tuple[str, dict[str, str], Kind | None, str | None]:
+    """Resolve ``(endpoint, params, kind, platform)`` from the URL + ``labelup_*`` extras.
+
+    Default route is ``/accounts/statistics?url=<url>``. A forced
+    ``labelup_endpoint`` switches to raw gateway mode; explicit
+    ``nickname``/``uid``/``id`` extras switch to handle/id lookup.
+    """
+    extra = strip_extra_prefix(opts.extra, "labelup_")
+    forced_endpoint = extra.pop("endpoint", None)
+    kind_hint = extra.pop("kind", None)
+    kind: Kind | None = kind_hint if kind_hint in _VALID_KINDS else None
+    # Multi-platform: tag by explicit override, else infer from the URL host.
+    platform = extra.pop("platform", None) or platform_for_url(url)
+
+    params = {str(k): str(v) for k, v in extra.items()}
+
+    if forced_endpoint is not None:
+        return str(forced_endpoint), params, kind, platform
+
+    # Verified default route. Fall back to the universal ``url`` param unless the
+    # caller pinned the account some other way (nickname/uid/id/network_id).
+    if not (_ROUTING_KEYS & params.keys()):
+        params["url"] = url
+    # A handle/uid lookup needs a network_id; derive it from the platform.
+    if ("nickname" in params or "uid" in params) and "network_id" not in params:
+        net = NETWORK_IDS.get(platform or "")
+        if net is not None:
+            params["network_id"] = str(net)
+    # /accounts/statistics returns a profile-with-stats entity.
+    if kind is None:
+        kind = "profile"
+    return _STATISTICS_ENDPOINT, params, kind, platform
 
 
 def _unwrap(payload: object) -> object:
@@ -54,7 +125,15 @@ def _unwrap(payload: object) -> object:
 
 
 class LabelUpEngine(ScrapeEngine):
-    """LabelUp authenticated JSON gateway (no default routing — endpoint required)."""
+    """Multi-platform analytics engine backed by the LabelUp REST API.
+
+    Maps a public profile URL to ``/accounts/statistics``, returns the JSON in
+    ``ScrapeResult.json``, and normalizes the account into ``ScrapeResult.social``
+    (``platform`` inferred from the URL host).
+
+    API key from the constructor or ``LABELUP_API_TOKEN``. ``is_available()``
+    returns ``False`` when neither is set.
+    """
 
     NAME = "labelup"
     CAPABILITIES = EngineCapabilities(
@@ -73,22 +152,13 @@ class LabelUpEngine(ScrapeEngine):
         super().__init__(api_key or os.getenv("LABELUP_API_TOKEN"))
 
     async def _fetch(self, url: str, opts: ScrapeOptions) -> ScrapeResult:
-        extra = strip_extra_prefix(opts.extra, "labelup_")
-        endpoint = extra.pop("endpoint", None)
-        if not endpoint:
-            raise ValueError(
-                "labelup is gateway-only: set opts.extra['labelup_endpoint'] "
-                "(no default URL routing until the API contract is confirmed)"
-            )
+        endpoint, params, kind, platform = _adapt(opts, url)
+        headers = {
+            "Authorization": f"Bearer {self.api_key or ''}",
+            "X-Requested-With": "XMLHttpRequest",
+        }
 
-        kind_hint = extra.pop("kind", None)
-        kind: Kind | None = kind_hint if kind_hint in _VALID_KINDS else None
-        # Multi-platform: tag by explicit override, else infer from the URL host.
-        platform = extra.pop("platform", None) or platform_for_url(url)
-        params = {str(k): str(v) for k, v in extra.items()}
-        headers = {"Authorization": f"Bearer {self.api_key or ''}"}
-
-        logger.debug("labelup endpoint=%s params=%s", endpoint, params)
+        logger.debug("labelup endpoint=%s params=%s platform=%s", endpoint, params, platform)
 
         async with httpx.AsyncClient(timeout=float(opts.timeout_s)) as client:
             response = await client.get(f"{_base_url()}{endpoint}", params=params, headers=headers)
@@ -116,4 +186,4 @@ class LabelUpEngine(ScrapeEngine):
         )
 
 
-__all__ = ["LabelUpEngine"]
+__all__ = ["NETWORK_IDS", "LabelUpEngine"]

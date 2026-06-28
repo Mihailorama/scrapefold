@@ -78,16 +78,62 @@ async def test_telemetr_http_error_wrapped(httpx_mock) -> None:
 
 
 # ---------------------------------------------------------------------------
-# LabelUp (gateway-only)
+# LabelUp (verified /accounts/statistics routing)
 # ---------------------------------------------------------------------------
 
 
-async def test_labelup_requires_endpoint() -> None:
+def test_labelup_default_route_uses_url_param() -> None:
+    from scrapefold.engines.labelup import _adapt
+
+    ep, params, kind, platform = _adapt(ScrapeOptions(), "https://t.me/durov")
+    assert ep == "/accounts/statistics"
+    assert params == {"url": "https://t.me/durov"}
+    assert kind == "profile"
+    assert platform == "telegram"
+
+
+def test_labelup_nickname_route_derives_network_id() -> None:
+    from scrapefold.engines.labelup import _adapt
+
+    ep, params, _kind, platform = _adapt(
+        ScrapeOptions(extra={"labelup_nickname": "nasa"}),
+        "https://www.instagram.com/nasa/",
+    )
+    assert ep == "/accounts/statistics"
+    # Pinned by nickname -> no url param, network_id derived from platform.
+    assert "url" not in params
+    assert params["nickname"] == "nasa"
+    assert params["network_id"] == "1"  # instagram
+    assert platform == "instagram"
+
+
+def test_labelup_forced_endpoint_is_raw_gateway() -> None:
+    from scrapefold.engines.labelup import _adapt
+
+    ep, params, kind, _platform = _adapt(
+        ScrapeOptions(extra={"labelup_endpoint": "/custom/x", "labelup_limit": 5}),
+        "https://t.me/durov",
+    )
+    assert ep == "/custom/x"
+    assert params == {"limit": "5"}
+    assert kind is None  # no kind hint in raw gateway mode
+
+
+async def test_labelup_default_route_profile(httpx_mock) -> None:
     from scrapefold.engines.labelup import LabelUpEngine
 
-    with pytest.raises(EngineError) as exc:
-        await LabelUpEngine(api_key="x").scrape("https://t.me/durov")
-    assert exc.value.engine == "labelup"
+    httpx_mock.add_response(json={"nickname": "durov", "followers_count": 1000})
+    engine = LabelUpEngine(api_key="labelup-test")
+    result = await engine.scrape("https://t.me/durov")
+
+    assert result.engine == "labelup"
+    assert isinstance(result.social, Profile)
+    assert result.social.platform == "telegram"
+    assert result.social.followers == 1000
+
+    request = httpx_mock.get_requests()[0]
+    assert request.url.path == "/api/v2/accounts/statistics"
+    assert request.url.params["url"] == "https://t.me/durov"
 
 
 async def test_labelup_gateway_post(httpx_mock) -> None:
@@ -113,10 +159,9 @@ async def test_labelup_platform_inferred_from_url(httpx_mock) -> None:
     # not be hard-coded to telegram.
     from scrapefold.engines.labelup import LabelUpEngine
 
-    httpx_mock.add_response(json={"data": {"username": "nasa", "followersCount": 90}})
+    httpx_mock.add_response(json={"username": "nasa", "followersCount": 90})
     engine = LabelUpEngine(api_key="x")
-    opts = ScrapeOptions(extra={"labelup_endpoint": "/ig/nasa", "labelup_kind": "profile"})
-    result = await engine.scrape("https://www.instagram.com/nasa/", opts)
+    result = await engine.scrape("https://www.instagram.com/nasa/")
 
     assert isinstance(result.social, Profile)
     assert result.social.platform == "instagram"
@@ -126,24 +171,21 @@ async def test_labelup_platform_inferred_from_url(httpx_mock) -> None:
 async def test_labelup_platform_override(httpx_mock) -> None:
     from scrapefold.engines.labelup import LabelUpEngine
 
-    httpx_mock.add_response(json={"data": {"username": "x", "followersCount": 1}})
+    httpx_mock.add_response(json={"username": "x", "followersCount": 1})
     engine = LabelUpEngine(api_key="x")
-    opts = ScrapeOptions(
-        extra={"labelup_endpoint": "/x", "labelup_kind": "profile", "labelup_platform": "youtube"}
-    )
+    opts = ScrapeOptions(extra={"labelup_platform": "youtube"})
     result = await engine.scrape("https://example.com/x", opts)
     assert result.social.platform == "youtube"
 
 
-async def test_labelup_bearer_auth(httpx_mock) -> None:
+async def test_labelup_bearer_auth_and_xhr_header(httpx_mock) -> None:
     from scrapefold.engines.labelup import LabelUpEngine
 
-    httpx_mock.add_response(json={"data": {"username": "d"}})
-    await LabelUpEngine(api_key="tok").scrape(
-        "https://t.me/durov", ScrapeOptions(extra={"labelup_endpoint": "/x"})
-    )
+    httpx_mock.add_response(json={"username": "d"})
+    await LabelUpEngine(api_key="tok").scrape("https://t.me/durov")
     request = httpx_mock.get_requests()[0]
     assert request.headers["Authorization"] == "Bearer tok"
+    assert request.headers["X-Requested-With"] == "XMLHttpRequest"
 
 
 def test_registry_resolves_telemetr_and_labelup() -> None:

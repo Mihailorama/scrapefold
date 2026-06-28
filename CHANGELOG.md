@@ -24,10 +24,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   routing, `token` query auth, `{"status":"ok","response":…}` envelope).
   `telemetr` ships a best-effort, **override-friendly** contract (default
   routing + `telemetr_endpoint` escape hatch) pending live verification.
-  `labelup` is a **gateway-only**, **multi-platform** authenticated JSON adapter
-  (explicit `labelup_endpoint` required) — it spans Instagram, YouTube, TikTok,
-  VK, Telegram, Twitch, … so its normalized `platform` is inferred from the
-  target URL host (or `extra["labelup_platform"]`), not hard-coded. `tgstat` /
+  `labelup` follows LabelUp's **verified** API contract
+  (https://help.labelup.ru/article/23384): `GET /api/v2/accounts/statistics`
+  with `Authorization: Bearer` + `X-Requested-With: XMLHttpRequest`. It is
+  genuinely **multi-platform** (Instagram, YouTube, VK, Telegram, TikTok,
+  RUTUBE, Dzen) — `scrape(url)` routes via the universal `?url=` param, with
+  `network_id`/`nickname`/`uid`/`id` lookups and a `labelup_endpoint`
+  raw-gateway escape hatch; the normalized `platform` is inferred from the URL
+  host (or `extra["labelup_platform"]`), never hard-coded. `tgstat` /
   `telemetr` are raced into the `telegram` ladder behind the free engine.
 - `platform_for_url()` helper in `scrapefold.social` — shared host→platform map
   (incl. Telegram/VK/Max/OK/Dzen/RuTube/Twitch/Threads/…) used by `apify_actor`
