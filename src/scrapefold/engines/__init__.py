@@ -92,6 +92,9 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "selenium": lambda: (
         __import__("scrapefold.engines.selenium", fromlist=["SeleniumEngine"]).SeleniumEngine
     ),
+    "telegram": lambda: (
+        __import__("scrapefold.engines.telegram", fromlist=["TelegramEngine"]).TelegramEngine
+    ),
 }
 
 

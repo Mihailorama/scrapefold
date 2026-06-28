@@ -8,6 +8,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- `telegram` engine + `telegram` / `vk` / `max` site classes. Telegram is a
+  first-class **global** social platform (not lumped under `russian_social`):
+  the free `telegram` engine fetches public-channel HTML previews
+  (`t.me/s/<channel>`, single-message embeds) and parses them into normalized
+  `Post` objects — text, media (photo/video + thumbnail), view count,
+  timestamp, author — with no API key. `vk` (vk.com / vk.ru) and `max` (max.ru)
+  get dedicated classes and stealth-led ladders; their structured path is the
+  `apify_actor` engine (host→platform labelling added so `.social` is tagged
+  correctly when an Apify actor is supplied). Telegram analytics vendors
+  (TGStat, Telemetr, LabelUp) are candidate future dedicated engines.
 - Normalized social entities (`scrapefold.social`) — a thin, best-effort layer
   that maps the many vendor JSON envelopes onto a stable
   `Profile` / `Post` / `Comment` shape (with a light `Author`), so callers read

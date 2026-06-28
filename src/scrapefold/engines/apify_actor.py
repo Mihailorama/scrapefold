@@ -101,7 +101,9 @@ def _load_sdk() -> Any:
     return ApifyClientAsync
 
 
-# Host -> canonical platform name, for the normalized social view.
+# Host -> canonical platform name, for the normalized social view. (Labelling
+# only — these hosts get a correct ``platform`` on ScrapeResult.social even when
+# the default actor is supplied via opts.extra["apify_actor_id"].)
 _PLATFORM_BY_HOST: dict[str, str] = {
     "instagram.com": "instagram",
     "tiktok.com": "tiktok",
@@ -113,6 +115,11 @@ _PLATFORM_BY_HOST: dict[str, str] = {
     "fb.com": "facebook",
     "reddit.com": "reddit",
     "linkedin.com": "linkedin",
+    "t.me": "telegram",
+    "telegram.me": "telegram",
+    "vk.com": "vk",
+    "vk.ru": "vk",
+    "max.ru": "max",
 }
 
 
