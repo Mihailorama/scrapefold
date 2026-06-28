@@ -15,7 +15,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   `diggCount`, or `favorite_count`. `normalize_social(payload, platform=…,
   kind=…)` is hint-driven (engines derive `platform`/`kind` from the endpoint
   via `platform_kind`) and infers the kind from the field signature when no
-  hint is given; the untouched vendor payload is always kept on each entity's
+  hint is given. `Post` carries a `media` list of `Media` (image/video URL +
+  optional thumbnail), extracted best-effort from single-media posts, carousels
+  / galleries (`media`, `images`, `childPosts`, …), nested media objects, and
+  bare URL lists — de-duplicated, with the post permalink never mistaken for an
+  image. The untouched vendor payload is always kept on each entity's
   `.raw`. `ScrapeResult` gains an additive `social` slot, populated by every
   social-structured engine — `scrapecreators`, `socialcrawl`, `apify_actor`,
   and `apify_linkedin` (LinkedIn profiles, with `firstName`/`lastName` composed

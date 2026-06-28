@@ -114,10 +114,59 @@ _VIEWS = ("viewCount", "viewsCount", "view_count", "playCount", "play_count", "v
 _COMMENT_TEXT = ("text", "body", "content", "comment", "message")
 _AUTHOR_NESTED = ("author", "user", "owner", "account", "channel")
 
+# Media extraction.
+_VIDEO_URL = ("videoUrl", "video_url", "webVideoUrl", "playAddr", "downloadAddr", "video")
+# Post-level image keys — must NOT include bare ``url``/``src`` (at post level
+# those mean the permalink, not an image).
+_IMAGE_URL = (
+    "displayUrl",
+    "display_url",
+    "imageUrl",
+    "image_url",
+    "image",
+    "photoUrl",
+    "pictureUrl",
+    "media_url_https",
+    "thumbnailUrl",
+    "thumbnail",
+    "coverUrl",
+    "cover",
+)
+# Inside a media-object dict, ``url``/``src`` legitimately point at the asset.
+_MEDIA_OBJ_IMAGE_URL = (*_IMAGE_URL, "url", "src")
+# Keys whose value is a list of media items (carousels, galleries, attachments).
+_MEDIA_CONTAINERS = (
+    "media",
+    "images",
+    "photos",
+    "videos",
+    "mediaUrls",
+    "media_urls",
+    "attachments",
+    "childPosts",
+    "carousel",
+    "sidecarItems",
+)
+_VIDEO_EXTS = (".mp4", ".mov", ".m3u8", ".webm", ".m4v")
+_IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".heic")
+_VIDEO_TYPE_WORDS = ("video", "reel", "clip", "gif", "animated")
+
 
 # ---------------------------------------------------------------------------
 # Entities
 # ---------------------------------------------------------------------------
+
+
+MediaType = Literal["image", "video"]
+
+
+@dataclass(frozen=True)
+class Media:
+    """A single image or video attached to a post."""
+
+    url: str | None = None
+    type: MediaType | None = None
+    thumbnail: str | None = None
 
 
 @dataclass(frozen=True)
@@ -162,6 +211,7 @@ class Post:
     comment_count: int | None = None
     share_count: int | None = None
     view_count: int | None = None
+    media: list[Media] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -254,6 +304,71 @@ def _has_any(payload: dict[str, Any], aliases: tuple[str, ...]) -> bool:
     return any(payload.get(k) is not None for k in aliases)
 
 
+def _guess_media_type(url: str) -> MediaType | None:
+    """Infer image vs video from a URL's file extension; ``None`` if unknown."""
+    low = url.lower().split("?", 1)[0]
+    if low.endswith(_VIDEO_EXTS):
+        return "video"
+    if low.endswith(_IMAGE_EXTS):
+        return "image"
+    return None
+
+
+def _parse_media_item(item: Any) -> Media | None:
+    """Build a :class:`Media` from a string URL or a media-object dict."""
+    if isinstance(item, str):
+        url = item.strip()
+        return Media(url=url, type=_guess_media_type(url)) if url else None
+    if not isinstance(item, dict):
+        return None
+    video = _as_str(_first(item, _VIDEO_URL))
+    image = _as_str(_first(item, _MEDIA_OBJ_IMAGE_URL))
+    type_word = str(item.get("type", "")).lower()
+    if video:
+        return Media(url=video, type="video", thumbnail=image)
+    if image:
+        if any(word in type_word for word in _VIDEO_TYPE_WORDS):
+            media_type: MediaType | None = "video"
+        else:
+            media_type = _guess_media_type(image) or ("image" if image else None)
+        return Media(url=image, type=media_type)
+    return None
+
+
+def _collect_media(payload: dict[str, Any]) -> list[Media]:
+    """Best-effort gather of a post's media: list containers first, else scalars.
+
+    Carousels / galleries (``media``, ``images``, ``childPosts``, …) take
+    precedence; a single-media post falls back to the post's own
+    ``videoUrl`` / image fields. Results are de-duplicated by URL, order kept.
+    """
+    collected: list[Media] = []
+    for key in _MEDIA_CONTAINERS:
+        value = payload.get(key)
+        if isinstance(value, list):
+            for item in value:
+                parsed = _parse_media_item(item)
+                if parsed is not None:
+                    collected.append(parsed)
+
+    if not collected:
+        video = _as_str(_first(payload, _VIDEO_URL))
+        image = _as_str(_first(payload, _IMAGE_URL))
+        if video:
+            collected.append(Media(url=video, type="video", thumbnail=image))
+        elif image:
+            collected.append(Media(url=image, type=_guess_media_type(image) or "image"))
+
+    seen: set[str | None] = set()
+    deduped: list[Media] = []
+    for media in collected:
+        if media.url in seen:
+            continue
+        seen.add(media.url)
+        deduped.append(media)
+    return deduped
+
+
 def _infer_kind(payload: dict[str, Any]) -> Kind | None:
     """Guess the entity kind from which alias families are present."""
     post_signal = _has_any(payload, _POST_TEXT) or _has_any(
@@ -320,6 +435,7 @@ def _build_post(payload: dict[str, Any], platform: str | None) -> Post:
         comment_count=_as_int(_first(payload, _COMMENTS)),
         share_count=_as_int(_first(payload, _SHARES)),
         view_count=_as_int(_first(payload, _VIEWS)),
+        media=_collect_media(payload),
         raw=payload,
     )
 
@@ -434,6 +550,8 @@ __all__ = [
     "Author",
     "Comment",
     "Kind",
+    "Media",
+    "MediaType",
     "Post",
     "Profile",
     "SocialEntity",

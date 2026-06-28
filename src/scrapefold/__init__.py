@@ -36,6 +36,7 @@ from scrapefold.router import walk as _walk
 from scrapefold.social import (
     Author,
     Comment,
+    Media,
     Post,
     Profile,
     SocialEntity,
@@ -53,6 +54,7 @@ __all__ = [
     "EngineCapabilities",
     "EngineError",
     "EnginePool",
+    "Media",
     "Policy",
     "Post",
     "Profile",

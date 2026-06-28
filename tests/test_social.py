@@ -7,6 +7,7 @@ import pytest
 from scrapefold.social import (
     Author,
     Comment,
+    Media,
     Post,
     Profile,
     normalize_social,
@@ -127,6 +128,100 @@ def test_post_string_counts_coerced_to_int() -> None:
     assert isinstance(entity, Post)
     assert entity.like_count == 1234
     assert entity.comment_count == 56
+
+
+# ---------------------------------------------------------------------------
+# Media extraction
+# ---------------------------------------------------------------------------
+
+
+def test_media_single_video_with_cover() -> None:
+    payload = {
+        "caption": "clip",
+        "webVideoUrl": "https://cdn.tt/v/7.mp4",
+        "coverUrl": "https://cdn.tt/c/7.jpg",
+    }
+    post = normalize_social(payload, kind="post")
+    assert isinstance(post, Post)
+    assert post.media == [
+        Media(url="https://cdn.tt/v/7.mp4", type="video", thumbnail="https://cdn.tt/c/7.jpg")
+    ]
+
+
+def test_media_single_image() -> None:
+    post = normalize_social({"caption": "pic", "displayUrl": "https://ig/p.jpg"}, kind="post")
+    assert isinstance(post, Post)
+    assert post.media == [Media(url="https://ig/p.jpg", type="image")]
+
+
+def test_media_permalink_url_not_mistaken_for_image() -> None:
+    # Post-level ``url`` is the permalink — it must NOT become media.
+    post = normalize_social(
+        {"caption": "text only", "url": "https://x.com/u/status/1", "likeCount": 3},
+        kind="post",
+    )
+    assert isinstance(post, Post)
+    assert post.url == "https://x.com/u/status/1"
+    assert post.media == []
+
+
+def test_media_carousel_list_of_dicts() -> None:
+    payload = {
+        "caption": "gallery",
+        "images": [
+            {"url": "https://ig/1.jpg", "type": "image"},
+            {"url": "https://ig/2.jpg"},
+            {"videoUrl": "https://ig/3.mp4", "displayUrl": "https://ig/3.jpg"},
+        ],
+    }
+    post = normalize_social(payload, kind="post")
+    assert isinstance(post, Post)
+    assert [m.url for m in post.media] == [
+        "https://ig/1.jpg",
+        "https://ig/2.jpg",
+        "https://ig/3.mp4",
+    ]
+    assert post.media[2].type == "video"
+    assert post.media[2].thumbnail == "https://ig/3.jpg"
+
+
+def test_media_list_of_strings_typed_by_extension() -> None:
+    payload = {"caption": "g", "mediaUrls": ["https://a/x.mp4", "https://a/y.png", "https://a/z"]}
+    post = normalize_social(payload, kind="post")
+    assert isinstance(post, Post)
+    assert [(m.url, m.type) for m in post.media] == [
+        ("https://a/x.mp4", "video"),
+        ("https://a/y.png", "image"),
+        ("https://a/z", None),
+    ]
+
+
+def test_media_twitter_entities_with_type_word() -> None:
+    payload = {
+        "full_text": "tweet",
+        "media": [{"media_url_https": "https://t/v.jpg", "type": "animated_gif"}],
+    }
+    post = normalize_social(payload, platform="twitter", kind="post")
+    assert isinstance(post, Post)
+    assert post.media[0].url == "https://t/v.jpg"
+    assert post.media[0].type == "video"  # inferred from the "gif"/"animated" type word
+
+
+def test_media_deduplicated_by_url() -> None:
+    payload = {
+        "caption": "dup",
+        "images": [{"url": "https://a/1.jpg"}],
+        "photos": [{"url": "https://a/1.jpg"}],
+    }
+    post = normalize_social(payload, kind="post")
+    assert isinstance(post, Post)
+    assert len(post.media) == 1
+
+
+def test_media_absent_is_empty_list() -> None:
+    post = normalize_social({"caption": "just words", "likeCount": 1}, kind="post")
+    assert isinstance(post, Post)
+    assert post.media == []
 
 
 # ---------------------------------------------------------------------------
