@@ -11,8 +11,28 @@ from scrapefold.social import (
     Post,
     Profile,
     normalize_social,
+    platform_for_url,
     platform_kind,
 )
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        ("https://www.instagram.com/nasa/", "instagram"),
+        ("https://t.me/durov", "telegram"),
+        ("https://vk.com/foo", "vk"),
+        ("https://vk.ru/foo", "vk"),
+        ("https://max.ru/u/foo", "max"),
+        ("https://ok.ru/foo", "odnoklassniki"),
+        ("https://www.twitch.tv/foo", "twitch"),
+        ("https://x.com/foo", "twitter"),
+        ("https://example.com/foo", None),
+    ],
+)
+def test_platform_for_url(url: str, expected: str | None) -> None:
+    assert platform_for_url(url) == expected
+
 
 # ---------------------------------------------------------------------------
 # platform_kind — endpoint parsing

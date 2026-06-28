@@ -24,9 +24,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   routing, `token` query auth, `{"status":"ok","response":…}` envelope).
   `telemetr` ships a best-effort, **override-friendly** contract (default
   routing + `telemetr_endpoint` escape hatch) pending live verification.
-  `labelup` is a **gateway-only** authenticated JSON adapter (explicit
-  `labelup_endpoint` required) until its contract is confirmed. `tgstat` /
+  `labelup` is a **gateway-only**, **multi-platform** authenticated JSON adapter
+  (explicit `labelup_endpoint` required) — it spans Instagram, YouTube, TikTok,
+  VK, Telegram, Twitch, … so its normalized `platform` is inferred from the
+  target URL host (or `extra["labelup_platform"]`), not hard-coded. `tgstat` /
   `telemetr` are raced into the `telegram` ladder behind the free engine.
+- `platform_for_url()` helper in `scrapefold.social` — shared host→platform map
+  (incl. Telegram/VK/Max/OK/Dzen/RuTube/Twitch/Threads/…) used by `apify_actor`
+  and `labelup` to tag `.social` when the platform is known only from the URL.
 - Normalized social entities (`scrapefold.social`) — a thin, best-effort layer
   that maps the many vendor JSON envelopes onto a stable
   `Profile` / `Post` / `Comment` shape (with a light `Author`), so callers read

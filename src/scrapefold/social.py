@@ -25,6 +25,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 Kind = Literal["profile", "post", "comment"]
 
@@ -493,6 +494,47 @@ _RESOURCE_KIND: dict[str, Kind] = {
 }
 
 
+# Host -> canonical platform name. Covers the social networks / messengers that
+# multi-platform vendors (Apify, LabelUp, …) span — so a normalized entity can
+# be tagged even when the engine learns the platform only from the target URL.
+_PLATFORM_HOSTS: tuple[tuple[str, str], ...] = (
+    ("instagram.com", "instagram"),
+    ("tiktok.com", "tiktok"),
+    ("youtube.com", "youtube"),
+    ("youtu.be", "youtube"),
+    ("twitter.com", "twitter"),
+    ("x.com", "twitter"),
+    ("facebook.com", "facebook"),
+    ("fb.com", "facebook"),
+    ("reddit.com", "reddit"),
+    ("linkedin.com", "linkedin"),
+    ("t.me", "telegram"),
+    ("telegram.me", "telegram"),
+    ("telegram.dog", "telegram"),
+    ("vk.com", "vk"),
+    ("vk.ru", "vk"),
+    ("max.ru", "max"),
+    ("ok.ru", "odnoklassniki"),
+    ("dzen.ru", "dzen"),
+    ("zen.yandex.ru", "dzen"),
+    ("rutube.ru", "rutube"),
+    ("twitch.tv", "twitch"),
+    ("pinterest.com", "pinterest"),
+    ("threads.net", "threads"),
+    ("likee.video", "likee"),
+    ("yappy.media", "yappy"),
+)
+
+
+def platform_for_url(url: str) -> str | None:
+    """Best-effort canonical platform name from a URL's host, or ``None``."""
+    host = urlparse(url if "://" in url else f"https://{url}").netloc.lower().removeprefix("www.")
+    for needle, platform in _PLATFORM_HOSTS:
+        if host == needle or host.endswith("." + needle):
+            return platform
+    return None
+
+
 def platform_kind(endpoint: str) -> tuple[str | None, Kind | None]:
     """Parse a gateway endpoint path into ``(platform, kind)``.
 
@@ -567,5 +609,6 @@ __all__ = [
     "Profile",
     "SocialEntity",
     "normalize_social",
+    "platform_for_url",
     "platform_kind",
 ]

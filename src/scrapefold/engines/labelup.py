@@ -1,4 +1,9 @@
-"""LabelUpEngine — influencer-marketing / Telegram analytics gateway (labelup).
+"""LabelUpEngine — multi-platform influencer / social analytics gateway (labelup).
+
+LabelUp spans **many** social networks and messengers — Instagram, YouTube,
+TikTok, VK, Telegram, Twitch, and more — not just Telegram. The normalized
+``platform`` is therefore inferred from the target URL's host (or set
+explicitly via ``opts.extra["labelup_platform"]``), never hard-coded.
 
 .. warning::
 
@@ -7,8 +12,9 @@
    authenticated JSON gateway: you supply the endpoint explicitly via
    ``opts.extra["labelup_endpoint"]`` (and ``labelup_*`` query extras), it
    GETs ``<base><endpoint>`` with bearer auth, stores the JSON, and normalizes
-   it into ``ScrapeResult.social``. Set the base via ``LABELUP_BASE_URL`` and
-   the kind hint via ``opts.extra["labelup_kind"]`` (``profile``/``post``).
+   it into ``ScrapeResult.social``. Set the base via ``LABELUP_BASE_URL``, the
+   kind hint via ``opts.extra["labelup_kind"]`` (``profile``/``post``), and the
+   platform via ``opts.extra["labelup_platform"]`` to override host inference.
 
 Once the real contract is known, this can grow URL->endpoint routing like the
 ``tgstat`` engine. Until then the gateway keeps it usable and honest.
@@ -25,7 +31,7 @@ from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import json_to_scrape_text
 from scrapefold.options import ScrapeOptions, strip_extra_prefix
 from scrapefold.result import ScrapeResult
-from scrapefold.social import Kind, normalize_social
+from scrapefold.social import Kind, normalize_social, platform_for_url
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +83,8 @@ class LabelUpEngine(ScrapeEngine):
 
         kind_hint = extra.pop("kind", None)
         kind: Kind | None = kind_hint if kind_hint in _VALID_KINDS else None
+        # Multi-platform: tag by explicit override, else infer from the URL host.
+        platform = extra.pop("platform", None) or platform_for_url(url)
         params = {str(k): str(v) for k, v in extra.items()}
         headers = {"Authorization": f"Bearer {self.api_key or ''}"}
 
@@ -99,8 +107,12 @@ class LabelUpEngine(ScrapeEngine):
             elapsed_ms=0,
             cost_usd=self.CAPABILITIES.estimated_cost_usd,
             json=payload,
-            social=normalize_social(entity, platform="telegram", kind=kind),  # type: ignore[arg-type]
-            meta={"status_code": response.status_code, "labelup_endpoint": str(endpoint)},
+            social=normalize_social(entity, platform=platform, kind=kind),  # type: ignore[arg-type]
+            meta={
+                "status_code": response.status_code,
+                "labelup_endpoint": str(endpoint),
+                "labelup_platform": platform,
+            },
         )
 
 

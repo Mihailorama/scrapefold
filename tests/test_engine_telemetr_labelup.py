@@ -108,6 +108,33 @@ async def test_labelup_gateway_post(httpx_mock) -> None:
     assert result.social[0].text == "hi"
 
 
+async def test_labelup_platform_inferred_from_url(httpx_mock) -> None:
+    # LabelUp spans many platforms — the platform must come from the URL host,
+    # not be hard-coded to telegram.
+    from scrapefold.engines.labelup import LabelUpEngine
+
+    httpx_mock.add_response(json={"data": {"username": "nasa", "followersCount": 90}})
+    engine = LabelUpEngine(api_key="x")
+    opts = ScrapeOptions(extra={"labelup_endpoint": "/ig/nasa", "labelup_kind": "profile"})
+    result = await engine.scrape("https://www.instagram.com/nasa/", opts)
+
+    assert isinstance(result.social, Profile)
+    assert result.social.platform == "instagram"
+    assert result.meta["labelup_platform"] == "instagram"
+
+
+async def test_labelup_platform_override(httpx_mock) -> None:
+    from scrapefold.engines.labelup import LabelUpEngine
+
+    httpx_mock.add_response(json={"data": {"username": "x", "followersCount": 1}})
+    engine = LabelUpEngine(api_key="x")
+    opts = ScrapeOptions(
+        extra={"labelup_endpoint": "/x", "labelup_kind": "profile", "labelup_platform": "youtube"}
+    )
+    result = await engine.scrape("https://example.com/x", opts)
+    assert result.social.platform == "youtube"
+
+
 async def test_labelup_bearer_auth(httpx_mock) -> None:
     from scrapefold.engines.labelup import LabelUpEngine
 
