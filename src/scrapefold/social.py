@@ -41,8 +41,11 @@ _HANDLE = (
     "screenName",
     "ownerUsername",
     "uniqueId",
+    "publicIdentifier",
     "nickname",
 )
+_FIRST_NAME = ("firstName", "first_name")
+_LAST_NAME = ("lastName", "last_name")
 _NAME = ("fullName", "full_name", "displayName", "display_name", "name", "title", "nickname")
 _PROFILE_URL = ("profileUrl", "profile_url", "url", "link")
 _BIO = ("biography", "bio", "description", "summary", "about", "signature")
@@ -233,7 +236,7 @@ def _author(payload: dict[str, Any], platform: str | None) -> Author | None:
     nested = _first(payload, _AUTHOR_NESTED)
     src = nested if isinstance(nested, dict) else payload
     handle = _as_str(_first(src, _HANDLE))
-    name = _as_str(_first(src, _NAME))
+    name = _full_name(src)
     url = _as_str(_first(src, _PROFILE_URL))
     if handle is None and name is None and url is None:
         return None
@@ -275,11 +278,26 @@ def _infer_kind(payload: dict[str, Any]) -> Kind | None:
 # ---------------------------------------------------------------------------
 
 
+def _full_name(payload: dict[str, Any]) -> str | None:
+    """Resolve a display name, composing first + last when no single name field exists.
+
+    Many APIs (LinkedIn actors, some person endpoints) split the name into
+    ``firstName`` / ``lastName`` rather than a single ``name`` field.
+    """
+    name = _as_str(_first(payload, _NAME))
+    if name is not None:
+        return name
+    first = _as_str(_first(payload, _FIRST_NAME))
+    last = _as_str(_first(payload, _LAST_NAME))
+    composed = " ".join(part for part in (first, last) if part)
+    return composed or None
+
+
 def _build_profile(payload: dict[str, Any], platform: str | None) -> Profile:
     return Profile(
         platform=platform,
         handle=_as_str(_first(payload, _HANDLE)),
-        name=_as_str(_first(payload, _NAME)),
+        name=_full_name(payload),
         url=_as_str(_first(payload, _PROFILE_URL)),
         bio=_as_str(_first(payload, _BIO)),
         followers=_as_int(_first(payload, _FOLLOWERS)),

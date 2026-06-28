@@ -63,6 +63,22 @@ def test_profile_basic() -> None:
     assert entity.raw is payload  # raw preserved
 
 
+def test_profile_name_composed_from_first_last() -> None:
+    # LinkedIn-style payload: name split into firstName / lastName, handle in
+    # publicIdentifier, bio in summary.
+    payload = {
+        "firstName": "Satya",
+        "lastName": "Nadella",
+        "publicIdentifier": "satyanadella",
+        "summary": "Empowering every person and organization.",
+    }
+    entity = normalize_social(payload, platform="linkedin", kind="profile")
+    assert isinstance(entity, Profile)
+    assert entity.name == "Satya Nadella"
+    assert entity.handle == "satyanadella"
+    assert entity.bio == "Empowering every person and organization."
+
+
 @pytest.mark.parametrize(
     "follower_key",
     ["followersCount", "followers_count", "followerCount", "followers", "fan_count"],

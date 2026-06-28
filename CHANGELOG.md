@@ -16,9 +16,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   kind=…)` is hint-driven (engines derive `platform`/`kind` from the endpoint
   via `platform_kind`) and infers the kind from the field signature when no
   hint is given; the untouched vendor payload is always kept on each entity's
-  `.raw`. `ScrapeResult` gains an additive `social` slot, populated by the
-  `scrapecreators`, `socialcrawl`, and `apify_actor` engines. The types and
-  `normalize_social` are re-exported from the package root.
+  `.raw`. `ScrapeResult` gains an additive `social` slot, populated by every
+  social-structured engine — `scrapecreators`, `socialcrawl`, `apify_actor`,
+  and `apify_linkedin` (LinkedIn profiles, with `firstName`/`lastName` composed
+  into a single `name`). HTML/markdown engines (`anysite`, `firecrawl`, …) and
+  the non-social-structured services (`exa` neural search, `outscraper`
+  business insights) leave `social=None`. The types and `normalize_social` are
+  re-exported from the package root.
 - `apify_actor` engine — universal [Apify](https://apify.com) Actor adapter that
   generalises the LinkedIn-only `apify_linkedin` engine to any actor. Public
   social URLs (Instagram, TikTok, X/Twitter, YouTube, Facebook, Reddit,
