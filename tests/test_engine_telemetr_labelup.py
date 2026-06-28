@@ -19,34 +19,37 @@ from scrapefold.social import Post, Profile
 
 
 def test_telemetr_routing() -> None:
-    from scrapefold.engines.telemetr import _adapt
+    from scrapefold.engines.telemetr import _route_for
 
-    ep, _params, kind = _adapt(ScrapeOptions(), "https://t.me/durov")
-    assert ep == "/channels/@durov"
+    assert _route_for("https://t.me/durov") == ("durov", "profile", None)
+    assert _route_for("https://t.me/s/durov") == ("durov", "posts", None)
+    assert _route_for("https://t.me/durov/151") == ("durov", "post", "151")
+
+
+def test_telemetr_build_request() -> None:
+    from scrapefold.engines.telemetr import _build_request
+
+    ep, params, kind = _build_request("profile", "42", None, {})
+    assert ep == "/channel/info"
+    assert params == {"internal_id": "42"}
     assert kind == "profile"
 
-    ep, _params, kind = _adapt(ScrapeOptions(), "https://t.me/s/durov")
-    assert ep == "/channels/@durov/posts"
+    ep, params, kind = _build_request("posts", "42", None, {})
+    assert ep == "/messages/channel"
     assert kind == "post"
 
-    ep, _params, kind = _adapt(ScrapeOptions(), "https://t.me/durov/151")
-    assert ep == "/posts/151"
+    ep, params, kind = _build_request("post", "42", "151", {})
+    assert ep == "/messages/by_id"
+    assert params == {"internal_id": "42", "message_id": "151"}
     assert kind == "post"
-
-
-def test_telemetr_forced_endpoint() -> None:
-    from scrapefold.engines.telemetr import _adapt
-
-    ep, _params, kind = _adapt(
-        ScrapeOptions(extra={"telemetr_endpoint": "/custom/x"}), "https://t.me/durov"
-    )
-    assert ep == "/custom/x"
-    assert kind is None
 
 
 async def test_telemetr_channel_profile(httpx_mock) -> None:
     from scrapefold.engines.telemetr import TelemetrEngine
 
+    # Step 1: search resolves the slug to an internal_id.
+    httpx_mock.add_response(json={"items": [{"internal_id": 777, "username": "durov"}]})
+    # Step 2: channel info by internal_id.
     httpx_mock.add_response(
         json={"data": {"username": "durov", "title": "Durov", "subscribers_count": 1000}},
     )
@@ -59,14 +62,52 @@ async def test_telemetr_channel_profile(httpx_mock) -> None:
     assert result.social.platform == "telegram"
     assert result.social.followers == 1000
 
+    search, info = httpx_mock.get_requests()
+    assert search.url.path.endswith("/channels/search")
+    assert search.url.params["term"] == "durov"
+    assert info.url.path.endswith("/channel/info")
+    assert info.url.params["internal_id"] == "777"
 
-async def test_telemetr_bearer_auth(httpx_mock) -> None:
+
+async def test_telemetr_internal_id_skips_search(httpx_mock) -> None:
+    # When the caller supplies internal_id, no search call is made.
     from scrapefold.engines.telemetr import TelemetrEngine
 
+    httpx_mock.add_response(json={"data": {"username": "durov", "subscribers_count": 5}})
+    engine = TelemetrEngine(api_key="x")
+    opts = ScrapeOptions(extra={"telemetr_internal_id": "999"})
+    result = await engine.scrape("https://t.me/durov", opts)
+
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1  # no search round-trip
+    assert requests[0].url.params["internal_id"] == "999"
+    assert isinstance(result.social, Profile)
+
+
+async def test_telemetr_forced_endpoint_single_call(httpx_mock) -> None:
+    from scrapefold.engines.telemetr import TelemetrEngine
+
+    httpx_mock.add_response(json={"items": [{"username": "x"}]})
+    engine = TelemetrEngine(api_key="x")
+    opts = ScrapeOptions(extra={"telemetr_endpoint": "/catalog/search", "telemetr_term": "ai"})
+    result = await engine.scrape("https://t.me/durov", opts)
+
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1  # forced path -> no resolution
+    assert requests[0].url.path.endswith("/catalog/search")
+    assert requests[0].url.params["term"] == "ai"
+    assert result.engine == "telemetr"
+
+
+async def test_telemetr_xapikey_auth(httpx_mock) -> None:
+    from scrapefold.engines.telemetr import TelemetrEngine
+
+    httpx_mock.add_response(json={"items": [{"internal_id": 1}]})
     httpx_mock.add_response(json={"data": {"username": "d"}})
     await TelemetrEngine(api_key="tok").scrape("https://t.me/durov")
     request = httpx_mock.get_requests()[0]
-    assert request.headers["Authorization"] == "Bearer tok"
+    assert request.headers["x-api-key"] == "tok"
+    assert "Authorization" not in request.headers
 
 
 async def test_telemetr_http_error_wrapped(httpx_mock) -> None:

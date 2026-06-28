@@ -22,8 +22,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   adapters that normalize into `ScrapeResult.social` (`platform="telegram"`).
   `tgstat` follows TGStat's **verified** API contract (channel/posts/post
   routing, `token` query auth, `{"status":"ok","response":…}` envelope).
-  `telemetr` ships a best-effort, **override-friendly** contract (default
-  routing + `telemetr_endpoint` escape hatch) pending live verification.
+  `telemetr` follows Telemetr.io's **verified** API contract
+  (https://api.telemetr.io/api-docs/openapi.json): `x-api-key` auth, and a
+  two-step resolve — `/channels/search` maps a public `t.me` slug to Telemetr's
+  numeric `internal_id`, then `/channel/info` (profile), `/messages/channel`
+  (feed), or `/messages/by_id` (single post). `telemetr_internal_id` skips the
+  search step; `telemetr_endpoint` forces a raw single-call path.
   `labelup` follows LabelUp's **verified** API contract
   (https://help.labelup.ru/article/23384): `GET /api/v2/accounts/statistics`
   with `Authorization: Bearer` + `X-Requested-With: XMLHttpRequest`. It is
