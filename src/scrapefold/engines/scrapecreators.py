@@ -63,6 +63,7 @@ from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import json_to_scrape_text
 from scrapefold.options import ScrapeOptions, strip_extra_prefix
 from scrapefold.result import ScrapeResult
+from scrapefold.social import normalize_social, platform_kind
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +204,8 @@ class ScrapeCreatorsEngine(ScrapeEngine):
         payload = response.json()
         text_out, markdown_out = json_to_scrape_text(payload)
 
+        platform, kind = platform_kind(endpoint)
+
         return ScrapeResult(
             url=url,
             text=text_out,
@@ -212,6 +215,7 @@ class ScrapeCreatorsEngine(ScrapeEngine):
             elapsed_ms=0,  # base class fills this in
             cost_usd=self.CAPABILITIES.estimated_cost_usd,
             json=payload,
+            social=normalize_social(payload, platform=platform, kind=kind),
             meta={
                 "status_code": response.status_code,
                 "scrapecreators_endpoint": endpoint,

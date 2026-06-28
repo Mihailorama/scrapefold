@@ -55,6 +55,7 @@ from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import json_to_scrape_text
 from scrapefold.options import ScrapeOptions, strip_extra_prefix
 from scrapefold.result import ScrapeResult
+from scrapefold.social import normalize_social
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +101,34 @@ def _load_sdk() -> Any:
     return ApifyClientAsync
 
 
+# Host -> canonical platform name, for the normalized social view.
+_PLATFORM_BY_HOST: dict[str, str] = {
+    "instagram.com": "instagram",
+    "tiktok.com": "tiktok",
+    "twitter.com": "twitter",
+    "x.com": "twitter",
+    "youtube.com": "youtube",
+    "youtu.be": "youtube",
+    "facebook.com": "facebook",
+    "fb.com": "facebook",
+    "reddit.com": "reddit",
+    "linkedin.com": "linkedin",
+}
+
+
 def _host(url: str) -> str:
     """Return the lowercased host of ``url`` without a leading ``www.``."""
     parsed = urlparse(url if "://" in url else f"https://{url}")
     return parsed.netloc.lower().removeprefix("www.")
+
+
+def _platform_for(url: str) -> str | None:
+    """Return the canonical platform name for ``url``'s host, or ``None``."""
+    host = _host(url)
+    for needle, platform in _PLATFORM_BY_HOST.items():
+        if host == needle or host.endswith("." + needle):
+            return platform
+    return None
 
 
 def _default_actor_for(url: str) -> str | None:
@@ -217,6 +242,7 @@ class ApifyActorEngine(ScrapeEngine):
             elapsed_ms=0,  # base class patches this
             cost_usd=self.CAPABILITIES.estimated_cost_usd,
             json=payload,
+            social=normalize_social(payload, platform=_platform_for(url)),
             meta={
                 "actor_id": actor_id,
                 "actor_run_id": run_id,

@@ -8,6 +8,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- Normalized social entities (`scrapefold.social`) — a thin, best-effort layer
+  that maps the many vendor JSON envelopes onto a stable
+  `Profile` / `Post` / `Comment` shape (with a light `Author`), so callers read
+  `post.like_count` without caring whether the vendor spelled it `likeCount`,
+  `diggCount`, or `favorite_count`. `normalize_social(payload, platform=…,
+  kind=…)` is hint-driven (engines derive `platform`/`kind` from the endpoint
+  via `platform_kind`) and infers the kind from the field signature when no
+  hint is given; the untouched vendor payload is always kept on each entity's
+  `.raw`. `ScrapeResult` gains an additive `social` slot, populated by the
+  `scrapecreators`, `socialcrawl`, and `apify_actor` engines. The types and
+  `normalize_social` are re-exported from the package root.
 - `apify_actor` engine — universal [Apify](https://apify.com) Actor adapter that
   generalises the LinkedIn-only `apify_linkedin` engine to any actor. Public
   social URLs (Instagram, TikTok, X/Twitter, YouTube, Facebook, Reddit,

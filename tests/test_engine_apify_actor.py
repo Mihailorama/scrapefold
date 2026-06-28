@@ -84,6 +84,12 @@ async def test_basic_call_success() -> None:
     assert result.markdown
     assert result.cost_usd == 0.0015
     assert result.engine == "apify_actor"
+    # Social-media payload is normalized into ScrapeResult.social.
+    from scrapefold.social import Post
+
+    assert isinstance(result.social, Post)
+    assert result.social.platform == "instagram"
+    assert result.social.like_count == 12345
 
 
 # ---------------------------------------------------------------------------

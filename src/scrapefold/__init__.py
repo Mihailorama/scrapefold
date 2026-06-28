@@ -33,17 +33,29 @@ from scrapefold.options import ScrapeOptions
 from scrapefold.pool import EnginePool
 from scrapefold.result import ScrapeResult
 from scrapefold.router import walk as _walk
+from scrapefold.social import (
+    Author,
+    Comment,
+    Post,
+    Profile,
+    SocialEntity,
+    normalize_social,
+)
 
 __version__ = "0.2.0"
 
 __all__ = [
     "AllEnginesFailed",
+    "Author",
     "BudgetExceeded",
+    "Comment",
     "CrawlResult",
     "EngineCapabilities",
     "EngineError",
     "EnginePool",
     "Policy",
+    "Post",
+    "Profile",
     "RaceStep",
     "RedirectScopeViolation",
     "ScrapeEngine",
@@ -51,11 +63,13 @@ __all__ = [
     "ScrapeResult",
     "SequentialStep",
     "SiteClass",
+    "SocialEntity",
     "WalkBudget",
     "__version__",
     "classify_url",
     "crawl_site",
     "get_ladder",
+    "normalize_social",
     "scrape",
 ]
 
