@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed current docs/backlog status after the 0.3.0 social-engine release.
+
 ## [0.3.0] - 2026-06-28
 
 ### Added

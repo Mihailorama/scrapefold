@@ -1,6 +1,6 @@
 ---
 purpose: "High-level architecture — package layout, engine ABC, router, crawler, public API."
-updated: "2026-05-22"
+updated: "2026-06-29"
 related:
   - ../conventions/golden-rules.md
   - ../workflows/testing.md
@@ -19,14 +19,14 @@ src/scrapefold/
 ├── engines/
 │   ├── base.py          ScrapeEngine ABC + EngineCapabilities + EngineError
 │   ├── __init__.py      lazy engine registry
-│   └── <name>.py        one file per engine (16 planned)
+│   └── <name>.py        one file per engine
 ├── router.py            (S7) auto-select + sequential fallback chain
 ├── parallel.py          (S7) run-many + LLM-judge with injected callable
 ├── html_to_text.py      (S2) shared HTML → text / markdown
 ├── url_utils.py         (S2) scan_urls, classify_url, is_technical_url, formaturl
 ├── crawler/             (S8) sitemap → BFS → filters → stitcher
 ├── cache.py             (S8) disk-backed TTL cache
-├── vision.py            (S6/S7) optional analyze_screenshot_with_llm(callable_llm)
+├── vision.py            optional analyze_screenshot_with_llm(callable_llm)
 ├── cli.py               (S9) Typer entry — `scrapefold` console script
 └── mcp_server.py        (S10) MCP stdio server — `scrapefold-mcp` console script
 ```
@@ -91,7 +91,7 @@ Full adapter matrix: see `CONTRIBUTING.md` § "Add an engine" once filled in by 
 | `text` | ✅ yes | Always, post-converted from whichever native form |
 | `markdown` | ✅ yes | Always, engine-native or post-converted from HTML |
 | `html` | optional | Only when an engine returned HTML (most browser engines) |
-| `json` | optional | Only when an engine returned **structured data natively** (Firecrawl `/extract`, AnySite endpoints, Apify actors, vendor schema-extract endpoints) |
+| `json` | optional | Only when an engine returned structured data natively or via an injected reader (Firecrawl `/extract`, AnySite endpoints, Apify actors, PixelRAG VLM/OCR tile reader) |
 | `social` | optional | Best-effort normalized `Profile` / `Post` / `Comment` (see `scrapefold.social`) when a social engine recognised the payload. A convenience view over `json`; the raw payload stays in `json` and on each entity's `.raw`. |
 
 `ScrapeOptions.output_format` is a **hint** to the engine about which native form is cheapest to produce — `auto` lets the engine choose. The hint does not gate which slots are filled: an HTML-returning engine still produces `text` and `markdown` via post-conversion regardless of the hint.
@@ -109,6 +109,10 @@ res.get_format("json")  # raises ValueError if not "text|markdown|html|json"
 ```
 
 For *structured extraction* (passing a JSON schema and getting native JSON back), engines that support it accept an `extra={"schema": {...}}` key. Engines that don't support structured extraction fill `json=None` and the call falls back to text/markdown/html.
+
+Visual extraction follows the same no-vendor-SDK rule: `pixelrag` captures
+tiles with local `pixelshot`, then an injected `pixelrag_reader` callable can
+turn those tiles into markdown/text and per-tile JSON.
 
 ## Anti-bot escalation — per-site-class ladders
 

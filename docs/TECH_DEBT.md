@@ -1,6 +1,6 @@
 ---
 purpose: "Prioritized register of known follow-up items deferred from earlier PRs."
-updated: "2026-06-19"
+updated: "2026-06-29"
 related:
   - architecture/overview.md
   - ../CHANGELOG.md
@@ -19,11 +19,12 @@ These seven items came out of Codex round-3 review of the ladders PR
 (Option A); these are implementation pin-downs that belong in code, not
 in the ladders.py file alone.
 
-**Post-0.2 status:**
+**Post-0.3 status:**
 
-- v0.2.0 shipped the Oxylabs, ScrapeCreators, Exa, and presentation-site
-  work. The router still walks `RaceStep` entries sequentially.
-- Items tagged "RaceStep-coupled" remain open after v0.2.0 — they cannot
+- v0.3.0 shipped the social-normalization layer, `apify_actor`, Telegram,
+  TGStat, Telemetr, LabelUp, PixelRAG, and SocialCrawl. The router still
+  walks `RaceStep` entries sequentially.
+- Items tagged "RaceStep-coupled" remain open after v0.3.0 — they cannot
   be fully validated without concurrent race fan-out in the router. Item
   #1 (`budget_mode`), #2 (race billing), and #4 (race billing default)
   are RaceStep-coupled.
@@ -107,7 +108,7 @@ public behavior.
 ### 11. Dedicated geofenced fallback tier
 
 - **Where:** `src/scrapefold/engines/`.
-- **Status:** Some geofenced targets are unreachable from US/EU IPs at the network layer (TCP timeout, not bot detection). No amount of stealth / JS rendering / fingerprint randomisation helps — the connection never completes. v0.2.0 ships `oxylabs` with residential geo routing (`ScrapeOptions.country` → `geo_location`), but the dedicated Bright Data-family fallback tier is still missing.
+- **Status:** Some geofenced targets are unreachable from US/EU IPs at the network layer (TCP timeout, not bot detection). No amount of stealth / JS rendering / fingerprint randomisation helps — the connection never completes. `oxylabs` ships residential geo routing (`ScrapeOptions.country` → `geo_location`), but the dedicated Bright Data-family fallback tier is still missing after v0.3.0.
 - **Originally scoped, never shipped:** `brightdata_unlocker` and `brightdata_browser` were listed in the early README's 16-engine table; the placeholder pyproject extras were removed in `0.1.0a2` (CHANGELOG).
 - **Fix sketch:** implement `engines/brightdata_unlocker.py` against Bright Data's Web Unlocker API (`https://api.brightdata.com/datacenter/zone/unlock` or equivalent). Capability: `proxy_type="residential"`, `geography=(<country_code>,)`. Wire into ladders for the geofenced site class.
 - **Priority:** P2 — needed for provider redundancy and full coverage of IP-geofenced targets; Oxylabs covers the first shipped residential-geo path.

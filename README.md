@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 20 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 25 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -16,13 +16,13 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-791%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-918%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <strong>20 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>791 tests</strong> · <strong>MIT</strong>
+  <strong>25 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>918 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -69,9 +69,14 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Cloudflare BR**](https://developers.cloudflare.com/browser-rendering/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Outscraper**](https://outscraper.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**Apify (LinkedIn)**](https://apify.com/) | ✅ | SaaS | Paid | ★★☆ | ★★★ | ★★★ | Medium | $$$ |
+| [**Apify Actor**](https://apify.com/) | ✅ | SaaS | Paid | ★★☆ | ★★★ | ★★★ | Medium | $$$ |
 | [**Anysite**](https://anysite.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**Scrape Creators**](https://scrapecreators.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
 | [**SocialCrawl**](https://www.socialcrawl.dev/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
+| [**Telegram**](https://telegram.org/) | ✅ | Local | — | ★★☆ | ☆☆☆ | ☆☆☆ | Fast | Free |
+| [**TGStat**](https://tgstat.com/) | ✅ | SaaS | Paid | — | — | ★★☆ | Fast | $$ |
+| [**Telemetr**](https://telemetr.io/) | ✅ | SaaS | Paid | — | — | ★★☆ | Fast | $$ |
+| [**LabelUp**](https://labelup.ru/) | ✅ | SaaS | Paid | — | — | ★★☆ | Fast | $$ |
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**ScraperAPI**](https://www.scraperapi.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Exa**](https://exa.ai/) | ✅ | SaaS | Paid | ★★★ | ★★☆ | ★★☆ | Fast | $$ |
@@ -91,6 +96,8 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
 | Social profiles, posts, channels, comments | **SocialCrawl** gateway + **Scrape Creators** structured JSON |
+| Telegram analytics | **Telegram** free preview → **TGStat** / **Telemetr** structured APIs |
+| Cross-platform social stats | **LabelUp** normalized social profile/statistics output |
 | LinkedIn / niche social | **Exa** (`people` / `company` public search) + **Apify (LinkedIn)** + **SocialCrawl** fallback |
 | IP-geofenced targets | **Oxylabs** (`geo_location` via residential pool) — or **brightdata_unlocker** (tracked) |
 | Self-hosted, all-in-one | **scrapling_stealth** + **crawl4ai** + **requests** ladder |
@@ -158,9 +165,14 @@ asyncio.run(main())
 | [**Cloudflare BR**](https://developers.cloudflare.com/browser-rendering/) | SaaS | Paid | Cloudflare-native browser API | `pip install scrapefold[cloudflare]` |
 | [**Outscraper**](https://outscraper.com/) | SaaS | Paid | Niche aggregator scrapes | `pip install scrapefold[outscraper]` |
 | [**Apify (LinkedIn)**](https://apify.com/) | SaaS | Paid | LinkedIn actor runs | `pip install scrapefold[apify]` |
+| [**Apify Actor**](https://apify.com/) | SaaS | Paid | Universal public-social actor adapter | `pip install scrapefold[apify]` |
 | [**Anysite**](https://anysite.dev/) | SaaS | Paid | General-purpose vendor | `pip install scrapefold[anysite]` |
 | [**Scrape Creators**](https://scrapecreators.com/) | SaaS | Paid | Social-media JSON API (TikTok, IG, YouTube, X, Reddit) | (built-in — pure httpx) |
 | [**SocialCrawl**](https://www.socialcrawl.dev/) | SaaS | Paid | Social-data JSON gateway (TikTok, IG, YouTube, Facebook, X, LinkedIn, Reddit, plus endpoint overrides) | (built-in — pure httpx) |
+| **Telegram** | Local | — | Public Telegram channel/message preview parser | (built-in) |
+| **TGStat** | SaaS | Paid | Telegram channel/posts/post REST data | (built-in — pure httpx) |
+| **Telemetr** | SaaS | Paid | Telegram channel/message analytics REST data | (built-in — pure httpx) |
+| **LabelUp** | SaaS | Paid | Multi-platform social account statistics | (built-in — pure httpx) |
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | SaaS | Paid | Web Scraper API (realtime, residential geo) | (built-in — pure httpx) |
 | [**ScraperAPI**](https://www.scraperapi.com/) | SaaS | Paid | Proxy + JS render, native markdown, AI Parser (`json`) | `pip install scrapefold[scraperapi]` |
 | [**Exa**](https://exa.ai/) | SaaS | Paid | Search, Contents, Answer, Agent; LinkedIn people/company defaults | (built-in — pure httpx) |
@@ -456,10 +468,15 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `firecrawl` | SaaS | ✓ | ✓ | ✓ | ✓ | datacenter | ✓ | ✓ | $1.00 |
 | `scrapingbee` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | ✓ | $1.00 |
 | `apify_linkedin` | SaaS · site | ✓ | ✓ | — | — | residential | ✓ | ✓ | $1.50 |
+| `apify_actor` | SaaS · site | ✓ | ✓ | — | — | residential | ✓ | ✓ | $1.50 |
 | `cloudflare` | SaaS | ✓ | — | — | ✓ | none | ✓ | — | $1.80 |
 | `anysite` | SaaS | ✓ | ✓ | — | ✓ | residential | ✓ | ✓ | $2.00 |
 | `scrapecreators` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
 | `socialcrawl` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
+| `telegram` | local · social | — | — | — | — | none | no | ✓ | $0 |
+| `tgstat` | SaaS · site | — | ✓ | — | — | none | ✓ | — | $2.00 |
+| `telemetr` | SaaS · site | — | ✓ | — | — | none | ✓ | — | $2.00 |
+| `labelup` | SaaS · site | — | ✓ | — | — | none | ✓ | — | $2.00 |
 | `oxylabs` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | trial | $2.80 |
 | `outscraper` | SaaS · site | ✓ | ✓ | — | — | datacenter | ✓ | ✓ | $3.00 |
 | `scraperapi` | SaaS | ✓ | — | — | ✓ | datacenter | ✓ | ✓ | $0.49–4.90 |

@@ -1,6 +1,6 @@
 ---
 purpose: "Local dev workflow — clone, install, run, lint."
-updated: "2026-05-22"
+updated: "2026-06-29"
 related:
   - testing.md
   - ../conventions/golden-rules.md
@@ -93,6 +93,7 @@ See [../../CONTRIBUTING.md](../../CONTRIBUTING.md) § "Add an engine". Five-step
 | `FIRECRAWL_API_KEY` | firecrawl |
 | `SCRAPINGBEE_API_KEY` | scrapingbee |
 | `SCRAPINGDOG_API_KEY` | scrapingdog |
+| `SCRAPERAPI_API_KEY` | scraperapi |
 | `JINA_API_KEY` | jina |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | cloudflare |
 | `OUTSCRAPER_API_KEY` | outscraper |
@@ -101,6 +102,10 @@ See [../../CONTRIBUTING.md](../../CONTRIBUTING.md) § "Add an engine". Five-step
 | `SCRAPECREATORS_API_KEY` | scrapecreators |
 | `SOCIALCRAWL_API_KEY` | socialcrawl |
 | `EXA_API_KEY` | exa |
-| `BRIGHTDATA_API_KEY` | brightdata |
+| `TGSTAT_API_TOKEN` | tgstat |
+| `TELEMETR_API_TOKEN`, `TELEMETR_BASE_URL` | telemetr |
+| `LABELUP_API_TOKEN`, `LABELUP_BASE_URL` | labelup |
+| `OXYLABS_USERNAME`, `OXYLABS_PASSWORD` | oxylabs |
+| `PIXELRAG_BIN` | pixelrag |
 
 scrapefold does not call `load_dotenv()`. Set them in your shell or use your own loader.

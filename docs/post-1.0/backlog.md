@@ -1,12 +1,12 @@
 ---
-purpose: "Engines + features intentionally deferred after the v0.2.0 release."
-updated: "2026-06-19"
+purpose: "Engines + features intentionally deferred after the v0.3.0 release."
+updated: "2026-06-29"
 related:
   - ../TECH_DEBT.md
   - ../../CHANGELOG.md
 ---
 
-# Post-v0.2 backlog
+# Post-v0.3 backlog
 
 Tracked here so released lines stay focused and the deferrals remain
 recoverable in future minor releases. For follow-up items that have a
@@ -80,12 +80,32 @@ shape.
 
 ### Residential-proxy escalation tier
 
-- **Why deferred:** v0.2.0 ships the first residential-geo path via
-  `oxylabs`, but the Bright Data-family fallback tier is still missing
+- **Why deferred:** `oxylabs` ships the first residential-geo path, but the
+  Bright Data-family fallback tier is still missing after v0.3.0
   (see `TECH_DEBT.md` #11). Some geofenced targets are unreachable from
   US/EU IPs at the TCP layer; stealth doesn't help.
 - **Future plan:** Add a new ladder tier above the unlocker engines
   for the `geofenced_*` site classes.
+
+### PixelRAG hosted/index search mode
+
+- **Why deferred:** the shipped `pixelrag` engine handles URL capture plus an
+  injected VLM/OCR reader for markdown / JSON. PixelRAG's hosted/index search
+  API is query-to-index retrieval, not URL scraping, so it should not be hidden
+  inside the default `scrape(url)` ladder.
+- **Future plan:** add an explicit helper or CLI/MCP command for visual index
+  search once there is a stable local contract for index URL, query shape, and
+  result normalization.
+
+### Social endpoint contract drift checks
+
+- **Why deferred:** v0.3.0 now depends on several third-party social APIs
+  (`socialcrawl`, `tgstat`, `telemetr`, `labelup`, Apify actors). Most are
+  pure REST adapters with offline tests pinned to observed contracts; vendor
+  docs and actor defaults can still drift.
+- **Future plan:** Add a small opt-in live contract check script for keyed
+  social engines, marked `network`/`paid`, that verifies auth shape and one
+  low-cost endpoint per provider before release branches.
 
 ## Website / publication
 

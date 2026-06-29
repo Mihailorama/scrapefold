@@ -48,7 +48,7 @@ These are the non-negotiable invariants of scrapefold. Read before touching code
 - **Don't:** `return text, status_code`.
 
 ### Rule: All four format slots are populated when achievable
-- **What:** `ScrapeResult.text` and `ScrapeResult.markdown` are **always** non-empty when the scrape succeeds (post-converted from whichever native form). `html` is set when the engine returned HTML. `json` is set only when the engine produced structured data natively (Firecrawl `/extract`, AnySite, Apify actors).
+- **What:** `ScrapeResult.text` and `ScrapeResult.markdown` are **always** non-empty when the scrape succeeds (post-converted from whichever native form). `html` is set when the engine returned HTML. `json` is set only when the engine produced structured data natively or through an injected reader (Firecrawl `/extract`, AnySite, Apify actors, PixelRAG VLM/OCR reader).
 - **Why:** Downstream callers must be able to ask `res.markdown` without having to know which engine ran. The cost of running html2text once inside an engine is negligible compared to a network call.
 - **Do:** Inside `_fetch`, if the vendor returned HTML, run `scrapefold.html_to_text.to_markdown(html)` and fill both `text` and `markdown` before constructing the result.
 - **Don't:** Return `ScrapeResult(text="", markdown="", html=raw, ...)` and expect the caller to convert.
