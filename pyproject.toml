@@ -65,6 +65,7 @@ cloakbrowser = ["cloakbrowser>=0.3"]
 anysite      = []
 scrapecreators = []
 socialcrawl = []
+maxun        = []
 # --- interfaces ---
 mcp          = ["mcp>=1.27"]
 # --- meta ---

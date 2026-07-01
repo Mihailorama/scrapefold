@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- `maxun` engine — REST adapter for a self-hosted
+  [Maxun](https://github.com/getmaxun/maxun) instance (open-source no-code
+  web data extraction platform). Runs a recorded robot via the **verified**
+  synchronous API contract (`x-api-key` auth,
+  `POST /api/robots/{id}/runs`): the robot's captured list/field/crawl/search
+  output lands in `ScrapeResult.json`, page markdown/HTML fill the text
+  slots, screenshots and LLM summary/promptResult go to `meta`. The robot is
+  selected via `extra["maxun_robot_id"]` (no URL→robot default);
+  `extra["maxun_duplicate_for_url"]=True` opts into Maxun's documented
+  robot-duplication flow to retarget the recorded robot at the scraped URL.
+  Instance location via `MAXUN_BASE_URL` (default `http://localhost:8080`),
+  key via `MAXUN_API_KEY`. Self-hosted → `cost_usd=0.0`.
+
 ### Changed
 
 - Refreshed current docs/backlog status after the 0.3.0 social-engine release.
