@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- **Serper engine** (`serper`) — page scrape via `https://scrape.serper.dev`, returning native text + markdown and any JSON-LD structured data. Pure httpx, no SDK. Reads `SERPER_API_KEY`.
+
 ### Changed
 
 - Refreshed current docs/backlog status after the 0.3.0 social-engine release.

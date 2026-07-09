@@ -176,6 +176,7 @@ asyncio.run(main())
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | SaaS | Paid | Web Scraper API (realtime, residential geo) | (built-in — pure httpx) |
 | [**ScraperAPI**](https://www.scraperapi.com/) | SaaS | Paid | Proxy + JS render, native markdown, AI Parser (`json`) | `pip install scrapefold[scraperapi]` |
 | [**Exa**](https://exa.ai/) | SaaS | Paid | Search, Contents, Answer, Agent; LinkedIn people/company defaults | (built-in — pure httpx) |
+| [**Serper**](https://serper.dev/) | SaaS | Paid | Fast, cheap page scrape — native markdown + JSON-LD | (built-in — pure httpx) |
 
 > **Adding your own engine?** Implement the `ScrapeEngine` interface — see [Adding a Custom Engine](#adding-a-custom-engine) below and [CONTRIBUTING.md](CONTRIBUTING.md) for the 5-step checklist.
 
