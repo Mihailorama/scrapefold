@@ -1,6 +1,6 @@
 ---
 purpose: "Prioritized register of known follow-up items deferred from earlier PRs."
-updated: "2026-06-29"
+updated: "2026-07-09"
 related:
   - architecture/overview.md
   - ../CHANGELOG.md
@@ -137,6 +137,18 @@ public behavior.
 - **Test:** `test_scrape_sync_works_inside_running_event_loop` — call
   `scrape_sync()` from inside `asyncio.run(harness())` and assert it returns
   a `ScrapeResult` instead of raising.
+
+### 13. Maxun capability ratings in README / site are unverified
+
+- **Where:** `README.md` (Engine Comparison + Supported Engines tables), `docs/index.html` (engine card).
+- **Status:** The `maxun` engine (v0.4.0) was merged without any README/site
+  documentation. When the 0.4.0 release was cut (with the `serper` engine),
+  maxun was added to the tables/site to keep the "27 engines" count honest,
+  but its capability stars (`Static ★★★ / JS ★★★ / Stealth ★★☆ / Medium /
+  Free`) were **inferred from its CHANGELOG description**, not measured.
+- **Fix:** verify against a live self-hosted Maxun instance (robot replay is
+  Playwright-based) and correct the ratings / strengths blurb if wrong.
+- **Priority:** P3 — cosmetic doc accuracy, no code impact.
 
 ## How to add an item
 
