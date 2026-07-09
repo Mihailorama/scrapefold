@@ -6,8 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-09
+
 ### Added
 
+- **Serper engine** (`serper`) — page scrape via `https://scrape.serper.dev`, returning native text + markdown and any JSON-LD structured data. Pure httpx, no SDK. Reads `SERPER_API_KEY`.
 - `maxun` engine — REST adapter for a self-hosted
   [Maxun](https://github.com/getmaxun/maxun) instance (open-source no-code
   web data extraction platform). Runs a recorded robot via the **verified**

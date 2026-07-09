@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 25 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 27 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -16,13 +16,13 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-918%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-952%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <strong>25 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>918 tests</strong> · <strong>MIT</strong>
+  <strong>27 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>952 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -80,6 +80,8 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**ScraperAPI**](https://www.scraperapi.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Exa**](https://exa.ai/) | ✅ | SaaS | Paid | ★★★ | ★★☆ | ★★☆ | Fast | $$ |
+| [**Serper**](https://serper.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★☆☆ | Fast | $ |
+| [**Maxun**](https://github.com/getmaxun/maxun) | ✅ | Local | AGPL | ★★★ | ★★★ | ★★☆ | Medium | Free (self-hosted) |
 
 **★★★** Excellent **★★☆** Good **★☆☆** Basic **☆☆☆** Not supported — **$** ~$0.1–0.5/1K req **$$** ~$1–3/1K req **$$$** ~$5–15/1K req
 
@@ -176,6 +178,8 @@ asyncio.run(main())
 | [**Oxylabs**](https://oxylabs.io/products/scraper-api/web) | SaaS | Paid | Web Scraper API (realtime, residential geo) | (built-in — pure httpx) |
 | [**ScraperAPI**](https://www.scraperapi.com/) | SaaS | Paid | Proxy + JS render, native markdown, AI Parser (`json`) | `pip install scrapefold[scraperapi]` |
 | [**Exa**](https://exa.ai/) | SaaS | Paid | Search, Contents, Answer, Agent; LinkedIn people/company defaults | (built-in — pure httpx) |
+| [**Serper**](https://serper.dev/) | SaaS | Paid | Fast, cheap page scrape — native markdown + JSON-LD | (built-in — pure httpx) |
+| [**Maxun**](https://github.com/getmaxun/maxun) | Local | AGPL | Self-hosted no-code robot runs → structured JSON | (built-in — pure httpx) |
 
 > **Adding your own engine?** Implement the `ScrapeEngine` interface — see [Adding a Custom Engine](#adding-a-custom-engine) below and [CONTRIBUTING.md](CONTRIBUTING.md) for the 5-step checklist.
 
