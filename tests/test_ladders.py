@@ -57,6 +57,8 @@ _VALID_ENGINES = frozenset(
         # new stealth browsers (open-source)
         "obscura",
         "cloakbrowser",
+        "pydoll",
+        "camoufox",
         # new paid SaaS
         "anysite",
         "scrapecreators",

@@ -6,6 +6,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- **pydoll engine** (`pydoll`) — free, local, stealth-first Chromium driven
+  directly over the Chrome DevTools Protocol with **no WebDriver** and no
+  `navigator.webdriver` flag, built to clear Cloudflare / Turnstile challenges
+  without plugins. Maps `user_agent`, `language`, `cookies` (injected before
+  navigation), `wait_ms`, `wait_for_selector`, `take_screenshot`, `timeout_s`;
+  extra raw Chrome flags via `extra["pydoll_args"]`. Lazy-imported SDK
+  (`pip install scrapefold[pydoll]`), `cost_usd=0.0`. Raced into the free
+  stealth tier of the general, `js_spa`, `ecommerce_other`, and
+  `cloudflare_protected` ladders.
+- **Camoufox engine** (`camoufox`) — free, local anti-detect **Firefox** whose
+  fingerprint is coherent at the browser source level, passing anti-bot walls
+  that patched-Chromium engines leak on. scrapefold's only Firefox-based
+  stealth path, giving the ladder fingerprint diversity a second Chromium can't.
+  A drop-in Playwright browser: maps `language`→`locale` + `Accept-Language`,
+  `custom_headers`, `cookies`, `wait_until`, `wait_ms`, `wait_for_selector`,
+  `take_screenshot`, `timeout_s`; `camoufox_*` launch-option passthrough via
+  `extra` (proxy, os, geoip, fingerprint). `user_agent` is intentionally
+  dropped to keep the fingerprint coherent. Lazy-imported SDK
+  (`pip install scrapefold[camoufox]` + `python -m camoufox fetch`),
+  `cost_usd=0.0`. Raced alongside pydoll in the free stealth tier.
+- **Main-content extraction** — `ScrapeOptions(main_content=True)` re-derives
+  `ScrapeResult.text`/`.markdown` from the main article body (nav / ads /
+  boilerplate stripped) via [Trafilatura](https://github.com/adbar/trafilatura),
+  applied **centrally** in `ScrapeEngine.scrape` so every HTML-producing engine
+  in a fallback chain honors it. Degrades gracefully: if `trafilatura` is not
+  installed or finds no article, the engine's full-page output is kept
+  unchanged (never blanks a result). New helper
+  `scrapefold.html_to_text.html_to_main_content`; optional extra
+  `pip install scrapefold[trafilatura]`.
+
+### Changed
+
+- Engine count 27 → 29 (pydoll, camoufox). README engine tables and
+  `_VALID_ENGINES` ladder guard updated.
+
 ## [0.4.0] - 2026-07-09
 
 ### Added

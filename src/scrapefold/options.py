@@ -64,6 +64,17 @@ class ScrapeOptions:
     include_links: bool = True
     include_external_links: bool = False
 
+    main_content: bool = False
+    """Extract only the main article body, dropping nav / ads / boilerplate.
+
+    When ``True`` and the engine returned HTML, ``ScrapeResult.text`` and
+    ``.markdown`` are re-derived from the main content via Trafilatura (needs
+    the ``trafilatura`` extra). Applied centrally in ``ScrapeEngine.scrape`` for
+    every HTML-producing engine, so any engine in a fallback chain honors it.
+    Degrades gracefully: if trafilatura is not installed or finds no article,
+    the engine's full-page text/markdown is kept unchanged.
+    """
+
     # --- Crawl scope (used by crawl_site, ignored by single scrape) ---
     max_pages: int = 50
     max_depth: int = 3

@@ -356,7 +356,7 @@ def _race(*engines: str, **kwargs: object) -> RaceStep:
 _GENERAL_LADDER: Ladder = (
     _seq("requests", cost=_FREE),  # T0
     _race("scrapling_stealth", "crawl4ai"),  # T1 free JS
-    _race("cloakbrowser", "obscura"),  # T2 free stealth
+    _race("cloakbrowser", "obscura", "pydoll", "camoufox"),  # T2 free stealth
     _race(
         "firecrawl",
         "scrapingbee",
@@ -535,7 +535,7 @@ LADDERS: dict[SiteClass, Ladder] = {
     "ecommerce_other": (
         _seq("requests"),
         _race("scrapling_stealth", "crawl4ai"),
-        _race("cloakbrowser", "obscura"),
+        _race("cloakbrowser", "obscura", "pydoll", "camoufox"),
         _race("firecrawl", "scrapingbee", budget_accounting="sum_all"),
     ),
     # Paywall — needs a real browser to get past front-page gate
@@ -551,7 +551,10 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Anti-bot vendor — reclassification targets
     "cloudflare_protected": (
-        _race("cloakbrowser", "obscura", "scrapling_stealth"),
+        # pydoll / camoufox specifically advertise clearing Cloudflare +
+        # Turnstile without plugins; race them alongside the other free stealth
+        # browsers before any paid fan-out.
+        _race("cloakbrowser", "obscura", "scrapling_stealth", "pydoll", "camoufox"),
         _race("firecrawl", "scrapingbee", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
@@ -570,7 +573,7 @@ LADDERS: dict[SiteClass, Ladder] = {
     # Difficulty class
     "js_spa": (
         _race("scrapling_stealth", "crawl4ai"),
-        _race("cloakbrowser", "obscura"),
+        _race("cloakbrowser", "obscura", "pydoll", "camoufox"),
         _seq("firecrawl", cost=_MED),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),

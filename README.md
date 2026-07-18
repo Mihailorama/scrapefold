@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 27 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 29 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <strong>27 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>952 tests</strong> · <strong>MIT</strong>
+  <strong>29 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>952 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -59,6 +59,8 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**scrapling_fast**](https://github.com/D4Vinci/Scrapling) | ✅ | Local | BSD | ★★★ | ☆☆☆ | ★☆☆ | Ultra | Free |
 | [**scrapling_stealth**](https://github.com/D4Vinci/Scrapling) | ✅ | Local | BSD | ★★★ | ★★★ | ★★★ | Medium | Free |
 | [**crawl4ai**](https://github.com/unclecode/crawl4ai) | ✅ | Local | Apache | ★★★ | ★★★ | ★★☆ | Slow | Free |
+| [**pydoll**](https://github.com/autoscrape-labs/pydoll) | ✅ | Local | MIT | ★★★ | ★★★ | ★★★ | Medium | Free |
+| [**Camoufox**](https://github.com/daijro/camoufox) | ✅ | Local | MIT | ★★★ | ★★★ | ★★★ | Slow | Free |
 | [**PixelRAG**](https://github.com/StarTrail-org/PixelRAG) | ✅ | Local | Apache | ★★☆ | ★★★ | ☆☆☆ | Medium | Free |
 | [**cloakbrowser**](https://github.com/) | ✅ | Local | MIT | ★★☆ | ★★★ | ★★★ | Slow | Free |
 | [**selenium**](https://github.com/SeleniumHQ/selenium) | ✅ | Local | Apache | ★★☆ | ★★★ | ★☆☆ | Slow | Free |
@@ -93,7 +95,9 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 |---|---|
 | Static blog or documentation site | **requests** — zero deps, sub-second |
 | JS-rendered SPA, no anti-bot | **scrapling_fast** (free) or **Jina Reader** (free tier) |
+| Cloudflare / Turnstile, free only | **scrapling_stealth** / **pydoll** / **Camoufox** (all free, local, raced) → **Firecrawl** / **ScrapingBee** (paid) |
 | Cloudflare / Datadome / PerimeterX | **scrapling_stealth** (free) → **Firecrawl** / **ScrapingBee** (paid) |
+| Article body only, no nav/ads/boilerplate | any HTML engine + `ScrapeOptions(main_content=True)` — Trafilatura-backed, `pip install scrapefold[trafilatura]` |
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
@@ -157,6 +161,8 @@ asyncio.run(main())
 | [**requests**](https://www.python-httpx.org/) | Local | Apache | Static HTML; ultra-fast | (built-in) |
 | [**scrapling**](https://github.com/D4Vinci/Scrapling) | Local | BSD | Static + stealth modes | `pip install scrapefold[scrapling]` |
 | [**crawl4ai**](https://github.com/unclecode/crawl4ai) | Local | Apache | JS rendering, markdown cleanup | `pip install scrapefold[crawl4ai]` |
+| [**pydoll**](https://github.com/autoscrape-labs/pydoll) | Local | MIT | Stealth Chromium over CDP — no WebDriver; clears Cloudflare / Turnstile | `pip install scrapefold[pydoll]` |
+| [**Camoufox**](https://github.com/daijro/camoufox) | Local | MIT | Anti-detect Firefox; source-level fingerprint (fingerprint diversity vs. Chromium engines) | `pip install scrapefold[camoufox]` then `python -m camoufox fetch` |
 | [**PixelRAG**](https://github.com/StarTrail-org/PixelRAG) | Local | Apache | Visual screenshot-tile capture via `pixelshot`, with injected VLM/OCR reader output in markdown / JSON | `pip install "scrapefold[pixelrag]"` on Python 3.12+, or set `PIXELRAG_BIN` |
 | [**cloakbrowser**](https://github.com/) | Local | MIT | Anti-fingerprint browser | `pip install scrapefold[cloakbrowser]` |
 | [**selenium**](https://github.com/SeleniumHQ/selenium) | Local | Apache | Classic JS rendering (deprecated) | `pip install scrapefold[selenium]` |

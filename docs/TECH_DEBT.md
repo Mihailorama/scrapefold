@@ -150,6 +150,103 @@ public behavior.
   Playwright-based) and correct the ratings / strengths blurb if wrong.
 - **Priority:** P3 — cosmetic doc accuracy, no code impact.
 
+## P2 — architecture borrowed from competitors (carousel review 2026-07-18)
+
+These three came out of a side-by-side with the market leaders (Firecrawl,
+Crawl4AI, Crawlee, ScrapeGraphAI, Scrapy, pydoll, Camoufox, Trafilatura,
+Katana, Selectolax). The engines worth having as engines shipped this cycle
+(`pydoll`, `camoufox`, plus Trafilatura as opt-in `main_content`). What's left
+are **cross-cutting architecture ideas** — layers, not engines — that the
+per-engine `ScrapeEngine` abstraction doesn't cover yet. Each is scoped to slot
+in without breaking the golden rules (one options schema, engines drop
+unsupported opts, no vendor LLM SDK).
+
+### 14. Crawlee-style session pool + proxy rotation ("proxy over proxy")
+
+- **Where:** new `src/scrapefold/proxy.py` (a `SessionPool` / `ProxyRotator`),
+  consumed by `EnginePool` + the router; new `ScrapeOptions.proxies` /
+  `extra["proxy_pool"]`.
+- **Status:** `EnginePool` reuses engine instances (connection reuse) but there
+  is **no proxy/session-health layer**. [Crawlee](https://github.com/apify/crawlee)'s
+  core value is exactly this: a pool of `(proxy, user-agent, cookie-jar)`
+  sessions, each with a health score, that automatically retires a session on
+  block/challenge and rotates to a fresh one. Today a scrapefold engine that
+  403s just escalates to the next tier; it never *retries the same tier behind
+  a different exit IP*, which is the cheaper win for datacenter/residential
+  fleets. This is the "прокси над прокси" idea — a rotation layer *above* each
+  engine's own single-proxy setting.
+- **Fix sketch:** a `SessionPool` holding N `Session(proxy, ua, jar, score)`.
+  The router asks the pool for a session before a step, threads
+  `session.proxy` into the engine via the existing per-engine proxy option
+  (scrapling `proxy`, camoufox `camoufox_proxy`, pydoll `--proxy-server`,
+  vendor `country`/`premium_proxy`), and reports the outcome back
+  (`pool.report(session, blocked=is_suspicious(result))`). Blocked sessions
+  drop in score and are retired past a threshold. Keeps the engine abstraction
+  intact — engines still take one proxy; the *pool* owns rotation.
+- **Why P2:** meaningful lift for high-volume crawls, but needs the router's
+  race/budget loop stable first (interacts with `budget_accounting`). Does not
+  block single-URL scrapes.
+- **Test:** `test_session_pool_retires_blocked_session_and_rotates_exit_ip`
+  (mock two proxies; first 403s → second is chosen on retry; blocked one is
+  not reused within the walk).
+
+### 15. Scrapy-style AutoThrottle for the crawler
+
+- **Where:** `src/scrapefold/crawler/__init__.py` (the BFS crawl loop); new
+  `ScrapeOptions.autothrottle` / `extra["target_concurrency"]`.
+- **Status:** `crawl()` walks discovered URLs but uses a fixed fan-out. [Scrapy](https://github.com/scrapy/scrapy)'s
+  AutoThrottle adapts the request delay/concurrency to the *observed* server
+  latency — speeding up on healthy hosts, backing off when a host slows or
+  starts returning errors. scrapefold has neither adaptive delay nor a
+  politeness backoff, so a large crawl can hammer a slow origin (and invite
+  blocks, undercutting the stealth engines it just added).
+- **Fix sketch:** track an EWMA of per-host response latency + error rate in
+  the crawl loop; scale the in-flight semaphore between
+  `[1, max_concurrency]` toward a target latency, and add exponential backoff
+  on 429/503. Pure crawler-layer change; engines and `ScrapeResult` untouched.
+- **Why P2:** improves crawl robustness + politeness, but single-URL `scrape()`
+  is unaffected and current crawls work.
+- **Test:** `test_autothrottle_backs_off_on_rising_latency` (feed synthetic
+  latencies; assert effective concurrency drops).
+
+### 16. LLM-schema extraction (ScrapeGraphAI-shaped) via the user LLM callable
+
+- **Where:** `src/scrapefold/` — a new `extract(result, schema, llm=...)` helper
+  built on the **existing** user-provided async LLM callable (same contract as
+  `llm_judge` / `vision.py`).
+- **Status:** [ScrapeGraphAI](https://github.com/ScrapeGraphAI/Scrapegraph-ai)'s
+  hook is "describe what you want in natural language, the LLM builds the
+  extraction." scrapefold deliberately ships **no vendor LLM SDK** (golden rule
+  #5), so we can't adopt its engine — but the *shape* is compatible: feed
+  `result.markdown` + a user schema to the caller's own LLM callable and return
+  structured `json`. Firecrawl `/extract` already lands structured data in
+  `ScrapeResult.json`; this generalizes it to any engine's output without
+  importing `openai`/`litellm`.
+- **Fix sketch:** `async def extract(result, *, schema, llm) -> dict` that
+  prompts the injected `llm` with the markdown + JSON schema and validates the
+  return into `result.json`. Provider-agnostic; no new dependency.
+- **Why P2 / careful:** must stay a thin helper over the user callable — the
+  moment it imports a provider SDK it violates rule #5. Lower priority than the
+  proxy/throttle layers, which have no LLM dependency.
+- **Test:** `test_extract_fills_json_via_injected_llm` (stub llm returns a
+  fixed JSON blob; assert it lands in `result.json`, and that no vendor LLM
+  module is imported).
+
+### Deliberately NOT adopted
+
+Recorded so the next reviewer doesn't re-litigate:
+
+- **Crawlee (framework), Scrapy (framework):** whole crawling *frameworks* with
+  their own engine/scheduler/pipeline model — adopting either wholesale would
+  replace scrapefold's router+ladder, not extend it. We borrow their best
+  *ideas* (items 14–15) instead. Crawlee is also Node.js.
+- **Katana:** a Go link/endpoint-discovery crawler for pentest recon — it emits
+  URLs, not cleaned content, so it's out of scope for a URL→markdown library.
+  (If sitemap/BFS discovery ever needs a JS-aware endpoint harvester, revisit.)
+- **Selectolax:** a faster HTML parser (Lexbor). Pure optimization — would swap
+  BeautifulSoup/markdownify in `html_to_text.py` for throughput on massive
+  crawls. Deferred until parsing shows up in a profile; not a capability gap.
+
 ## How to add an item
 
 1. Open a row here with **P-priority**, **where** (file/function), **status**, **fix sketch**, **test**.

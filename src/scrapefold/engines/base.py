@@ -148,7 +148,29 @@ class ScrapeEngine(ABC):
         # Patch elapsed_ms in case the engine didn't set it
         if result.elapsed_ms == 0:
             result = replace(result, elapsed_ms=elapsed)
+        # Optional main-content extraction is engine-agnostic: it runs on the
+        # HTML any engine returned, so it lives here rather than in each _fetch.
+        # Keyed off the ORIGINAL opts because main_content is not in any
+        # engine's SUPPORTED_OPTIONS and would be stripped before _fetch.
+        if opts.main_content and result.html:
+            result = self._apply_main_content(result)
         return result
+
+    @staticmethod
+    def _apply_main_content(result: ScrapeResult) -> ScrapeResult:
+        """Re-derive text/markdown from the main article body when possible.
+
+        No-op (returns ``result`` unchanged) when trafilatura is unavailable or
+        finds no extractable content — so enabling ``main_content`` can never
+        blank an otherwise-good result.
+        """
+        from scrapefold.html_to_text import html_to_main_content
+
+        extracted = html_to_main_content(result.html or "", base_url=result.url)
+        if extracted is None:
+            return result
+        text, markdown = extracted
+        return replace(result, text=text, markdown=markdown)
 
     # ------------------------------------------------------------------
     # Subclass hooks

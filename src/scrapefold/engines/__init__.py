@@ -87,6 +87,12 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "crawl4ai": lambda: (
         __import__("scrapefold.engines.crawl4ai", fromlist=["Crawl4AIEngine"]).Crawl4AIEngine
     ),
+    "pydoll": lambda: (
+        __import__("scrapefold.engines.pydoll", fromlist=["PydollEngine"]).PydollEngine
+    ),
+    "camoufox": lambda: (
+        __import__("scrapefold.engines.camoufox", fromlist=["CamoufoxEngine"]).CamoufoxEngine
+    ),
     "cloakbrowser": lambda: (
         __import__(
             "scrapefold.engines.cloakbrowser", fromlist=["CloakBrowserEngine"]
