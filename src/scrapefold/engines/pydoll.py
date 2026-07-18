@@ -80,24 +80,48 @@ def _adapt_options(opts: ScrapeOptions, options_cls: Any) -> Any:
     """Build a ChromiumOptions from browser-level options.
 
     Always headless with the container-safe sandbox flags. ``user_agent`` and
-    ``language`` map to their dedicated ChromiumOptions setters; extra raw
-    Chrome flags may be supplied via ``extra["pydoll_args"]``.
+    ``language`` map to their dedicated ChromiumOptions setters. Extra hooks via
+    ``opts.extra``: ``pydoll_binary`` sets a non-default Chrome/Chromium path
+    (for containers where auto-detection fails), ``pydoll_args`` appends raw
+    Chrome flags (e.g. ``--proxy-server=...``).
     """
     options = options_cls()
     options.headless = True
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+
+    def _add(arg: str) -> None:
+        # pydoll's add_argument raises on a duplicate flag, and it reserves
+        # some flags itself (e.g. --no-first-run). Guard against both: skip a
+        # flag already in the list, and swallow the "already exists" raised for
+        # pydoll-reserved flags so an overlapping base flag or a user-supplied
+        # pydoll_args duplicate can't crash the whole scrape.
+        if arg in getattr(options, "arguments", []):
+            return
+        try:
+            options.add_argument(arg)
+        except Exception as exc:  # reserved-flag collision inside pydoll
+            logger.debug("pydoll skipping duplicate/reserved arg %s: %s", arg, exc)
+
+    _add("--no-sandbox")
+    _add("--disable-dev-shm-usage")
+
+    binary = opts.extra.get("pydoll_binary")
+    if binary:
+        options.binary_location = str(binary)
 
     if opts.user_agent:
-        options.add_argument(f"--user-agent={opts.user_agent}")
+        _add(f"--user-agent={opts.user_agent}")
 
     if opts.language:
         options.set_accept_languages(opts.language)
 
     for arg in opts.extra.get("pydoll_args", []):
-        options.add_argument(str(arg))
+        _add(str(arg))
 
-    logger.debug("pydoll options headless=True args=%s", options.arguments)
+    logger.debug(
+        "pydoll options headless=True binary=%s args=%s",
+        getattr(options, "binary_location", None),
+        options.arguments,
+    )
     return options
 
 

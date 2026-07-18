@@ -13,7 +13,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   `navigator.webdriver` flag, built to clear Cloudflare / Turnstile challenges
   without plugins. Maps `user_agent`, `language`, `cookies` (injected before
   navigation), `wait_ms`, `wait_for_selector`, `take_screenshot`, `timeout_s`;
-  extra raw Chrome flags via `extra["pydoll_args"]`. Lazy-imported SDK
+  extra raw Chrome flags via `extra["pydoll_args"]` and an explicit browser
+  path via `extra["pydoll_binary"]` (for containers where auto-detection
+  fails). Duplicate / pydoll-reserved flags (e.g. `--no-first-run`) are
+  de-duplicated and never crash the scrape. Lazy-imported SDK
   (`pip install scrapefold[pydoll]`), `cost_usd=0.0`. Raced into the free
   stealth tier of the general, `js_spa`, `ecommerce_other`, and
   `cloudflare_protected` ladders.

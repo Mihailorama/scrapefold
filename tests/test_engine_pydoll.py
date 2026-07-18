@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from scrapefold.engines.base import EngineError
-from scrapefold.engines.pydoll import PydollEngine
+from scrapefold.engines.pydoll import PydollEngine, _adapt_options
 from scrapefold.options import ScrapeOptions
 from scrapefold.result import ScrapeResult
 
@@ -318,3 +318,65 @@ async def test_sdk_exception_wrapped_in_engine_error() -> None:
 
 def test_is_available_true() -> None:
     assert PydollEngine().is_available() is True
+
+
+# ---------------------------------------------------------------------------
+# 12. extra["pydoll_binary"] sets ChromiumOptions.binary_location
+# ---------------------------------------------------------------------------
+
+
+def test_pydoll_binary_sets_binary_location() -> None:
+    # Containers where pydoll can't auto-detect Chrome need an explicit path.
+    options = _adapt_options(
+        ScrapeOptions(extra={"pydoll_binary": "/opt/pw-browsers/chromium"}),
+        _make_options_cls(),
+    )
+    assert options.binary_location == "/opt/pw-browsers/chromium"
+
+
+# ---------------------------------------------------------------------------
+# 13. a base flag repeated via pydoll_args is de-duplicated, not doubled
+# ---------------------------------------------------------------------------
+
+
+def test_duplicate_arg_is_deduped() -> None:
+    # --no-sandbox is already a base flag; passing it again must not double it,
+    # since pydoll's add_argument rejects duplicates.
+    options = _adapt_options(
+        ScrapeOptions(extra={"pydoll_args": ["--no-sandbox", "--mute-audio"]}),
+        _make_options_cls(),
+    )
+    assert options.arguments.count("--no-sandbox") == 1
+    assert "--mute-audio" in options.arguments
+
+
+# ---------------------------------------------------------------------------
+# 14. a pydoll-reserved flag that raises inside add_argument is swallowed
+# ---------------------------------------------------------------------------
+
+
+def test_reserved_flag_collision_is_swallowed() -> None:
+    class RaisingOptions:
+        """Stand-in whose add_argument rejects a pydoll-reserved flag."""
+
+        def __init__(self) -> None:
+            self.headless = False
+            self.arguments: list[str] = []
+            self.accept_languages: str | None = None
+
+        def add_argument(self, argument: str) -> None:
+            if argument == "--no-first-run":  # reserved by pydoll internally
+                raise ValueError("Argument already exists: --no-first-run")
+            self.arguments.append(argument)
+
+        def set_accept_languages(self, languages: str) -> None:
+            self.accept_languages = languages
+
+    # Must not propagate the SDK's ValueError — a reserved-flag collision from a
+    # user-supplied pydoll_args entry can't be allowed to crash the whole scrape.
+    options = _adapt_options(
+        ScrapeOptions(extra={"pydoll_args": ["--no-first-run", "--kept"]}),
+        RaisingOptions,
+    )
+    assert "--kept" in options.arguments
+    assert "--no-first-run" not in options.arguments
