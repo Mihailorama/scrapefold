@@ -35,6 +35,7 @@ from scrapefold.ladders import (
 )
 from scrapefold.options import ScrapeOptions
 from scrapefold.pool import EnginePool
+from scrapefold.proxy import SessionPool, build_pool_from_options
 from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,21 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_ENGINES = 4
 _DEFAULT_MAX_COST_USD = 0.05
 _DEFAULT_AVG_RESPONSE_MB = 2.0
+_DEFAULT_PROXY_ROTATIONS = 2
+"""Extra same-engine retries behind a fresh exit IP before escalating a tier."""
+
+
+def _resolve_session_pool(opts: ScrapeOptions) -> SessionPool | None:
+    """Return the proxy rotation pool for this walk, or ``None`` when unset.
+
+    A pre-built ``extra["proxy_pool"]`` (caller-owned, may span a whole crawl)
+    wins over ``opts.proxies`` (a static list turned into a per-walk pool).
+    """
+    prebuilt = opts.extra.get("proxy_pool")
+    if isinstance(prebuilt, SessionPool):
+        return prebuilt
+    return build_pool_from_options(opts.proxies)
+
 
 # ---------------------------------------------------------------------------
 # Probe cache (P1 #7)
@@ -113,6 +129,7 @@ async def _attempt_engine(
     max_engines: int,
     max_cost_usd: float,
     failures: list[str],
+    proxy_pool: SessionPool | None = None,
 ) -> _AttemptResult:
     """Try one engine through all gates.
 
@@ -249,72 +266,127 @@ async def _attempt_engine(
     dedup_seen.add(canonical)
     budget_engines_tried.add(canonical)
 
-    # 7. Invoke
-    try:
-        result = await engine.scrape(url, opts)
-    except RedirectScopeViolation as exc:
-        # SSRF guard: an off-host redirect was detected.  This is not a
-        # transient engine failure — escalating to another engine would just
-        # follow the same redirect on a different backend.  Terminate the walk.
-        target = exc.target or exc.message
-        logger.warning("router: redirect_offhost url=%s target=%s — walk terminated", url, target)
-        failures.append(f"{canonical}:redirect_offhost:{target}")
-        return _AttemptResult(
-            result=None,
-            keep_walking=False,
-            cost_delta=0.0,
-            elapsed_delta=float(exc.elapsed_ms),
-        )
-    except EngineError as exc:
-        # If the underlying cause is an ImportError the SDK is not installed.
-        # Treat that as "unavailable" — no paid call was made so no cost is
-        # credited and the slot is NOT consumed.
-        if isinstance(exc.__cause__, ImportError):
-            import_exc: ImportError = exc.__cause__
-            budget_engines_tried.discard(canonical)
-            mod = import_exc.name or str(import_exc)
-            logger.debug("router: skip engine=%s reason=missing_sdk:%s", canonical, mod)
-            failures.append(f"{canonical}:unavailable:missing_sdk:{mod}")
-            return _AttemptResult(result=None, keep_walking=True, cost_delta=0.0, elapsed_delta=0.0)
-        # Credit cost even on error — the paid request was made.
-        failures.append(f"{canonical}:error:{exc.message}")
-        return _AttemptResult(
-            result=None,
-            keep_walking=True,
-            cost_delta=engine_cost,
-            elapsed_delta=float(exc.elapsed_ms),
-        )
-
-    # 8. Quality checks
+    # 7-9. Invoke (optionally rotating exit IPs) + quality gate.
+    #
+    # When a proxy rotation pool is active AND the engine reads the unified
+    # ``proxy`` option, a blocked / failed response retries the SAME engine
+    # behind a fresh exit IP (up to ``proxy_max_rotations`` times) before the
+    # walk escalates to the next, more expensive tier — the "proxy over proxy"
+    # layer. When no pool is active the loop runs exactly once with the caller's
+    # opts, reproducing the original single-shot behavior.
+    #
     # Post-call accounting uses the higher of estimated vs reported cost so that
-    # engines that overspend (e.g. ScrapingBee extra credits, Cloudflare 2-request
-    # fallback) actually deplete the budget.  The estimate was the pre-call ceiling;
-    # the actual is authoritative once the call has been made.
-    actual_cost = max(engine_cost, float(result.cost_usd or 0.0))
+    # engines that overspend (ScrapingBee extra credits, Cloudflare 2-request
+    # fallback) actually deplete the budget; costs accumulate across rotations.
+    use_rotation = proxy_pool is not None and "proxy" in engine_cls.SUPPORTED_OPTIONS
+    max_rotations = (
+        int(opts.extra.get("proxy_max_rotations", _DEFAULT_PROXY_ROTATIONS)) if use_rotation else 0
+    )
 
-    if result.is_empty():
-        failures.append(f"{canonical}:empty")
+    total_cost = 0.0
+    total_elapsed = 0.0
+    rotation = 0
+    while True:
+        session = None
+        call_opts = opts
+        if use_rotation and proxy_pool is not None:
+            session = proxy_pool.acquire()
+            if session is None:
+                # Pool exhausted. Never silently fall back to the real IP against
+                # the caller's clear intent to proxy — skip this engine instead.
+                if rotation == 0:
+                    budget_engines_tried.discard(canonical)
+                    failures.append(f"{canonical}:proxy_pool_exhausted")
+                break
+            call_opts = opts.with_updates(proxy=session.proxy)
+
+        # 7. Invoke
+        try:
+            result = await engine.scrape(url, call_opts)
+        except RedirectScopeViolation as exc:
+            # SSRF guard: a different exit IP would follow the same off-host
+            # redirect, so terminate the walk regardless of rotation.
+            target = exc.target or exc.message
+            logger.warning(
+                "router: redirect_offhost url=%s target=%s — walk terminated", url, target
+            )
+            failures.append(f"{canonical}:redirect_offhost:{target}")
+            return _AttemptResult(
+                result=None,
+                keep_walking=False,
+                cost_delta=total_cost,
+                elapsed_delta=total_elapsed + float(exc.elapsed_ms),
+            )
+        except EngineError as exc:
+            # If the underlying cause is an ImportError the SDK is not installed.
+            # Treat that as "unavailable" — no paid call was made so no cost is
+            # credited and the slot is NOT consumed.
+            if isinstance(exc.__cause__, ImportError):
+                import_exc: ImportError = exc.__cause__
+                budget_engines_tried.discard(canonical)
+                mod = import_exc.name or str(import_exc)
+                logger.debug("router: skip engine=%s reason=missing_sdk:%s", canonical, mod)
+                failures.append(f"{canonical}:unavailable:missing_sdk:{mod}")
+                return _AttemptResult(
+                    result=None,
+                    keep_walking=True,
+                    cost_delta=total_cost,
+                    elapsed_delta=total_elapsed,
+                )
+            # Credit cost even on error — the paid request was made.
+            total_cost += engine_cost
+            total_elapsed += float(exc.elapsed_ms)
+            if session is not None and proxy_pool is not None:
+                proxy_pool.report(session, blocked=True)
+            if (
+                use_rotation
+                and rotation < max_rotations
+                and proxy_pool is not None
+                and proxy_pool.usable()
+            ):
+                rotation += 1
+                logger.debug("router: rotate exit IP after error engine=%s", canonical)
+                continue
+            failures.append(f"{canonical}:error:{exc.message}")
+            return _AttemptResult(
+                result=None, keep_walking=True, cost_delta=total_cost, elapsed_delta=total_elapsed
+            )
+
+        # 8. Quality checks
+        actual_cost = max(engine_cost, float(result.cost_usd or 0.0))
+        total_cost += actual_cost
+        total_elapsed += float(result.elapsed_ms)
+        is_empty = result.is_empty()
+        is_blocked = is_empty or is_suspicious(result)
+        if session is not None and proxy_pool is not None:
+            proxy_pool.report(session, blocked=is_blocked)
+        if is_blocked:
+            reason = "empty" if is_empty else "suspicious"
+            if (
+                use_rotation
+                and rotation < max_rotations
+                and proxy_pool is not None
+                and proxy_pool.usable()
+            ):
+                rotation += 1
+                logger.debug("router: rotate exit IP after %s engine=%s", reason, canonical)
+                continue
+            failures.append(f"{canonical}:{reason}")
+            return _AttemptResult(
+                result=None, keep_walking=True, cost_delta=total_cost, elapsed_delta=total_elapsed
+            )
+
+        # 9. Winner
         return _AttemptResult(
-            result=None,
-            keep_walking=True,
-            cost_delta=actual_cost,
-            elapsed_delta=float(result.elapsed_ms),
-        )
-    if is_suspicious(result):
-        failures.append(f"{canonical}:suspicious")
-        return _AttemptResult(
-            result=None,
-            keep_walking=True,
-            cost_delta=actual_cost,
-            elapsed_delta=float(result.elapsed_ms),
+            result=result, keep_walking=False, cost_delta=total_cost, elapsed_delta=total_elapsed
         )
 
-    # 9. Winner
+    # Rotations exhausted (or pool drained mid-walk) without a good result —
+    # escalate to the next tier rather than giving up the whole walk.
+    if rotation > 0:
+        failures.append(f"{canonical}:proxy_rotations_exhausted")
     return _AttemptResult(
-        result=result,
-        keep_walking=False,
-        cost_delta=actual_cost,
-        elapsed_delta=float(result.elapsed_ms),
+        result=None, keep_walking=True, cost_delta=total_cost, elapsed_delta=total_elapsed
     )
 
 
@@ -366,6 +438,10 @@ async def _walk_inner(
 ) -> ScrapeResult:
     """Internal walk implementation; pool lifecycle managed by caller (``walk``)."""
     failures: list[str] = []
+    # Proxy rotation layer ("proxy over proxy"): None unless the caller supplied
+    # opts.proxies or a pre-built extra["proxy_pool"]. Shared across the walk so a
+    # session retired by one engine stays retired for the rest of the walk.
+    proxy_pool = _resolve_session_pool(opts)
 
     # -----------------------------------------------------------------------
     # opts.engines override path
@@ -414,6 +490,7 @@ async def _walk_inner(
                 max_engines=max_engines_override,
                 max_cost_usd=max_cost_usd_override,
                 failures=failures,
+                proxy_pool=proxy_pool,
             )
 
             cost_accum += attempt.cost_delta
@@ -471,6 +548,7 @@ async def _walk_inner(
                 max_engines=max_engines,
                 max_cost_usd=max_cost_usd,
                 failures=failures,
+                proxy_pool=proxy_pool,
             )
 
             budget.cost_usd += attempt.cost_delta

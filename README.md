@@ -98,6 +98,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | Cloudflare / Turnstile, free only | **scrapling_stealth** / **pydoll** / **Camoufox** (all free, local, raced) → **Firecrawl** / **ScrapingBee** (paid) |
 | Cloudflare / Datadome / PerimeterX | **scrapling_stealth** (free) → **Firecrawl** / **ScrapingBee** (paid) |
 | Article body only, no nav/ads/boilerplate | any HTML engine + `ScrapeOptions(main_content=True)` — Trafilatura-backed, `pip install scrapefold[trafilatura]` |
+| High-volume crawl behind your own proxy fleet | `ScrapeOptions(proxies=(...))` — health-scored rotation ("proxy over proxy"): retries a blocked page behind a fresh exit IP before escalating a tier |
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |

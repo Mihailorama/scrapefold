@@ -108,6 +108,11 @@ def _adapt_options(opts: ScrapeOptions, options_cls: Any) -> Any:
     if binary:
         options.binary_location = str(binary)
 
+    # Unified proxy → Chrome's --proxy-server (this is the exit the rotation
+    # pool threads in). An explicit --proxy-server via pydoll_args still applies.
+    if opts.proxy:
+        _add(f"--proxy-server={opts.proxy}")
+
     if opts.user_agent:
         _add(f"--user-agent={opts.user_agent}")
 
@@ -161,6 +166,7 @@ class PydollEngine(ScrapeEngine):
             "output_format",
             "take_screenshot",
             "timeout_s",
+            "proxy",
             "extra",
         }
     )

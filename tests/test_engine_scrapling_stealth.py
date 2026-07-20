@@ -267,3 +267,19 @@ def test_capabilities_declared_correctly() -> None:
     assert caps.requires_api_key is False
     assert caps.estimated_cost_usd == pytest.approx(0.0)
     assert caps.default_timeout_s == 60
+
+
+# ---------------------------------------------------------------------------
+# Unified proxy → scrapling StealthSession proxy kwarg (rotation pool exit)
+# ---------------------------------------------------------------------------
+
+
+def test_unified_proxy_maps_to_scrapling_proxy_kwarg() -> None:
+    from scrapefold.engines.scrapling_stealth import _adapt
+
+    kwargs = _adapt(ScrapeOptions(proxy="http://user:pass@host:8000"), "https://example.com/")
+    assert kwargs["proxy"] == "http://user:pass@host:8000"
+
+
+def test_scrapling_proxy_in_supported_options() -> None:
+    assert "proxy" in ScraplingStealthEngine.SUPPORTED_OPTIONS

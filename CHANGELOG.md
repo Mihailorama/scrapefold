@@ -40,11 +40,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   unchanged (never blanks a result). New helper
   `scrapefold.html_to_text.html_to_main_content`; optional extra
   `pip install scrapefold[trafilatura]`.
+- **Proxy rotation layer — "proxy over proxy"** (`scrapefold.proxy`). A
+  health-scored `SessionPool` that sits *above* each engine's single-proxy
+  setting: pass `ScrapeOptions(proxies=(...))` (or a crawl-spanning
+  `extra["proxy_pool"]`) and, when a response looks blocked, the router retries
+  the **same** engine behind a **different exit IP** before escalating to the
+  next (more expensive) tier — the cheaper win for datacenter / residential
+  fleets. Sessions accrue strikes on blocks (Crawlee-style), retire past a
+  threshold (`max_errors`, default 3), and heal one strike on a clean response;
+  rotation is capped per engine by `extra["proxy_max_rotations"]` (default 2).
+  New unified `ScrapeOptions.proxy` maps to each proxy-capable engine's native
+  option (Camoufox `proxy` dict, pydoll `--proxy-server`, scrapling `proxy`);
+  vendor engines that manage their own fleet drop it. The engine abstraction is
+  untouched — engines still take one proxy, the pool owns which. Fully opt-in:
+  with no proxies configured, the router path is unchanged. Resolves
+  TECH_DEBT #14.
 
 ### Changed
 
 - Engine count 27 → 29 (pydoll, camoufox). README engine tables and
   `_VALID_ENGINES` ladder guard updated.
+- The free stealth engines (`camoufox`, `pydoll`, `scrapling_stealth`) now read
+  the unified `ScrapeOptions.proxy`, so a rotation pool can thread an exit IP
+  into each.
 
 ## [0.4.0] - 2026-07-09
 

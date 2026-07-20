@@ -380,3 +380,21 @@ def test_reserved_flag_collision_is_swallowed() -> None:
     )
     assert "--kept" in options.arguments
     assert "--no-first-run" not in options.arguments
+
+
+# ---------------------------------------------------------------------------
+# 15. unified proxy → --proxy-server flag (the rotation pool's exit)
+# ---------------------------------------------------------------------------
+
+
+def test_unified_proxy_maps_to_proxy_server_flag() -> None:
+    options = _adapt_options(
+        ScrapeOptions(proxy="http://user:pass@host:8000"),
+        _make_options_cls(),
+    )
+    assert "--proxy-server=http://user:pass@host:8000" in options.arguments
+
+
+def test_proxy_in_supported_options() -> None:
+    # Rotation only engages for engines that opt in via SUPPORTED_OPTIONS.
+    assert "proxy" in PydollEngine.SUPPORTED_OPTIONS

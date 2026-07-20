@@ -82,14 +82,21 @@ def _adapt_launch(opts: ScrapeOptions) -> dict[str, Any]:
     """Map unified ScrapeOptions to AsyncCamoufox launch kwargs.
 
     Base: headless + humanize (human-like cursor movement). ``language`` maps
-    to Firefox ``locale``. Any ``camoufox_*`` key in ``opts.extra`` (e.g.
-    ``camoufox_proxy``, ``camoufox_os``, ``camoufox_geoip``) passes through.
+    to Firefox ``locale``. The unified ``proxy`` maps to Camoufox's Playwright
+    ``proxy`` dict (this is the exit the rotation pool threads in). Any
+    ``camoufox_*`` key in ``opts.extra`` (e.g. ``camoufox_proxy``,
+    ``camoufox_os``, ``camoufox_geoip``) passes through and wins over ``proxy``.
     """
     kwargs: dict[str, Any] = {"headless": True, "humanize": True}
 
     if opts.language:
         kwargs["locale"] = opts.language
 
+    if opts.proxy:
+        kwargs["proxy"] = {"server": opts.proxy}
+
+    # camoufox_* passthrough is applied last so an explicit camoufox_proxy
+    # (which may carry username/password) overrides the unified single proxy.
     kwargs.update(strip_extra_prefix(opts.extra, "camoufox_"))
     return kwargs
 
@@ -131,6 +138,7 @@ class CamoufoxEngine(ScrapeEngine):
             "output_format",
             "take_screenshot",
             "timeout_s",
+            "proxy",
             "extra",
         }
     )

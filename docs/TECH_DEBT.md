@@ -161,34 +161,34 @@ per-engine `ScrapeEngine` abstraction doesn't cover yet. Each is scoped to slot
 in without breaking the golden rules (one options schema, engines drop
 unsupported opts, no vendor LLM SDK).
 
-### 14. Crawlee-style session pool + proxy rotation ("proxy over proxy")
+### 14. Crawlee-style session pool + proxy rotation ("proxy over proxy") — RESOLVED (Unreleased)
 
-- **Where:** new `src/scrapefold/proxy.py` (a `SessionPool` / `ProxyRotator`),
-  consumed by `EnginePool` + the router; new `ScrapeOptions.proxies` /
-  `extra["proxy_pool"]`.
-- **Status:** `EnginePool` reuses engine instances (connection reuse) but there
-  is **no proxy/session-health layer**. [Crawlee](https://github.com/apify/crawlee)'s
-  core value is exactly this: a pool of `(proxy, user-agent, cookie-jar)`
-  sessions, each with a health score, that automatically retires a session on
-  block/challenge and rotates to a fresh one. Today a scrapefold engine that
-  403s just escalates to the next tier; it never *retries the same tier behind
-  a different exit IP*, which is the cheaper win for datacenter/residential
-  fleets. This is the "прокси над прокси" idea — a rotation layer *above* each
-  engine's own single-proxy setting.
-- **Fix sketch:** a `SessionPool` holding N `Session(proxy, ua, jar, score)`.
-  The router asks the pool for a session before a step, threads
-  `session.proxy` into the engine via the existing per-engine proxy option
-  (scrapling `proxy`, camoufox `camoufox_proxy`, pydoll `--proxy-server`,
-  vendor `country`/`premium_proxy`), and reports the outcome back
-  (`pool.report(session, blocked=is_suspicious(result))`). Blocked sessions
-  drop in score and are retired past a threshold. Keeps the engine abstraction
-  intact — engines still take one proxy; the *pool* owns rotation.
-- **Why P2:** meaningful lift for high-volume crawls, but needs the router's
-  race/budget loop stable first (interacts with `budget_accounting`). Does not
-  block single-URL scrapes.
-- **Test:** `test_session_pool_retires_blocked_session_and_rotates_exit_ip`
-  (mock two proxies; first 403s → second is chosen on retry; blocked one is
-  not reused within the walk).
+- **Where:** `src/scrapefold/proxy.py` (`Session` + `SessionPool` +
+  `build_pool_from_options`), consumed by `router.walk`; new
+  `ScrapeOptions.proxy` / `ScrapeOptions.proxies` / `extra["proxy_pool"]`.
+- **Resolution:** a health-scored `SessionPool` now sits *above* each engine's
+  single-proxy setting — the "прокси над прокси" layer.
+  `_resolve_session_pool(opts)` builds it from `opts.proxies` (per-walk) or a
+  caller-owned `extra["proxy_pool"]` (crawl-spanning). Inside `_attempt_engine`,
+  a proxy-capable engine (`"proxy" in SUPPORTED_OPTIONS`) that returns a blocked
+  / suspicious / errored response has its session struck
+  (`pool.report(session, blocked=…)`) and is **retried behind a fresh exit IP**
+  (up to `extra["proxy_max_rotations"]`, default 2) before the walk escalates to
+  the next tier. Sessions retire past `max_errors` (default 3, Crawlee-style)
+  and heal one strike on a clean response; `acquire()` hands out the healthiest,
+  least-used exit. The unified `ScrapeOptions.proxy` maps to each free stealth
+  engine's native option (camoufox `proxy` dict, pydoll `--proxy-server`,
+  scrapling `proxy`); vendor engines that run their own fleet simply drop it.
+  The engine abstraction is untouched (engines still take one proxy) and the
+  whole layer is opt-in — with no proxies configured the router path is
+  byte-for-byte unchanged. Pool exhaustion never silently falls back to the real
+  IP: the engine is skipped so the walk escalates to vendor unlockers instead.
+- **Tests:** `tests/test_proxy.py` (12 unit tests: dedup, health-order acquire,
+  strike/retire/heal, exhaustion, masking) and
+  `tests/test_router.py::test_session_pool_retires_blocked_session_and_rotates_exit_ip`
+  (two proxies; first blocks → second chosen on retry; blocked one retired and
+  not reused), plus rotation-give-up and no-rotation-without-proxy-support, and
+  per-engine `proxy`-mapping tests for camoufox / pydoll / scrapling_stealth.
 
 ### 15. Scrapy-style AutoThrottle for the crawler
 

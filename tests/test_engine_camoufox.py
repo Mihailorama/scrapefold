@@ -258,3 +258,29 @@ async def test_sdk_exception_wrapped_in_engine_error() -> None:
 
 def test_is_available_true() -> None:
     assert CamoufoxEngine().is_available() is True
+
+
+# ---------------------------------------------------------------------------
+# Unified proxy → Camoufox Playwright proxy dict (the rotation pool's exit)
+# ---------------------------------------------------------------------------
+
+
+def test_unified_proxy_maps_to_playwright_proxy_dict() -> None:
+    from scrapefold.engines.camoufox import _adapt_launch
+
+    kwargs = _adapt_launch(ScrapeOptions(proxy="http://user:pass@host:8000"))
+    assert kwargs["proxy"] == {"server": "http://user:pass@host:8000"}
+
+
+def test_explicit_camoufox_proxy_overrides_unified_proxy() -> None:
+    from scrapefold.engines.camoufox import _adapt_launch
+
+    explicit = {"server": "http://ex:9000", "username": "u", "password": "p"}
+    kwargs = _adapt_launch(
+        ScrapeOptions(proxy="http://host:8000", extra={"camoufox_proxy": explicit})
+    )
+    assert kwargs["proxy"] == explicit
+
+
+def test_camoufox_proxy_in_supported_options() -> None:
+    assert "proxy" in CamoufoxEngine.SUPPORTED_OPTIONS

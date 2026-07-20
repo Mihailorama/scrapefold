@@ -2039,3 +2039,122 @@ async def test_router_walk_closes_ephemeral_pool_on_exception(
         await walk("https://example.com/")
 
     assert close_calls == ["aclose"], "ephemeral pool must be closed even on exception"
+
+
+# ---------------------------------------------------------------------------
+# Proxy rotation layer ("proxy over proxy") — TECH_DEBT #14
+# ---------------------------------------------------------------------------
+
+
+def _proxy_stub(
+    seen: list[str | None],
+    *,
+    block_proxies: set[str | None],
+) -> type[ScrapeEngine]:
+    """A proxy-capable stub that records each exit it's called with and returns
+    a blocked (empty) result for any proxy in ``block_proxies``, else a good one."""
+
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        seen.append(opts.proxy)
+        if opts.proxy in block_proxies:
+            return _empty_result("stub_proxy", url)
+        return _make_result("stub_proxy", url=url)
+
+    return type(
+        "_Stub_proxy",
+        (ScrapeEngine,),
+        {
+            "NAME": "stub_proxy",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset({"proxy"}),  # opts into the rotation layer
+            "_fetch": _fetch,
+        },
+    )
+
+
+_P1 = "http://p1.example:8000"
+_P2 = "http://p2.example:8000"
+
+
+async def test_session_pool_retires_blocked_session_and_rotates_exit_ip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.proxy import SessionPool
+    from scrapefold.router import walk
+
+    seen: list[str | None] = []
+    monkeypatch.setitem(_REGISTRY, "stub_proxy", lambda: _proxy_stub(seen, block_proxies={_P1}))
+
+    # max_errors=1 → the first block retires the exit for the rest of the walk.
+    pool = SessionPool([_P1, _P2], max_errors=1)
+    opts = ScrapeOptions(engines=("stub_proxy",), extra={"proxy_pool": pool})
+
+    result = await walk("https://example.com/", opts)
+
+    # The good result comes back — same engine, second exit IP.
+    assert result.engine == "stub_proxy"
+    assert result.text == _GOOD_TEXT
+    # First exit blocked → rotated to the second; blocked exit not reused.
+    assert seen == [_P1, _P2]
+    assert seen[1:].count(_P1) == 0
+    # The blocked session is retired and no longer usable.
+    assert pool.usable_count == 1
+    assert pool.stats()["retired"] == [_P1]
+
+
+async def test_router_rotation_gives_up_after_all_exits_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.proxy import SessionPool
+    from scrapefold.router import walk
+
+    seen: list[str | None] = []
+    # Both exits always block.
+    monkeypatch.setitem(
+        _REGISTRY, "stub_proxy", lambda: _proxy_stub(seen, block_proxies={_P1, _P2})
+    )
+
+    pool = SessionPool([_P1, _P2], max_errors=1)
+    opts = ScrapeOptions(engines=("stub_proxy",), extra={"proxy_pool": pool})
+
+    # Single engine, every exit blocked → the walk fails (nothing to escalate to).
+    with pytest.raises(scrapefold.AllEnginesFailed):
+        await walk("https://example.com/", opts)
+
+    # Both exits were tried once, then the pool was exhausted (no infinite loop).
+    assert set(seen) == {_P1, _P2}
+    assert pool.usable_count == 0
+
+
+async def test_router_does_not_rotate_engines_without_proxy_support(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.proxy import SessionPool
+    from scrapefold.router import walk
+
+    seen: list[str | None] = []
+
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        seen.append(opts.proxy)  # stripped to None — engine doesn't support proxy
+        return _make_result("stub_noproxy", url=url)
+
+    stub = type(
+        "_Stub_noproxy",
+        (ScrapeEngine,),
+        {
+            "NAME": "stub_noproxy",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),  # no "proxy" → rotation layer inert
+            "_fetch": _fetch,
+        },
+    )
+    monkeypatch.setitem(_REGISTRY, "stub_noproxy", lambda: stub)
+
+    pool = SessionPool([_P1, _P2])
+    opts = ScrapeOptions(engines=("stub_noproxy",), extra={"proxy_pool": pool})
+    result = await walk("https://example.com/", opts)
+
+    assert result.engine == "stub_noproxy"
+    # proxy was stripped (unsupported) and the engine ran exactly once, no rotation.
+    assert seen == [None]
+    assert pool.usable_count == 2  # untouched — no session was ever acquired

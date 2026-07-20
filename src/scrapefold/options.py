@@ -46,6 +46,31 @@ class ScrapeOptions:
     custom_headers: dict[str, str] | None = None
     cookies: dict[str, str] | None = None
 
+    # --- Proxy (unified single exit + rotation pool) ---
+    proxy: str | None = None
+    """A single exit proxy URL, e.g. ``"http://user:pass@host:8000"``.
+
+    Unified across every proxy-capable engine: each maps it to its native proxy
+    option (Camoufox ``proxy`` dict, pydoll ``--proxy-server``, scrapling
+    ``proxy``). Vendor engines that manage their own proxy fleet
+    (``premium_proxy`` / ``country``) don't list it in ``SUPPORTED_OPTIONS``, so
+    it's dropped for them. Usually set by the rotation layer, not by hand — see
+    ``proxies`` below.
+    """
+
+    proxies: tuple[str, ...] | None = None
+    """A rotation pool of exit proxies ("proxy over proxy").
+
+    When set, the router builds a health-scored
+    :class:`~scrapefold.proxy.SessionPool` and, for each proxy-capable engine,
+    threads one exit into ``proxy`` per attempt — retrying the *same* engine
+    behind a *different* exit IP when a response looks blocked, before
+    escalating to the next (more expensive) tier. Retirement / rotation policy
+    is owned by the pool; the engine still sees just one ``proxy``. Pass a
+    pre-built, crawl-spanning pool via ``extra["proxy_pool"]`` instead for
+    advanced control.
+    """
+
     # --- Output shape ---
     output_format: Literal["text", "markdown", "html", "json", "auto"] = "auto"
     """Preferred return format.

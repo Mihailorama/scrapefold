@@ -21,6 +21,8 @@ src/scrapefold/
 │   ├── __init__.py      lazy engine registry
 │   └── <name>.py        one file per engine
 ├── router.py            (S7) auto-select + sequential fallback chain
+├── pool.py              (S7) EnginePool — engine-instance reuse across a walk
+├── proxy.py             SessionPool — health-scored proxy rotation ("proxy over proxy")
 ├── parallel.py          (S7) run-many + LLM-judge with injected callable
 ├── html_to_text.py      (S2) shared HTML → text / markdown
 ├── url_utils.py         (S2) scan_urls, classify_url, is_technical_url, formaturl
@@ -204,6 +206,10 @@ _estimate_step_cost(step, avg_response_mb=2.0) -> float
 ### "Suspicious content" detection
 
 `scrapefold/detection.py` (S2) owns the heuristics (text length < `min_text_chars`, anti-bot phrases, `<noscript>`-dominant body, mostly-`<script>` body). The router calls `detection.is_suspicious(result)` and, on `True`, advances to the next step or reclassifies via `SIGNATURES`.
+
+### Proxy rotation — "proxy over proxy"
+
+`scrapefold/proxy.py` adds a health-scored `SessionPool` **above** each engine's own single-proxy setting. When the caller passes `opts.proxies=(…)` (or a crawl-spanning `extra["proxy_pool"]`), `router._resolve_session_pool` builds the pool once per walk. Before invoking a proxy-capable engine (`"proxy" in SUPPORTED_OPTIONS`), the router `acquire()`s the healthiest exit and threads it into the unified `opts.proxy`; after the call it `report()`s the outcome (`is_suspicious` / error → a strike). A blocked response triggers a **retry of the same engine behind a different exit IP** (up to `extra["proxy_max_rotations"]`, default 2) *before* escalating to the next, more expensive tier — the cheap win for datacenter/residential fleets. Sessions retire past `max_errors` (default 3) and heal one strike on a clean response. The engine abstraction is untouched (engines still take one proxy; the pool owns which), and the layer is fully opt-in — no proxies configured means the router path is unchanged. Pool exhaustion skips the engine rather than silently leaking the real IP, so the walk escalates to a vendor unlocker instead.
 
 ### Stopping rules — preventing overkill
 
