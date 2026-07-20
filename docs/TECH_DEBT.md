@@ -190,24 +190,30 @@ unsupported opts, no vendor LLM SDK).
   not reused), plus rotation-give-up and no-rotation-without-proxy-support, and
   per-engine `proxy`-mapping tests for camoufox / pydoll / scrapling_stealth.
 
-### 15. Scrapy-style AutoThrottle for the crawler
+### 15. Scrapy-style AutoThrottle for the crawler — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/crawler/__init__.py` (the BFS crawl loop); new
-  `ScrapeOptions.autothrottle` / `extra["target_concurrency"]`.
-- **Status:** `crawl()` walks discovered URLs but uses a fixed fan-out. [Scrapy](https://github.com/scrapy/scrapy)'s
-  AutoThrottle adapts the request delay/concurrency to the *observed* server
-  latency — speeding up on healthy hosts, backing off when a host slows or
-  starts returning errors. scrapefold has neither adaptive delay nor a
-  politeness backoff, so a large crawl can hammer a slow origin (and invite
-  blocks, undercutting the stealth engines it just added).
-- **Fix sketch:** track an EWMA of per-host response latency + error rate in
-  the crawl loop; scale the in-flight semaphore between
-  `[1, max_concurrency]` toward a target latency, and add exponential backoff
-  on 429/503. Pure crawler-layer change; engines and `ScrapeResult` untouched.
-- **Why P2:** improves crawl robustness + politeness, but single-URL `scrape()`
-  is unaffected and current crawls work.
-- **Test:** `test_autothrottle_backs_off_on_rising_latency` (feed synthetic
-  latencies; assert effective concurrency drops).
+- **Where:** `src/scrapefold/crawler/throttle.py` (`AutoThrottle` + `host_of`),
+  wired into the `crawl()` walk in `src/scrapefold/crawler/__init__.py`; new
+  `ScrapeOptions.autothrottle` (+ `extra["autothrottle_*"]` tuning knobs).
+- **Resolution:** `crawl()` is a *serial* walk (not the fixed fan-out the
+  original sketch assumed), so the [Scrapy](https://github.com/scrapy/scrapy)
+  mechanism is adopted as its core primitive — an adaptive per-host *delay*
+  rather than a semaphore. When `opts.autothrottle` is set, `_build_throttle`
+  constructs an `AutoThrottle`; the loop sleeps `delay_for(host)` before each
+  fetch and folds `(latency, status_code)` back via `record(...)` after. Per
+  host it keeps an EWMA of latency, eases the delay toward
+  `ewma_latency / target_concurrency`, **never shrinks** the delay on a non-2xx
+  response, and applies an explicit exponential (2×) backoff on `429` / `503`
+  (and on a hard fetch failure via `failed=True`), all clamped to
+  `[min_delay, max_delay]`. Pure crawler-layer change: engines, `ScrapeResult`,
+  and single-URL `scrape()` are untouched, and the whole thing is opt-in
+  (`autothrottle=False` → not a single `asyncio.sleep`).
+- **Tests:** `tests/test_autothrottle.py` — the named
+  `test_autothrottle_backs_off_on_rising_latency` (rising synthetic latencies →
+  delay rises monotonically, `effective_throughput` falls), plus 429/503/failed
+  backoff, never-speed-up-on-error, min/max clamp, per-host isolation, and two
+  offline crawler-integration tests (delays sleep + latency/status recorded;
+  no sleeps when disabled).
 
 ### 16. LLM-schema extraction (ScrapeGraphAI-shaped) via the user LLM callable
 

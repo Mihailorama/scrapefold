@@ -55,6 +55,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   untouched — engines still take one proxy, the pool owns which. Fully opt-in:
   with no proxies configured, the router path is unchanged. Resolves
   TECH_DEBT #14.
+- **AutoThrottle — adaptive crawl politeness** (`scrapefold.crawler.throttle`).
+  A [Scrapy](https://github.com/scrapy/scrapy)-style per-host controller: set
+  `ScrapeOptions(autothrottle=True)` and `crawl()` sleeps an adaptive delay
+  before each page fetch, easing toward `latency / target_concurrency` from an
+  EWMA of observed latency, **never speeding up** on a non-2xx response, and
+  backing off hard (2×) on `429` / `503` or a hard fetch failure — clamped to
+  `[min_delay, max_delay]`. Keeps a large crawl from hammering a slow or
+  rate-limiting origin (and inviting the blocks the stealth engines were added
+  to dodge). Tuning via `extra["autothrottle_target_concurrency" | "start_delay"
+  | "max_delay" | "min_delay"]`. Pure crawler-layer, opt-in (default off →
+  zero sleeps); engines, `ScrapeResult`, and single-URL `scrape()` untouched.
+  Resolves TECH_DEBT #15.
 
 ### Changed
 

@@ -99,6 +99,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | Cloudflare / Datadome / PerimeterX | **scrapling_stealth** (free) → **Firecrawl** / **ScrapingBee** (paid) |
 | Article body only, no nav/ads/boilerplate | any HTML engine + `ScrapeOptions(main_content=True)` — Trafilatura-backed, `pip install scrapefold[trafilatura]` |
 | High-volume crawl behind your own proxy fleet | `ScrapeOptions(proxies=(...))` — health-scored rotation ("proxy over proxy"): retries a blocked page behind a fresh exit IP before escalating a tier |
+| Large crawl of a slow / rate-limiting origin | `ScrapeOptions(autothrottle=True)` — Scrapy-style adaptive per-host delay: eases toward observed latency, backs off hard on 429/503 |
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
@@ -144,7 +145,8 @@ async def main():
     # Whole-site crawl with disk cache
     crawl = await crawl_site(
         "https://docs.example.com",
-        opts=ScrapeOptions(max_pages=50, max_depth=3),
+        # autothrottle: adaptive per-host delay — polite on slow / rate-limiting origins
+        opts=ScrapeOptions(max_pages=50, max_depth=3, autothrottle=True),
         output="site.md",                       # stitched markdown
         per_page_dir="pages/",                  # one .md per URL
         cache_dir="~/.scrapefold/cache",

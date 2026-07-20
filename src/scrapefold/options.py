@@ -105,6 +105,19 @@ class ScrapeOptions:
     max_depth: int = 3
     follow_subdomains: bool = False
 
+    autothrottle: bool = False
+    """Adapt the per-host crawl delay to observed latency (Scrapy-style).
+
+    When ``True``, :func:`~scrapefold.crawler.crawl` sleeps an adaptive delay
+    before each page fetch and folds the response latency + status into a
+    per-host controller (:class:`~scrapefold.crawler.throttle.AutoThrottle`):
+    the delay eases toward ``latency / target_concurrency``, never shrinks on an
+    error, and backs off hard on ``429`` / ``503``. Keeps a large crawl polite
+    on slow or rate-limiting origins instead of hammering at a fixed rate.
+    Tuning knobs live in ``extra["autothrottle_*"]`` (``target_concurrency``,
+    ``start_delay``, ``max_delay``, ``min_delay``). Ignored by single scrape.
+    """
+
     # --- Engine selection / orchestration ---
     engines: tuple[str, ...] | None = None
     """Ordered fallback chain. ``None`` lets the router auto-select."""
