@@ -100,6 +100,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | Article body only, no nav/ads/boilerplate | any HTML engine + `ScrapeOptions(main_content=True)` — Trafilatura-backed, `pip install scrapefold[trafilatura]` |
 | High-volume crawl behind your own proxy fleet | `ScrapeOptions(proxies=(...))` — health-scored rotation ("proxy over proxy"): retries a blocked page behind a fresh exit IP before escalating a tier |
 | Large crawl of a slow / rate-limiting origin | `ScrapeOptions(autothrottle=True)` — Scrapy-style adaptive per-host delay: eases toward observed latency, backs off hard on 429/503 |
+| Structured JSON from any page, via **your** LLM | `extract(result, schema=..., llm=my_llm)` — ScrapeGraphAI-style schema extraction over a user-provided callable; no vendor LLM SDK |
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
@@ -127,7 +128,7 @@ Every scraping vendor has trade-offs. Scrapefold lets you switch between them wi
 
 ```python
 import asyncio
-from scrapefold import scrape, crawl_site, ScrapeOptions
+from scrapefold import scrape, crawl_site, extract, ScrapeOptions
 
 async def main():
     # Single URL, auto-engine — router picks the cheapest tier that works
@@ -153,6 +154,17 @@ async def main():
         cache_ttl_days=7,
     )
     print(f"{len(crawl.pages)} pages, {len(crawl.failures)} failures")
+
+    # Structured extraction via YOUR LLM — scrapefold ships no vendor LLM SDK
+    async def my_llm(prompt: str) -> str:
+        ...  # call Claude / GPT / a local model — anything that returns text
+
+    data = await extract(
+        await scrape("https://shop.example.com/widget"),
+        schema={"type": "object", "required": ["title", "price"]},  # or plain English
+        llm=my_llm,
+    )
+    print(data)                   # {"title": ..., "price": ...}
 
 asyncio.run(main())
 ```

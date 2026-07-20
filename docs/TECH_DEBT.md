@@ -215,28 +215,33 @@ unsupported opts, no vendor LLM SDK).
   offline crawler-integration tests (delays sleep + latency/status recorded;
   no sleeps when disabled).
 
-### 16. LLM-schema extraction (ScrapeGraphAI-shaped) via the user LLM callable
+### 16. LLM-schema extraction (ScrapeGraphAI-shaped) via the user LLM callable — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/` — a new `extract(result, schema, llm=...)` helper
-  built on the **existing** user-provided async LLM callable (same contract as
-  `llm_judge` / `vision.py`).
-- **Status:** [ScrapeGraphAI](https://github.com/ScrapeGraphAI/Scrapegraph-ai)'s
-  hook is "describe what you want in natural language, the LLM builds the
-  extraction." scrapefold deliberately ships **no vendor LLM SDK** (golden rule
-  #5), so we can't adopt its engine — but the *shape* is compatible: feed
-  `result.markdown` + a user schema to the caller's own LLM callable and return
-  structured `json`. Firecrawl `/extract` already lands structured data in
-  `ScrapeResult.json`; this generalizes it to any engine's output without
-  importing `openai`/`litellm`.
-- **Fix sketch:** `async def extract(result, *, schema, llm) -> dict` that
-  prompts the injected `llm` with the markdown + JSON schema and validates the
-  return into `result.json`. Provider-agnostic; no new dependency.
-- **Why P2 / careful:** must stay a thin helper over the user callable — the
-  moment it imports a provider SDK it violates rule #5. Lower priority than the
-  proxy/throttle layers, which have no LLM dependency.
-- **Test:** `test_extract_fills_json_via_injected_llm` (stub llm returns a
-  fixed JSON blob; assert it lands in `result.json`, and that no vendor LLM
-  module is imported).
+- **Where:** `src/scrapefold/extract.py` (`extract`, `extract_into`,
+  `TextLLMCallable`, `ExtractionError`), exported from the package root.
+- **Resolution:** [ScrapeGraphAI](https://github.com/ScrapeGraphAI/Scrapegraph-ai)'s
+  "describe what you want, the LLM builds the extraction" hook, adopted as a
+  thin helper over the **user-provided** async callable — golden rule #5's
+  exact contract (`async def my_llm(prompt: str) -> str`), same injection
+  pattern as `vision.py` / pixelrag's `extra["reader"]`. No vendor LLM SDK, no
+  new dependency. `extract(source, schema=…, llm=…)` builds a deterministic
+  prompt from the result's markdown (falling back to `text`, or a raw string
+  source) + the schema — a JSON-Schema-style mapping *or* a natural-language
+  field description — plus optional `instructions`; parses the reply leniently
+  (code fences and surrounding prose stripped); runs a cheap dependency-free
+  structural check (top-level `type` object/array, top-level `required` keys);
+  and on a rejected reply **re-prompts with the failure reason fed back**
+  (`max_retries`, default 1) before raising `ExtractionError` (last raw reply
+  on `.raw_reply`). Content is capped at `max_content_chars` (default 150k)
+  before prompting. `extract_into(result, …)` returns a frozen copy with the
+  data landed in `ScrapeResult.json` + `meta["llm_extracted"]=True` — the same
+  slot native structured engines (Firecrawl `/extract`, AnySite, Apify) fill,
+  generalized to any engine's output.
+- **Tests:** `tests/test_extract.py` (19) — the named
+  `test_extract_fills_json_via_injected_llm` (stub llm; blob lands in
+  `result.json`; asserts no vendor LLM module imported), plus prompt
+  construction, fence/prose-tolerant parsing, self-correcting retry loop,
+  structural-check rejections, truncation, and frozen-copy semantics.
 
 ### Deliberately NOT adopted
 

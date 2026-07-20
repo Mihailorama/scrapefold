@@ -29,6 +29,7 @@ src/scrapefold/
 ├── crawler/             (S8) sitemap → BFS → filters → stitcher (+ throttle.py: AutoThrottle)
 ├── cache.py             (S8) disk-backed TTL cache
 ├── vision.py            optional analyze_screenshot_with_llm(callable_llm)
+├── extract.py           LLM-schema extraction over the user LLM callable → ScrapeResult.json
 ├── cli.py               (S9) Typer entry — `scrapefold` console script
 └── mcp_server.py        (S10) MCP stdio server — `scrapefold-mcp` console script
 ```
@@ -214,6 +215,10 @@ _estimate_step_cost(step, avg_response_mb=2.0) -> float
 ### AutoThrottle — adaptive crawl politeness
 
 `scrapefold/crawler/throttle.py` adds a Scrapy-style per-host `AutoThrottle` controller for the (serial) `crawl()` walk. It holds no sockets: the loop sleeps `delay_for(host)` before each page fetch and calls `record(host, latency_s=…, status_code=…)` after. Per host it keeps an EWMA of response latency, eases the delay toward `ewma_latency / target_concurrency` (`new = (current + target) / 2`), **never decreases** the delay on a non-2xx response, and applies an explicit exponential (2×) backoff on `429` / `503` — or on a hard fetch failure (`failed=True`, engine ladder exhausted) — all clamped to `[min_delay, max_delay]`. Enabled with `opts.autothrottle=True`; tuned via `extra["autothrottle_target_concurrency" | "start_delay" | "max_delay" | "min_delay"]`. Fully opt-in and crawler-local: with `autothrottle=False` the loop never sleeps, and engines / `ScrapeResult` / single-URL `scrape()` are untouched. Keeps a large crawl from hammering a slow or rate-limiting origin (and inviting the blocks the stealth engines were added to dodge).
+
+### LLM-schema extraction — the `ScrapeResult.json` slot for any engine
+
+`scrapefold/extract.py` generalizes the structured-`json` slot (natively filled by Firecrawl `/extract`, AnySite, Apify) to *any* engine's output, ScrapeGraphAI-style — without ever importing a vendor LLM SDK (golden rule #5). The caller injects `async def my_llm(prompt: str) -> str`; `extract(source, schema=…, llm=…)` builds a deterministic prompt from the result's markdown (falling back to `text`, or a raw string) plus the schema — a JSON-Schema-style mapping *or* a natural-language description of the wanted fields — parses the reply leniently (code fences / surrounding prose tolerated), applies a cheap dependency-free structural check (top-level `type` object/array, top-level `required` keys), and re-prompts with the rejection reason fed back (`max_retries`) before raising `ExtractionError`. `extract_into(result, …)` returns a frozen copy with `json` populated and `meta["llm_extracted"]=True`. Content is capped at `max_content_chars` (default 150k) before prompting.
 
 ### Stopping rules — preventing overkill
 

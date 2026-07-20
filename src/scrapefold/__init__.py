@@ -7,6 +7,7 @@ Public API (v0.2):
     res = await scrape("https://example.com")
     res = await scrape(url, opts=ScrapeOptions(language="ru", stealth=True))
     md_path = await crawl_site("https://docs.example.com", opts=ScrapeOptions(max_pages=50))
+    data = await extract(res, schema={...}, llm=my_llm)  # your LLM callable, no vendor SDK
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from scrapefold.engines.base import (
     RedirectScopeViolation,
     ScrapeEngine,
 )
+from scrapefold.extract import ExtractionError, TextLLMCallable, extract, extract_into
 from scrapefold.ladders import (
     AllEnginesFailed,
     BudgetExceeded,
@@ -54,6 +56,7 @@ __all__ = [
     "EngineCapabilities",
     "EngineError",
     "EnginePool",
+    "ExtractionError",
     "Media",
     "Policy",
     "Post",
@@ -66,10 +69,13 @@ __all__ = [
     "SequentialStep",
     "SiteClass",
     "SocialEntity",
+    "TextLLMCallable",
     "WalkBudget",
     "__version__",
     "classify_url",
     "crawl_site",
+    "extract",
+    "extract_into",
     "get_ladder",
     "normalize_social",
     "scrape",

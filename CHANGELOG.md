@@ -67,6 +67,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   | "max_delay" | "min_delay"]`. Pure crawler-layer, opt-in (default off →
   zero sleeps); engines, `ScrapeResult`, and single-URL `scrape()` untouched.
   Resolves TECH_DEBT #15.
+- **LLM-schema extraction** (`scrapefold.extract`) — ScrapeGraphAI-shaped
+  "describe what you want, the LLM extracts it", built strictly on a
+  **user-provided** async callable (`async def my_llm(prompt: str) -> str`);
+  no vendor LLM SDK, no new dependency (golden rule #5).
+  `extract(source, schema=…, llm=…)` prompts with the result's markdown (or a
+  raw string) + the schema — a JSON-Schema-style mapping or a plain
+  natural-language field description — and returns the parsed JSON;
+  `extract_into(result, …)` lands it in a frozen copy's `ScrapeResult.json`
+  (+ `meta["llm_extracted"]=True`) — the same slot native structured engines
+  (Firecrawl `/extract`, AnySite, Apify) fill, generalized to any engine's
+  output. Lenient reply parsing (code fences / surrounding prose), a cheap
+  dependency-free structural check (top-level `type`, `required` keys), a
+  self-correcting retry loop that feeds the rejection reason back to the LLM
+  (`max_retries`, default 1), content capped at `max_content_chars` (default
+  150k chars), and `ExtractionError` carrying the last raw reply. Resolves
+  TECH_DEBT #16.
 
 ### Changed
 
