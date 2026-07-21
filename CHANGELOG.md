@@ -83,6 +83,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   (`max_retries`, default 1), content capped at `max_content_chars` (default
   150k chars), and `ExtractionError` carrying the last raw reply. Resolves
   TECH_DEBT #16.
+- **Sync wrappers** — `scrape_sync(url, opts=None)` and
+  `crawl_site_sync(url, opts=None, output=None, **kwargs)` for sync codebases.
+  Each call runs the async API on a fresh event loop in a dedicated worker
+  thread, so they keep working even when the calling thread has a running or
+  *leaked* event loop (the Playwright-Sync-API failure mode where a bare
+  `asyncio.run(scrape(...))` raises `RuntimeError`). `scrape_sync`
+  deliberately takes no `pool` — engine-pool clients are bound to the loop
+  they were created on; use `crawl_site_sync` (one loop spans the whole
+  crawl) or the async API for connection reuse. Resolves TECH_DEBT #12.
 
 ### Changed
 

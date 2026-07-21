@@ -113,30 +113,28 @@ public behavior.
 - **Fix sketch:** implement `engines/brightdata_unlocker.py` against Bright Data's Web Unlocker API (`https://api.brightdata.com/datacenter/zone/unlock` or equivalent). Capability: `proxy_type="residential"`, `geography=(<country_code>,)`. Wire into ladders for the geofenced site class.
 - **Priority:** P2 — needed for provider redundancy and full coverage of IP-geofenced targets; Oxylabs covers the first shipped residential-geo path.
 
-### 12. No sync wrapper that's robust to leaked event loops in the caller
+### 12. No sync wrapper that's robust to leaked event loops in the caller — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/__init__.py` (public API surface).
-- **Status:** `scrape()` is async-only; callers in sync codebases write
-  `asyncio.run(scrape(...))` per call. This breaks the moment the caller's
-  process has *any* leaked asyncio loop in its main thread — most common
-  trigger: Playwright Sync API (used by `cloakbrowser`, `playwright-stealth`,
-  etc.) leaks a running loop, after which `asyncio.run` raises
-  `RuntimeError: asyncio.run() cannot be called from a running event loop`.
-- **Found by:** phynder PR 1 smoke test on 2026-05-26 (`Mihailorama/phynder#62`,
-  commit `ed16868`). Phynder's adapter currently works around this by running
-  `asyncio.run(scrape(...))` inside a `ThreadPoolExecutor(max_workers=1)` —
-  the worker thread always has a clean asyncio context regardless of leaks
-  in the main thread.
-- **Fix sketch:** expose `scrape_sync(url, opts=None, pool=None) -> ScrapeResult`
-  alongside `scrape()`. Implementation does the same worker-thread isolation
-  internally so sync callers don't repeat the pattern. Same for `crawl_site_sync`.
-  Document the rationale (leaked loops from Playwright Sync) in the docstring.
-- **Why P2:** sync callers can write the 5-line `ThreadPoolExecutor` workaround
-  themselves (phynder did), so it's an ergonomics improvement, not a blocker.
-  Becomes more valuable as more sync codebases adopt scrapefold.
-- **Test:** `test_scrape_sync_works_inside_running_event_loop` — call
-  `scrape_sync()` from inside `asyncio.run(harness())` and assert it returns
-  a `ScrapeResult` instead of raising.
+- **Where:** `src/scrapefold/__init__.py` — `scrape_sync(url, opts=None)` and
+  `crawl_site_sync(url, opts=None, output=None, **kwargs)`, both public exports.
+- **Resolution:** each call runs the async API to completion via
+  `asyncio.run` on a **fresh event loop in a dedicated worker thread**
+  (`_run_sync`, `ThreadPoolExecutor(max_workers=1)`), so the wrappers keep
+  working even when the calling thread has a running or leaked loop — the
+  Playwright-Sync-API failure mode found by phynder
+  (`Mihailorama/phynder#62`, commit `ed16868`), whose 5-line workaround this
+  internalizes. One deliberate deviation from the original sketch:
+  `scrape_sync` takes **no `pool` parameter** — an `EnginePool` holds network
+  clients bound to the loop they were created on, and each sync call uses a
+  fresh short-lived loop, so a reused pool would hand out clients tied to a
+  dead loop. Sync callers needing connection reuse across many URLs use
+  `crawl_site_sync` (one loop spans the whole crawl, pool reuse inside) or
+  the async API. Rationale documented in both docstrings.
+- **Tests:** `tests/test_sync.py` (5) — the named
+  `test_scrape_sync_works_inside_running_event_loop` (called from inside
+  `asyncio.run(harness())`; returns a `ScrapeResult`, and the walk provably
+  ran on the `scrapefold-sync` worker thread), plus plain-call, exception
+  propagation, opts pass-through, and `crawl_site_sync` under a running loop.
 
 ### 13. Maxun capability ratings in README / site are unverified
 

@@ -101,6 +101,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | High-volume crawl behind your own proxy fleet | `ScrapeOptions(proxies=(...))` — health-scored rotation ("proxy over proxy"): retries a blocked page behind a fresh exit IP before escalating a tier |
 | Large crawl of a slow / rate-limiting origin | `ScrapeOptions(autothrottle=True)` — Scrapy-style adaptive per-host delay: eases toward observed latency, backs off hard on 429/503 |
 | Structured JSON from any page, via **your** LLM | `extract(result, schema=..., llm=my_llm)` — ScrapeGraphAI-style schema extraction over a user-provided callable; no vendor LLM SDK |
+| Sync codebase (no `async`/`await`) | `scrape_sync(url)` / `crawl_site_sync(root)` — blocking wrappers that survive leaked event loops (e.g. Playwright Sync API in the same process) |
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
