@@ -68,19 +68,36 @@ public behavior.
 - **Fix:** when each engine PR (S2-S11) lands, set `CAPABILITIES = EngineCapabilities(avg_response_mb_estimate=N, ...)`. Browser/unlocker engines: 15-30 MB. Markdown engines (Jina): 0.5 MB.
 - **Test:** add a per-engine smoke test asserting the value is non-default for browser engines.
 
-### 6. Engine-registration must populate `ENGINE_ALIASES`
+### 6. Engine-registration must populate `ENGINE_ALIASES` — RESOLVED (Unreleased)
 
-- **Where:** Each engine file under `src/scrapefold/engines/` for multi-mode engines.
-- **Status:** `register_alias` / `resolve_alias` exist; `ENGINE_ALIASES` ships empty. Each engine PR for a multi-mode engine must call `register_alias("scrapling", "scrapling_stealth")` (etc.) at module import time.
-- **Fix:** in `engines/scrapling_stealth.py`, `engines/brightdata_unlocker_sync.py`, add a `register_alias(...)` call alongside `register(...)`.
-- **Test:** `test_user_facing_alias_resolves_to_default_mode` per engine.
+- **Where:** `src/scrapefold/engines/__init__.py`.
+- **Resolution:** aliases are registered centrally in the lazy registry module
+  (rather than per engine file — one place to audit):
+  `register_alias("scrapling", "scrapling_stealth")` and
+  `register_alias("apify", "apify_actor")` run at import time, and
+  `get_engine()` resolves through `resolve_alias()`. The
+  `brightdata_unlocker_sync` alias named in the original sketch is n/a until
+  the Bright Data engine ships (item #11).
+- **Tests:** `tests/test_ladders.py` —
+  `test_user_facing_alias_resolves_to_default_mode` (parametrized over both
+  aliases; asserts `get_engine(alias).NAME == canonical`), plus
+  `test_resolve_alias_round_trip` and
+  `test_register_alias_can_be_overridden_temporarily`;
+  `tests/test_engine_apify_actor.py::test_registry_resolves_apify_actor_and_alias`.
 
-### 7. Probe-cache implementation in the router
+### 7. Probe-cache implementation in the router — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/router.py` (S7).
-- **Status:** `ScrapeEngine.PROBE_SCOPE` declared (`"none" | "per_url" | "per_domain" | "per_session"`), default `probe()` returns `True`. No cache exists yet.
-- **Fix:** module-level `dict[tuple[engine_name, scope_key], bool]` where `scope_key` is `url`, `tldextract.extract(url).registered_domain`, or `"_session"`. Look up before calling `engine.probe(url)`; store the result keyed by scope.
-- **Test:** `test_router_caches_per_domain_probe_across_urls` (50-URL crawl on reddit.com → 1 probe call).
+- **Where:** `src/scrapefold/router.py` — `_PROBE_CACHE` + `_probe_scope_key`
+  + gate 6b of `_attempt_engine`.
+- **Resolution:** module-level `dict[tuple[engine_name, scope_key], bool]`
+  exactly per the sketch: `scope_key` is the URL (`per_url`), the
+  tldextract registered domain (`per_domain`), or `"_session"`
+  (`per_session`); `PROBE_SCOPE == "none"` bypasses the cache entirely.
+  Gate 6b consults the cache before `engine.probe(url)`: a cached `False`
+  skips the engine without re-probing; a miss runs the probe once and stores
+  the outcome keyed by scope.
+- **Tests:** `tests/test_router.py::test_router_caches_per_domain_probe_across_urls`
+  (two same-domain walks → exactly one probe call).
 
 ## P2 — backlog (no current blocker)
 

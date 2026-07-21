@@ -408,6 +408,19 @@ def test_register_alias_can_be_overridden_temporarily() -> None:
             ENGINE_ALIASES["scrapling"] = original
 
 
+@pytest.mark.parametrize(
+    ("alias", "default_mode"),
+    [("scrapling", "scrapling_stealth"), ("apify", "apify_actor")],
+)
+def test_user_facing_alias_resolves_to_default_mode(alias: str, default_mode: str) -> None:
+    """P1 #6: every multi-mode engine's user-facing alias must resolve through
+    the registry to the canonical default-mode engine class."""
+    from scrapefold.engines import get_engine
+
+    engine_cls = get_engine(alias)
+    assert default_mode == engine_cls.NAME
+
+
 # ---------------------------------------------------------------------------
 # Visited-class loop guard
 # ---------------------------------------------------------------------------
