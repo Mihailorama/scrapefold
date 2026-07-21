@@ -2158,3 +2158,166 @@ async def test_router_does_not_rotate_engines_without_proxy_support(
     # proxy was stripped (unsupported) and the engine ran exactly once, no rotation.
     assert seen == [None]
     assert pool.usable_count == 2  # untouched — no session was ever acquired
+
+
+# ---------------------------------------------------------------------------
+# P1 #1 — budget_mode wiring (_apply_budget_mode at the top of each step)
+# ---------------------------------------------------------------------------
+
+
+def _costed_engine(name: str, behavior: str, cost: float) -> type[ScrapeEngine]:
+    """Stub engine with a per-call cost estimate (requires_api_key stays False
+    so the paid-policy gate never interferes with cost-accounting tests)."""
+
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        if behavior == "empty":
+            return _empty_result(name, url)
+        return _make_result(name, url=url)
+
+    return type(
+        f"_Stub_{name}",
+        (ScrapeEngine,),
+        {
+            "NAME": name,
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False, estimated_cost_usd=cost),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch,
+        },
+    )
+
+
+async def test_router_applies_reset_fresh_session(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """The named P1 #1 test: a step declaring reset_fresh_session gets fresh
+    engine-count headroom after an earlier tier consumed the whole budget."""
+    from scrapefold.router import walk
+
+    stub_ladder(
+        (
+            SequentialStep(engine="stub_empty"),
+            SequentialStep(engine="stub_good", budget_mode="reset_fresh_session"),
+        )
+    )
+    opts = ScrapeOptions(extra={"max_engines": 1})
+
+    result = await walk("https://example.com/", opts)
+    assert result.engine == "stub_good"
+
+
+async def test_router_without_budget_mode_halts_on_max_engines(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """Control for the reset test: same ladder minus the budget_mode declaration
+    halts at the max_engines ceiling before reaching the second step."""
+    from scrapefold.ladders import AllEnginesFailed
+    from scrapefold.router import walk
+
+    stub_ladder(
+        (
+            SequentialStep(engine="stub_empty"),
+            SequentialStep(engine="stub_good"),
+        )
+    )
+    opts = ScrapeOptions(extra={"max_engines": 1})
+
+    with pytest.raises(AllEnginesFailed) as excinfo:
+        await walk("https://example.com/", opts)
+    assert "budget:max_engines" in excinfo.value.failures
+
+
+async def test_router_reset_user_fast_track_zeroes_cost(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """reset_user_fast_track grants fresh cost headroom: an expensive earlier
+    tier no longer starves the fast-tracked step's cost gate."""
+    from scrapefold.router import walk
+
+    for name, behavior, cost in (
+        ("bill_first", "empty", 0.04),
+        ("bill_fast_track", "good", 0.03),
+    ):
+        cls = _costed_engine(name, behavior, cost)
+        monkeypatch.setitem(_REGISTRY, name, lambda cls=cls: cls)
+
+    stub_ladder(
+        (
+            SequentialStep(engine="bill_first"),
+            SequentialStep(engine="bill_fast_track", budget_mode="reset_user_fast_track"),
+        )
+    )
+    opts = ScrapeOptions(extra={"max_cost_usd": 0.05})
+
+    result = await walk("https://example.com/", opts)
+    assert result.engine == "bill_fast_track"
+
+
+# ---------------------------------------------------------------------------
+# P1 #2 — race billing: every invoked engine credits the walk budget (sum_all)
+# ---------------------------------------------------------------------------
+
+
+async def test_router_race_step_bills_all_engines_when_sum_all(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The named P1 #2 test: both members of a sum_all race return blocked
+    pages; their combined cost depletes the budget so the next tier's cost
+    gate rejects an engine that would otherwise fit."""
+    from scrapefold.ladders import AllEnginesFailed
+    from scrapefold.router import walk
+
+    for name, behavior, cost in (
+        ("bill_race_a", "empty", 0.02),
+        ("bill_race_b", "empty", 0.02),
+        ("bill_next_tier", "good", 0.02),
+    ):
+        cls = _costed_engine(name, behavior, cost)
+        monkeypatch.setitem(_REGISTRY, name, lambda cls=cls: cls)
+
+    stub_ladder(
+        (
+            RaceStep(engines=("bill_race_a", "bill_race_b"), budget_accounting="sum_all"),
+            SequentialStep(engine="bill_next_tier"),
+        )
+    )
+    # 0.02 + 0.02 billed by the race → 0.04; next tier's 0.02 would breach 0.05.
+    opts = ScrapeOptions(extra={"max_cost_usd": 0.05})
+
+    with pytest.raises(AllEnginesFailed) as excinfo:
+        await walk("https://example.com/", opts)
+    failures = excinfo.value.failures
+    assert "bill_race_a:empty" in failures
+    assert "bill_race_b:empty" in failures
+    assert "bill_next_tier:skipped:budget:cost" in failures
+
+
+async def test_router_race_billing_control_with_headroom(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Control for the sum_all test: with 0.02 more headroom the same walk
+    escalates past the billed race and the next tier wins."""
+    from scrapefold.router import walk
+
+    for name, behavior, cost in (
+        ("bill_race_a", "empty", 0.02),
+        ("bill_race_b", "empty", 0.02),
+        ("bill_next_tier", "good", 0.02),
+    ):
+        cls = _costed_engine(name, behavior, cost)
+        monkeypatch.setitem(_REGISTRY, name, lambda cls=cls: cls)
+
+    stub_ladder(
+        (
+            RaceStep(engines=("bill_race_a", "bill_race_b"), budget_accounting="sum_all"),
+            SequentialStep(engine="bill_next_tier"),
+        )
+    )
+    opts = ScrapeOptions(extra={"max_cost_usd": 0.07})
+
+    result = await walk("https://example.com/", opts)
+    assert result.engine == "bill_next_tier"

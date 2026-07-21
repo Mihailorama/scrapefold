@@ -9,6 +9,18 @@ engine regardless of whether it arrives via the default ladder or
 Post-0.2 note: ``RaceStep`` members are still walked sequentially (one at a
 time). Concurrent fan-out with first-good-wins cancellation is deferred to a
 future router cycle.
+
+Race billing under sequential walking (P1 #2): every engine that is actually
+invoked credits its cost to the walk budget — an attempt that returns a
+blocked/suspicious page (or errors after issuing the request) was still billed
+vendor-side, so the walk counts it. This is exactly ``sum_all`` semantics and
+matches real spend, because sequentially every attempted engine truly issues
+its own request. ``budget_accounting="winner_only"``/``"max"`` become
+*scheduling-dependent* refinements that only diverge from ``sum_all`` once
+concurrent fan-out can cancel losers before they bill; the sequential walk
+deliberately does not under-count spend by honoring them early. The declared
+mode per step is kept consistent with engine ``bills_failed_attempts``
+capabilities by ``ladders.derive_budget_accounting`` + the ladder golden test.
 """
 
 from __future__ import annotations
@@ -23,6 +35,7 @@ from scrapefold.engines import get_engine
 from scrapefold.engines.base import EngineError, RedirectScopeViolation, ScrapeEngine
 from scrapefold.ladders import (
     AllEnginesFailed,
+    BudgetMode,
     Policy,
     RaceStep,
     SequentialStep,
@@ -87,6 +100,30 @@ def _resolve_policy(opts: ScrapeOptions, site_class: SiteClass) -> Policy:
     if isinstance(override, Policy):
         return override
     return get_default_policy(site_class)
+
+
+def _apply_budget_mode(budget: WalkBudget, mode: BudgetMode) -> None:
+    """Mutate *budget* per the step's declared ``budget_mode`` (P1 #1).
+
+    - ``inherit`` (default): no-op — the step spends from the running budget.
+    - ``reset_user_fast_track``: zero ``cost_usd`` / ``engines_tried`` so a
+      user-blessed expensive tier gets fresh cost + engine-count headroom, but
+      keep ``elapsed_ms`` and ``reclassifications`` — a fast track must not
+      restart the clock or re-arm the reclassification loop guard.
+    - ``reset_fresh_session``: zero the spend clocks too (``elapsed_ms``,
+      ``cost_usd``, ``engines_tried``, ``reclassifications``).
+      ``visited_site_classes`` is deliberately preserved in both modes: it is
+      loop-guard state, not budget — clearing it could re-enable A→B→A
+      reclassification ping-pong.
+    """
+    if mode == "inherit":
+        return
+    budget.cost_usd = 0.0
+    budget.engines_tried.clear()
+    if mode == "reset_fresh_session":
+        budget.elapsed_ms = 0
+        budget.reclassifications = 0
+    logger.debug("router: budget_mode=%s applied — budget counters reset", mode)
 
 
 # ---------------------------------------------------------------------------
@@ -529,6 +566,11 @@ async def _walk_inner(
         else:
             logger.debug("router: skip unknown step type: %r", step)
             continue
+
+        # P1 #1: a step may declare a budget reset (e.g. a user-blessed
+        # expensive tier gets fresh headroom). No ladder sets this today, so
+        # the default "inherit" keeps the walk byte-for-byte unchanged.
+        _apply_budget_mode(budget, step.budget_mode)
 
         for engine_name in engines_to_try:
             # Elapsed-time budget check (per-engine, mirrors override path).

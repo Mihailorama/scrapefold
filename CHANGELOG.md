@@ -92,6 +92,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   deliberately takes no `pool` — engine-pool clients are bound to the loop
   they were created on; use `crawl_site_sync` (one loop spans the whole
   crawl) or the async API for connection reuse. Resolves TECH_DEBT #12.
+- **Router budget & billing correctness** (P1 cluster, TECH_DEBT #1–#5):
+  - `budget_mode` is now wired: a ladder step declaring
+    `reset_user_fast_track` gets fresh `cost_usd`/`engines_tried` headroom
+    (clock and reclassification guard kept); `reset_fresh_session`
+    additionally resets `elapsed_ms`/`reclassifications`. No ladder sets a
+    non-`inherit` mode yet, so default walks are unchanged (#1).
+  - Race billing documented + pinned by tests: under the sequential race
+    walk every invoked engine credits its cost to the walk budget — `sum_all`
+    semantics matching real vendor spend (a blocked 200 was still billed);
+    `winner_only`/`max` become distinct only with future concurrent fan-out
+    (#2).
+  - New `EngineCapabilities.bills_failed_attempts`, set on all 17
+    per-call-billed paid engines, and
+    `ladders.derive_budget_accounting(engines)` deriving a race's billing
+    mode from those flags; a golden test asserts every `RaceStep` in
+    `LADDERS` declares exactly the derived mode — billing modes are now
+    data-checked, not trusted (#4).
+  - Per-engine `avg_response_mb_estimate` set across the registry: browser
+    session engines 15 MB, rendered-HTML proxy APIs 3 MB, markdown/JSON API
+    engines 0.5 MB — feeding the router's per-engine cost gate, which reads
+    each engine's own estimate (#3, #5).
 
 ### Changed
 

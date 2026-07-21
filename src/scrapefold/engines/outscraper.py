@@ -92,6 +92,8 @@ class OutscraperEngine(ScrapeEngine):
         output_native_markdown=False,
         site_classified=True,
         default_timeout_s=60,
+        avg_response_mb_estimate=0.5,  # JSON payload
+        bills_failed_attempts=True,
     )
     # Outscraper handles LinkedIn URLs as opaque inputs; most browser
     # knobs (render_js, stealth, country, wait_ms, …) do not apply.

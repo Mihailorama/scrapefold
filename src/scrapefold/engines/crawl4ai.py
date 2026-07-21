@@ -158,6 +158,7 @@ class Crawl4AIEngine(ScrapeEngine):
         proxy_type="datacenter",
         output_native_markdown=True,
         default_timeout_s=60,
+        avg_response_mb_estimate=15.0,  # full browser session
     )
     SUPPORTED_OPTIONS = frozenset(
         {

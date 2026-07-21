@@ -125,6 +125,7 @@ class ScraplingStealthEngine(ScrapeEngine):
         proxy_type="datacenter",
         output_native_markdown=False,
         default_timeout_s=60,
+        avg_response_mb_estimate=15.0,  # full browser session
     )
     SUPPORTED_OPTIONS = frozenset(
         {

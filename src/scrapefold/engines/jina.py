@@ -97,6 +97,7 @@ class JinaEngine(ScrapeEngine):
         free_tier=True,
         output_native_markdown=True,
         default_timeout_s=60,
+        avg_response_mb_estimate=0.5,  # markdown payload
     )
     SUPPORTED_OPTIONS = frozenset(
         {

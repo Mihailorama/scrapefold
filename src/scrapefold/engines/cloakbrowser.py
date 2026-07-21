@@ -153,6 +153,7 @@ class CloakBrowserEngine(ScrapeEngine):
         proxy_type="residential",
         output_native_markdown=False,
         default_timeout_s=90,
+        avg_response_mb_estimate=15.0,  # full browser session
     )
     SUPPORTED_OPTIONS = frozenset(
         {

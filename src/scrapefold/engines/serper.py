@@ -67,6 +67,8 @@ class SerperEngine(ScrapeEngine):
         output_native_markdown=True,
         free_tier=True,  # 2 500 free credits on signup
         default_timeout_s=60,
+        avg_response_mb_estimate=0.5,  # markdown/JSON payload
+        bills_failed_attempts=True,
     )
     SUPPORTED_OPTIONS = frozenset({"output_format", "timeout_s", "extra"})
 

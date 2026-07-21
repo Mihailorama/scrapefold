@@ -110,6 +110,7 @@ class SeleniumEngine(ScrapeEngine):
         proxy_type="datacenter",
         output_native_markdown=False,
         default_timeout_s=60,
+        avg_response_mb_estimate=15.0,  # full browser session
     )
     # custom_headers and cookies are NOT honored by this v1 (selenium can't set
     # arbitrary request headers, and add_cookie requires a prior same-domain

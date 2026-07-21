@@ -172,6 +172,7 @@ class MaxunEngine(ScrapeEngine):
         free_tier=True,
         output_native_markdown=True,
         default_timeout_s=_DEFAULT_TIMEOUT_S,
+        avg_response_mb_estimate=0.5,  # robot-run JSON payload
     )
     SUPPORTED_OPTIONS = frozenset({"output_format", "take_screenshot", "timeout_s", "extra"})
 

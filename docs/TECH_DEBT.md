@@ -24,49 +24,115 @@ in the ladders.py file alone.
 - v0.3.0 shipped the social-normalization layer, `apify_actor`, Telegram,
   TGStat, Telemetr, LabelUp, PixelRAG, and SocialCrawl. The router still
   walks `RaceStep` entries sequentially.
-- Items tagged "RaceStep-coupled" remain open after v0.3.0 — they cannot
-  be fully validated without concurrent race fan-out in the router. Item
-  #1 (`budget_mode`), #2 (race billing), and #4 (race billing default)
-  are RaceStep-coupled.
 
-Sequential walking is still the consumer-safe default; concurrent fan-out
-needs a focused router cycle with billing and budget tests before it becomes
-public behavior.
+**Post-0.4 (Unreleased) status: all seven items resolved** — see each item's
+Resolution note. The RaceStep-coupled ones (#1, #2, #4) are resolved *for the
+sequential walk*: budget-mode resets are wired, per-attempt billing implements
+`sum_all` semantics for real spend, and declared race billing modes are pinned
+to engine capabilities by a golden test. `winner_only`/`max` become
+behaviorally distinct only when a future router cycle lands concurrent
+fan-out with cancellation; `derive_budget_accounting` is the ready-made
+data-driven default for that cycle. Sequential walking remains the
+consumer-safe default.
 
-### 1. `budget_mode` wiring in the router
+### 1. `budget_mode` wiring in the router — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/router.py` (S7).
-- **Status:** `BudgetMode = Literal["inherit", "reset_user_fast_track", "reset_fresh_session"]` is defined and `_StepBase.budget_mode` carries the field, but no code mutates `WalkBudget` when a step declares a non-`inherit` mode.
-- **Fix:** add `_apply_budget_mode(walk, step.budget_mode)` at the top of the router loop. `reset_user_fast_track` zeros `cost_usd`/`engines_tried` but keeps `reclassifications`; `reset_fresh_session` zeros everything.
-- **Test:** `test_router_applies_reset_fresh_session` once router lands.
+- **Where:** `src/scrapefold/router.py` — `_apply_budget_mode`, called at the
+  top of the ladder step loop in `_walk_inner`.
+- **Resolution:** per the sketch: `reset_user_fast_track` zeros
+  `cost_usd`/`engines_tried` (fresh cost + engine-count headroom for a
+  user-blessed expensive tier) but keeps `elapsed_ms` and `reclassifications`
+  — a fast track must not restart the clock or re-arm the loop guard;
+  `reset_fresh_session` additionally zeros `elapsed_ms` and
+  `reclassifications`. `visited_site_classes` is deliberately preserved in
+  both modes (loop-guard state, not budget — clearing it could re-enable
+  A→B→A reclassification ping-pong). No ladder declares a non-`inherit` mode
+  today, so the default walk is byte-for-byte unchanged.
+- **Tests:** `tests/test_router.py` — the named
+  `test_router_applies_reset_fresh_session` (max_engines exhausted by tier 1;
+  the reset step still wins), its no-reset control
+  (`test_router_without_budget_mode_halts_on_max_engines`), and
+  `test_router_reset_user_fast_track_zeroes_cost`.
 
-### 2. Race fan-out cost when `budget_accounting="sum_all"`
+### 2. Race fan-out cost when `budget_accounting="sum_all"` — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/router.py` (S7), `_invoke_race_step`.
-- **Status:** `RaceStep.budget_accounting` is data; ladders already opt paid races into `sum_all`. But the router accumulator that credits `WalkBudget.cost_usd` doesn't yet exist.
-- **Fix:** for each engine that actually issued a request inside the race, add its `_estimate_step_cost`-equivalent to `walk.cost_usd`. `winner_only` only counts the winner; `max` charges the most expensive engine that ran.
-- **Test:** `test_router_race_step_bills_all_engines_when_sum_all`.
+- **Where:** `src/scrapefold/router.py` — the `_AttemptResult.cost_delta`
+  accumulator applied by `_walk_inner` for every invoked engine; module
+  docstring documents the race-billing semantics.
+- **Resolution:** under the sequential race walk, **every engine that is
+  actually invoked credits its cost to the walk budget** — an attempt that
+  returns a blocked/suspicious page (or errors after issuing the request) was
+  still billed vendor-side, so the walk counts it. That is exactly `sum_all`
+  semantics and matches real spend, because sequentially every attempted
+  engine truly issues its own request. `winner_only`/`max` are
+  *scheduling-dependent* refinements that only diverge from `sum_all` once
+  concurrent fan-out can cancel losers before they bill; the sequential walk
+  deliberately does not under-count spend by honoring them early. Declared
+  modes are kept consistent with engine capabilities by
+  `derive_budget_accounting` + the ladder golden test (item #4).
+- **Tests:** `tests/test_router.py` — the named
+  `test_router_race_step_bills_all_engines_when_sum_all` (both blocked race
+  members' costs deplete the budget; the next tier's cost gate then rejects
+  an engine that would otherwise fit) and its headroom control
+  (`test_router_race_billing_control_with_headroom`).
 
-### 3. Per-engine `avg_response_mb` override
+### 3. Per-engine `avg_response_mb` override — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/router.py` calling `_estimate_step_cost`.
-- **Status:** `EngineCapabilities.avg_response_mb_estimate: float = 2.0` exists per engine. `_estimate_step_cost` accepts an `avg_response_mb` arg but the router doesn't read the engine cap and pass it through.
-- **Fix:** when computing step cost for a `SequentialStep`, look up the engine's `CAPABILITIES.avg_response_mb_estimate` and pass it. For a `RaceStep`, take the max across the racing engines.
-- **Test:** `test_estimate_step_cost_for_browser_engine_uses_higher_mb_estimate`.
+- **Where:** `src/scrapefold/router.py` — gate 5 of `_attempt_engine`.
+- **Resolution:** the router reads
+  `engine_cls.CAPABILITIES.avg_response_mb_estimate` and passes it to
+  `estimate_step_cost(_cost_step, avg_response_mb=engine_mb)` when building
+  the per-engine cost estimate. Because billing happens per *engine attempt*
+  (races are walked sequentially — see #2), each racing engine gets its own
+  estimate, which supersedes the sketch's "max across the racing engines".
+  Per-engine values are now set (item #5), so gb-billed browser engines are
+  costed at their real session sizes.
+- **Tests:** `tests/test_router.py::test_router_uses_engine_avg_response_mb_override`
+  plus the per-engine value smoke tests in `tests/test_ladders.py` (item #5).
 
-### 4. Race billing default re-examination
+### 4. Race billing default re-examination — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/ladders.py` `RaceStep.budget_accounting` default.
-- **Status:** Current default is `winner_only`. Paid races in LADDERS already opt into `sum_all`. Codex round-3 R3-H1 argued the default should be `sum_all` because most paid vendors bill failed attempts.
-- **Fix:** once a `bills_failed_attempts: bool` lands on `EngineCapabilities`, derive the default per RaceStep from the engines it lists rather than hardcoding either side. Until then, keep `winner_only` default + per-step opt-in.
-- **Test:** golden-corpus snapshot of every `LADDERS` entry's billing mode (already partially covered by `test_paid_linkedin_race_steps_use_sum_all_billing`).
+- **Where:** `src/scrapefold/engines/base.py`
+  (`EngineCapabilities.bills_failed_attempts`) +
+  `src/scrapefold/ladders.py` (`derive_budget_accounting`).
+- **Resolution:** `bills_failed_attempts: bool` landed on
+  `EngineCapabilities` — set on all 17 per-call-billed paid engines
+  (`requires_api_key and estimated_cost_usd > 0`; self-hosted zero-cost
+  `maxun` correctly excluded), because a 200-with-captcha the router later
+  rejects was still billed vendor-side (Codex R3-H1's argument).
+  `derive_budget_accounting(engine_names)` derives a race's billing mode from
+  those flags: any billed engine → `sum_all`, all-free → `winner_only`
+  (unshipped names like `brightdata_*` are skipped). The dataclass default
+  stays `winner_only`, but it is no longer *trusted*: the ladder golden test
+  asserts every `RaceStep`'s declared mode equals the derivation — a race
+  that adds a billed engine without flipping to `sum_all` now fails CI. The
+  helper is also the ready-made data-driven default for the future concurrent
+  fan-out cycle.
+- **Tests:** `tests/test_ladders.py` —
+  `test_every_race_billing_mode_matches_engine_derivation` (the golden
+  snapshot over all `LADDERS`), `test_derive_budget_accounting_flags_billed_engine`,
+  and `test_billed_paid_engines_declare_bills_failed_attempts` (registry-wide
+  flag↔billing invariant), alongside the pre-existing
+  `test_paid_linkedin_race_steps_use_sum_all_billing`.
 
-### 5. `avg_response_mb_estimate` default per engine
+### 5. `avg_response_mb_estimate` default per engine — RESOLVED (Unreleased)
 
-- **Where:** Each engine file under `src/scrapefold/engines/`.
-- **Status:** Base default `2.0` is conservative for static HTTP, low for browser/unlocker engines that easily push 10-50 MB per session. The field exists; per-engine overrides are not yet set because engines don't exist yet.
-- **Fix:** when each engine PR (S2-S11) lands, set `CAPABILITIES = EngineCapabilities(avg_response_mb_estimate=N, ...)`. Browser/unlocker engines: 15-30 MB. Markdown engines (Jina): 0.5 MB.
-- **Test:** add a per-engine smoke test asserting the value is non-default for browser engines.
+- **Where:** Every engine file under `src/scrapefold/engines/`.
+- **Resolution:** per-engine values set across the registry:
+  full-browser-session engines (`selenium`, `cloakbrowser`,
+  `scrapling_stealth`, `crawl4ai`, joining the already-set `pydoll`,
+  `camoufox`, `pixelrag`) → **15 MB**; rendered-HTML proxy APIs
+  (`scrapingbee`, `scrapingdog`, `scraperapi`, `oxylabs`) → **3 MB**;
+  markdown/JSON API engines (`jina`, `firecrawl`, `serper`, `maxun`,
+  `telegram`, and the social/structured vendors) → **0.5 MB**; plain-HTTP
+  engines (`requests`, `scrapling_fast`) keep the conservative 2 MB default.
+  Combined with #3's pass-through, gb-billed engines are now costed at
+  realistic sizes.
+- **Tests:** `tests/test_ladders.py` —
+  `test_browser_engines_declare_nondefault_avg_response_mb` (≥ 10 MB for all
+  seven browser engines) and
+  `test_api_payload_engines_declare_light_avg_response_mb` (≤ 1 MB for the
+  fifteen API-payload engines).
 
 ### 6. Engine-registration must populate `ENGINE_ALIASES` — RESOLVED (Unreleased)
 

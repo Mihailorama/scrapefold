@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import ClassVar, Literal
 
@@ -645,6 +646,32 @@ def estimate_step_cost(
     return step.estimated_cost_usd
 
 
+def derive_budget_accounting(engine_names: Iterable[str]) -> Literal["winner_only", "sum_all"]:
+    """Derive a race's billing mode from its engines' capabilities (P1 #4).
+
+    ``"sum_all"`` when any resolvable engine declares
+    ``CAPABILITIES.bills_failed_attempts`` — a vendor that charges for
+    attempts the router later rejects must have every attempted request
+    counted against the walk budget (Codex R3-H1). All-free races stay
+    ``"winner_only"``. Engine names that don't resolve in the registry
+    (declared-but-unshipped, e.g. ``brightdata_*``) are skipped.
+
+    Used by the ladder golden test to keep every ``RaceStep``'s declared
+    ``budget_accounting`` consistent with its engines, and by any future
+    concurrent fan-out cycle as the data-driven default.
+    """
+    from scrapefold.engines import get_engine  # deferred: engines are lazy-imported
+
+    for name in engine_names:
+        try:
+            engine_cls = get_engine(name)
+        except KeyError:
+            continue
+        if engine_cls.CAPABILITIES.bills_failed_attempts:
+            return "sum_all"
+    return "winner_only"
+
+
 def check_budget(
     step: LadderStep,
     walk: WalkBudget,
@@ -692,6 +719,7 @@ __all__ = [
     "WalkBudget",
     "check_budget",
     "classify_url",
+    "derive_budget_accounting",
     "estimate_step_cost",
     "flatten_ladder",
     "get_default_policy",

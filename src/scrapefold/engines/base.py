@@ -65,6 +65,15 @@ class EngineCapabilities:
     """Expected response size for ``billing_unit == "gb"``. Browser/unlocker
     engines should override (sessions easily push 10-50 MB)."""
 
+    bills_failed_attempts: bool = False
+    """The vendor charges for attempts that don't yield a usable page.
+
+    True for paid per-call vendors: a 200-with-captcha the router later
+    rejects as suspicious was still billed vendor-side. Drives race billing —
+    ``ladders.derive_budget_accounting`` returns ``"sum_all"`` for any race
+    containing a flagged engine (Codex R3-H1). Keep ``False`` for free/local
+    engines and self-hosted paid ones with no per-call charge (maxun)."""
+
     # --- Vendor / geography / policy ---
     requires_api_key: bool = True
     geography: tuple[str, ...] = ()

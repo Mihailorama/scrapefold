@@ -76,6 +76,7 @@ class CloudflareEngine(ScrapeEngine):
         output_native_markdown=True,
         default_timeout_s=60,
         avg_response_mb_estimate=1.0,
+        bills_failed_attempts=True,
     )
     SUPPORTED_OPTIONS = frozenset(
         {
