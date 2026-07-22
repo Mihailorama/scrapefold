@@ -134,6 +134,8 @@ class FirecrawlEngine(ScrapeEngine):
         proxy_type="datacenter",
         output_native_markdown=True,
         default_timeout_s=60,
+        avg_response_mb_estimate=0.5,  # markdown/JSON payload
+        bills_failed_attempts=True,
     )
     SUPPORTED_OPTIONS = frozenset(
         {

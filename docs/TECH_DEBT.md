@@ -24,63 +24,146 @@ in the ladders.py file alone.
 - v0.3.0 shipped the social-normalization layer, `apify_actor`, Telegram,
   TGStat, Telemetr, LabelUp, PixelRAG, and SocialCrawl. The router still
   walks `RaceStep` entries sequentially.
-- Items tagged "RaceStep-coupled" remain open after v0.3.0 — they cannot
-  be fully validated without concurrent race fan-out in the router. Item
-  #1 (`budget_mode`), #2 (race billing), and #4 (race billing default)
-  are RaceStep-coupled.
 
-Sequential walking is still the consumer-safe default; concurrent fan-out
-needs a focused router cycle with billing and budget tests before it becomes
-public behavior.
+**Post-0.4 (Unreleased) status: all seven items resolved** — see each item's
+Resolution note. The RaceStep-coupled ones (#1, #2, #4) are resolved *for the
+sequential walk*: budget-mode resets are wired, per-attempt billing implements
+`sum_all` semantics for real spend, and declared race billing modes are pinned
+to engine capabilities by a golden test. `winner_only`/`max` become
+behaviorally distinct only when a future router cycle lands concurrent
+fan-out with cancellation; `derive_budget_accounting` is the ready-made
+data-driven default for that cycle. Sequential walking remains the
+consumer-safe default.
 
-### 1. `budget_mode` wiring in the router
+### 1. `budget_mode` wiring in the router — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/router.py` (S7).
-- **Status:** `BudgetMode = Literal["inherit", "reset_user_fast_track", "reset_fresh_session"]` is defined and `_StepBase.budget_mode` carries the field, but no code mutates `WalkBudget` when a step declares a non-`inherit` mode.
-- **Fix:** add `_apply_budget_mode(walk, step.budget_mode)` at the top of the router loop. `reset_user_fast_track` zeros `cost_usd`/`engines_tried` but keeps `reclassifications`; `reset_fresh_session` zeros everything.
-- **Test:** `test_router_applies_reset_fresh_session` once router lands.
+- **Where:** `src/scrapefold/router.py` — `_apply_budget_mode`, called at the
+  top of the ladder step loop in `_walk_inner`.
+- **Resolution:** per the sketch: `reset_user_fast_track` zeros
+  `cost_usd`/`engines_tried` (fresh cost + engine-count headroom for a
+  user-blessed expensive tier) but keeps `elapsed_ms` and `reclassifications`
+  — a fast track must not restart the clock or re-arm the loop guard;
+  `reset_fresh_session` additionally zeros `elapsed_ms` and
+  `reclassifications`. `visited_site_classes` is deliberately preserved in
+  both modes (loop-guard state, not budget — clearing it could re-enable
+  A→B→A reclassification ping-pong). No ladder declares a non-`inherit` mode
+  today, so the default walk is byte-for-byte unchanged.
+- **Tests:** `tests/test_router.py` — the named
+  `test_router_applies_reset_fresh_session` (max_engines exhausted by tier 1;
+  the reset step still wins), its no-reset control
+  (`test_router_without_budget_mode_halts_on_max_engines`), and
+  `test_router_reset_user_fast_track_zeroes_cost`.
 
-### 2. Race fan-out cost when `budget_accounting="sum_all"`
+### 2. Race fan-out cost when `budget_accounting="sum_all"` — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/router.py` (S7), `_invoke_race_step`.
-- **Status:** `RaceStep.budget_accounting` is data; ladders already opt paid races into `sum_all`. But the router accumulator that credits `WalkBudget.cost_usd` doesn't yet exist.
-- **Fix:** for each engine that actually issued a request inside the race, add its `_estimate_step_cost`-equivalent to `walk.cost_usd`. `winner_only` only counts the winner; `max` charges the most expensive engine that ran.
-- **Test:** `test_router_race_step_bills_all_engines_when_sum_all`.
+- **Where:** `src/scrapefold/router.py` — the `_AttemptResult.cost_delta`
+  accumulator applied by `_walk_inner` for every invoked engine; module
+  docstring documents the race-billing semantics.
+- **Resolution:** under the sequential race walk, **every engine that is
+  actually invoked credits its cost to the walk budget** — an attempt that
+  returns a blocked/suspicious page (or errors after issuing the request) was
+  still billed vendor-side, so the walk counts it. That is exactly `sum_all`
+  semantics and matches real spend, because sequentially every attempted
+  engine truly issues its own request. `winner_only`/`max` are
+  *scheduling-dependent* refinements that only diverge from `sum_all` once
+  concurrent fan-out can cancel losers before they bill; the sequential walk
+  deliberately does not under-count spend by honoring them early. Declared
+  modes are kept consistent with engine capabilities by
+  `derive_budget_accounting` + the ladder golden test (item #4).
+- **Tests:** `tests/test_router.py` — the named
+  `test_router_race_step_bills_all_engines_when_sum_all` (both blocked race
+  members' costs deplete the budget; the next tier's cost gate then rejects
+  an engine that would otherwise fit) and its headroom control
+  (`test_router_race_billing_control_with_headroom`).
 
-### 3. Per-engine `avg_response_mb` override
+### 3. Per-engine `avg_response_mb` override — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/router.py` calling `_estimate_step_cost`.
-- **Status:** `EngineCapabilities.avg_response_mb_estimate: float = 2.0` exists per engine. `_estimate_step_cost` accepts an `avg_response_mb` arg but the router doesn't read the engine cap and pass it through.
-- **Fix:** when computing step cost for a `SequentialStep`, look up the engine's `CAPABILITIES.avg_response_mb_estimate` and pass it. For a `RaceStep`, take the max across the racing engines.
-- **Test:** `test_estimate_step_cost_for_browser_engine_uses_higher_mb_estimate`.
+- **Where:** `src/scrapefold/router.py` — gate 5 of `_attempt_engine`.
+- **Resolution:** the router reads
+  `engine_cls.CAPABILITIES.avg_response_mb_estimate` and passes it to
+  `estimate_step_cost(_cost_step, avg_response_mb=engine_mb)` when building
+  the per-engine cost estimate. Because billing happens per *engine attempt*
+  (races are walked sequentially — see #2), each racing engine gets its own
+  estimate, which supersedes the sketch's "max across the racing engines".
+  Per-engine values are now set (item #5), so gb-billed browser engines are
+  costed at their real session sizes.
+- **Tests:** `tests/test_router.py::test_router_uses_engine_avg_response_mb_override`
+  plus the per-engine value smoke tests in `tests/test_ladders.py` (item #5).
 
-### 4. Race billing default re-examination
+### 4. Race billing default re-examination — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/ladders.py` `RaceStep.budget_accounting` default.
-- **Status:** Current default is `winner_only`. Paid races in LADDERS already opt into `sum_all`. Codex round-3 R3-H1 argued the default should be `sum_all` because most paid vendors bill failed attempts.
-- **Fix:** once a `bills_failed_attempts: bool` lands on `EngineCapabilities`, derive the default per RaceStep from the engines it lists rather than hardcoding either side. Until then, keep `winner_only` default + per-step opt-in.
-- **Test:** golden-corpus snapshot of every `LADDERS` entry's billing mode (already partially covered by `test_paid_linkedin_race_steps_use_sum_all_billing`).
+- **Where:** `src/scrapefold/engines/base.py`
+  (`EngineCapabilities.bills_failed_attempts`) +
+  `src/scrapefold/ladders.py` (`derive_budget_accounting`).
+- **Resolution:** `bills_failed_attempts: bool` landed on
+  `EngineCapabilities` — set on all 17 per-call-billed paid engines
+  (`requires_api_key and estimated_cost_usd > 0`; self-hosted zero-cost
+  `maxun` correctly excluded), because a 200-with-captcha the router later
+  rejects was still billed vendor-side (Codex R3-H1's argument).
+  `derive_budget_accounting(engine_names)` derives a race's billing mode from
+  those flags: any billed engine → `sum_all`, all-free → `winner_only`
+  (unshipped names like `brightdata_*` are skipped). The dataclass default
+  stays `winner_only`, but it is no longer *trusted*: the ladder golden test
+  asserts every `RaceStep`'s declared mode equals the derivation — a race
+  that adds a billed engine without flipping to `sum_all` now fails CI. The
+  helper is also the ready-made data-driven default for the future concurrent
+  fan-out cycle.
+- **Tests:** `tests/test_ladders.py` —
+  `test_every_race_billing_mode_matches_engine_derivation` (the golden
+  snapshot over all `LADDERS`), `test_derive_budget_accounting_flags_billed_engine`,
+  and `test_billed_paid_engines_declare_bills_failed_attempts` (registry-wide
+  flag↔billing invariant), alongside the pre-existing
+  `test_paid_linkedin_race_steps_use_sum_all_billing`.
 
-### 5. `avg_response_mb_estimate` default per engine
+### 5. `avg_response_mb_estimate` default per engine — RESOLVED (Unreleased)
 
-- **Where:** Each engine file under `src/scrapefold/engines/`.
-- **Status:** Base default `2.0` is conservative for static HTTP, low for browser/unlocker engines that easily push 10-50 MB per session. The field exists; per-engine overrides are not yet set because engines don't exist yet.
-- **Fix:** when each engine PR (S2-S11) lands, set `CAPABILITIES = EngineCapabilities(avg_response_mb_estimate=N, ...)`. Browser/unlocker engines: 15-30 MB. Markdown engines (Jina): 0.5 MB.
-- **Test:** add a per-engine smoke test asserting the value is non-default for browser engines.
+- **Where:** Every engine file under `src/scrapefold/engines/`.
+- **Resolution:** per-engine values set across the registry:
+  full-browser-session engines (`selenium`, `cloakbrowser`,
+  `scrapling_stealth`, `crawl4ai`, joining the already-set `pydoll`,
+  `camoufox`, `pixelrag`) → **15 MB**; rendered-HTML proxy APIs
+  (`scrapingbee`, `scrapingdog`, `scraperapi`, `oxylabs`) → **3 MB**;
+  markdown/JSON API engines (`jina`, `firecrawl`, `serper`, `maxun`,
+  `telegram`, and the social/structured vendors) → **0.5 MB**; plain-HTTP
+  engines (`requests`, `scrapling_fast`) keep the conservative 2 MB default.
+  Combined with #3's pass-through, gb-billed engines are now costed at
+  realistic sizes.
+- **Tests:** `tests/test_ladders.py` —
+  `test_browser_engines_declare_nondefault_avg_response_mb` (≥ 10 MB for all
+  seven browser engines) and
+  `test_api_payload_engines_declare_light_avg_response_mb` (≤ 1 MB for the
+  fifteen API-payload engines).
 
-### 6. Engine-registration must populate `ENGINE_ALIASES`
+### 6. Engine-registration must populate `ENGINE_ALIASES` — RESOLVED (Unreleased)
 
-- **Where:** Each engine file under `src/scrapefold/engines/` for multi-mode engines.
-- **Status:** `register_alias` / `resolve_alias` exist; `ENGINE_ALIASES` ships empty. Each engine PR for a multi-mode engine must call `register_alias("scrapling", "scrapling_stealth")` (etc.) at module import time.
-- **Fix:** in `engines/scrapling_stealth.py`, `engines/brightdata_unlocker_sync.py`, add a `register_alias(...)` call alongside `register(...)`.
-- **Test:** `test_user_facing_alias_resolves_to_default_mode` per engine.
+- **Where:** `src/scrapefold/engines/__init__.py`.
+- **Resolution:** aliases are registered centrally in the lazy registry module
+  (rather than per engine file — one place to audit):
+  `register_alias("scrapling", "scrapling_stealth")` and
+  `register_alias("apify", "apify_actor")` run at import time, and
+  `get_engine()` resolves through `resolve_alias()`. The
+  `brightdata_unlocker_sync` alias named in the original sketch is n/a until
+  the Bright Data engine ships (item #11).
+- **Tests:** `tests/test_ladders.py` —
+  `test_user_facing_alias_resolves_to_default_mode` (parametrized over both
+  aliases; asserts `get_engine(alias).NAME == canonical`), plus
+  `test_resolve_alias_round_trip` and
+  `test_register_alias_can_be_overridden_temporarily`;
+  `tests/test_engine_apify_actor.py::test_registry_resolves_apify_actor_and_alias`.
 
-### 7. Probe-cache implementation in the router
+### 7. Probe-cache implementation in the router — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/router.py` (S7).
-- **Status:** `ScrapeEngine.PROBE_SCOPE` declared (`"none" | "per_url" | "per_domain" | "per_session"`), default `probe()` returns `True`. No cache exists yet.
-- **Fix:** module-level `dict[tuple[engine_name, scope_key], bool]` where `scope_key` is `url`, `tldextract.extract(url).registered_domain`, or `"_session"`. Look up before calling `engine.probe(url)`; store the result keyed by scope.
-- **Test:** `test_router_caches_per_domain_probe_across_urls` (50-URL crawl on reddit.com → 1 probe call).
+- **Where:** `src/scrapefold/router.py` — `_PROBE_CACHE` + `_probe_scope_key`
+  + gate 6b of `_attempt_engine`.
+- **Resolution:** module-level `dict[tuple[engine_name, scope_key], bool]`
+  exactly per the sketch: `scope_key` is the URL (`per_url`), the
+  tldextract registered domain (`per_domain`), or `"_session"`
+  (`per_session`); `PROBE_SCOPE == "none"` bypasses the cache entirely.
+  Gate 6b consults the cache before `engine.probe(url)`: a cached `False`
+  skips the engine without re-probing; a miss runs the probe once and stores
+  the outcome keyed by scope.
+- **Tests:** `tests/test_router.py::test_router_caches_per_domain_probe_across_urls`
+  (two same-domain walks → exactly one probe call).
 
 ## P2 — backlog (no current blocker)
 
@@ -113,30 +196,28 @@ public behavior.
 - **Fix sketch:** implement `engines/brightdata_unlocker.py` against Bright Data's Web Unlocker API (`https://api.brightdata.com/datacenter/zone/unlock` or equivalent). Capability: `proxy_type="residential"`, `geography=(<country_code>,)`. Wire into ladders for the geofenced site class.
 - **Priority:** P2 — needed for provider redundancy and full coverage of IP-geofenced targets; Oxylabs covers the first shipped residential-geo path.
 
-### 12. No sync wrapper that's robust to leaked event loops in the caller
+### 12. No sync wrapper that's robust to leaked event loops in the caller — RESOLVED (Unreleased)
 
-- **Where:** `src/scrapefold/__init__.py` (public API surface).
-- **Status:** `scrape()` is async-only; callers in sync codebases write
-  `asyncio.run(scrape(...))` per call. This breaks the moment the caller's
-  process has *any* leaked asyncio loop in its main thread — most common
-  trigger: Playwright Sync API (used by `cloakbrowser`, `playwright-stealth`,
-  etc.) leaks a running loop, after which `asyncio.run` raises
-  `RuntimeError: asyncio.run() cannot be called from a running event loop`.
-- **Found by:** phynder PR 1 smoke test on 2026-05-26 (`Mihailorama/phynder#62`,
-  commit `ed16868`). Phynder's adapter currently works around this by running
-  `asyncio.run(scrape(...))` inside a `ThreadPoolExecutor(max_workers=1)` —
-  the worker thread always has a clean asyncio context regardless of leaks
-  in the main thread.
-- **Fix sketch:** expose `scrape_sync(url, opts=None, pool=None) -> ScrapeResult`
-  alongside `scrape()`. Implementation does the same worker-thread isolation
-  internally so sync callers don't repeat the pattern. Same for `crawl_site_sync`.
-  Document the rationale (leaked loops from Playwright Sync) in the docstring.
-- **Why P2:** sync callers can write the 5-line `ThreadPoolExecutor` workaround
-  themselves (phynder did), so it's an ergonomics improvement, not a blocker.
-  Becomes more valuable as more sync codebases adopt scrapefold.
-- **Test:** `test_scrape_sync_works_inside_running_event_loop` — call
-  `scrape_sync()` from inside `asyncio.run(harness())` and assert it returns
-  a `ScrapeResult` instead of raising.
+- **Where:** `src/scrapefold/__init__.py` — `scrape_sync(url, opts=None)` and
+  `crawl_site_sync(url, opts=None, output=None, **kwargs)`, both public exports.
+- **Resolution:** each call runs the async API to completion via
+  `asyncio.run` on a **fresh event loop in a dedicated worker thread**
+  (`_run_sync`, `ThreadPoolExecutor(max_workers=1)`), so the wrappers keep
+  working even when the calling thread has a running or leaked loop — the
+  Playwright-Sync-API failure mode found by phynder
+  (`Mihailorama/phynder#62`, commit `ed16868`), whose 5-line workaround this
+  internalizes. One deliberate deviation from the original sketch:
+  `scrape_sync` takes **no `pool` parameter** — an `EnginePool` holds network
+  clients bound to the loop they were created on, and each sync call uses a
+  fresh short-lived loop, so a reused pool would hand out clients tied to a
+  dead loop. Sync callers needing connection reuse across many URLs use
+  `crawl_site_sync` (one loop spans the whole crawl, pool reuse inside) or
+  the async API. Rationale documented in both docstrings.
+- **Tests:** `tests/test_sync.py` (5) — the named
+  `test_scrape_sync_works_inside_running_event_loop` (called from inside
+  `asyncio.run(harness())`; returns a `ScrapeResult`, and the walk provably
+  ran on the `scrapefold-sync` worker thread), plus plain-call, exception
+  propagation, opts pass-through, and `crawl_site_sync` under a running loop.
 
 ### 13. Maxun capability ratings in README / site are unverified
 
@@ -149,6 +230,114 @@ public behavior.
 - **Fix:** verify against a live self-hosted Maxun instance (robot replay is
   Playwright-based) and correct the ratings / strengths blurb if wrong.
 - **Priority:** P3 — cosmetic doc accuracy, no code impact.
+
+## P2 — architecture borrowed from competitors (carousel review 2026-07-18)
+
+These three came out of a side-by-side with the market leaders (Firecrawl,
+Crawl4AI, Crawlee, ScrapeGraphAI, Scrapy, pydoll, Camoufox, Trafilatura,
+Katana, Selectolax). The engines worth having as engines shipped this cycle
+(`pydoll`, `camoufox`, plus Trafilatura as opt-in `main_content`). What's left
+are **cross-cutting architecture ideas** — layers, not engines — that the
+per-engine `ScrapeEngine` abstraction doesn't cover yet. Each is scoped to slot
+in without breaking the golden rules (one options schema, engines drop
+unsupported opts, no vendor LLM SDK).
+
+### 14. Crawlee-style session pool + proxy rotation ("proxy over proxy") — RESOLVED (Unreleased)
+
+- **Where:** `src/scrapefold/proxy.py` (`Session` + `SessionPool` +
+  `build_pool_from_options`), consumed by `router.walk`; new
+  `ScrapeOptions.proxy` / `ScrapeOptions.proxies` / `extra["proxy_pool"]`.
+- **Resolution:** a health-scored `SessionPool` now sits *above* each engine's
+  single-proxy setting — the "прокси над прокси" layer.
+  `_resolve_session_pool(opts)` builds it from `opts.proxies` (per-walk) or a
+  caller-owned `extra["proxy_pool"]` (crawl-spanning). Inside `_attempt_engine`,
+  a proxy-capable engine (`"proxy" in SUPPORTED_OPTIONS`) that returns a blocked
+  / suspicious / errored response has its session struck
+  (`pool.report(session, blocked=…)`) and is **retried behind a fresh exit IP**
+  (up to `extra["proxy_max_rotations"]`, default 2) before the walk escalates to
+  the next tier. Sessions retire past `max_errors` (default 3, Crawlee-style)
+  and heal one strike on a clean response; `acquire()` hands out the healthiest,
+  least-used exit. The unified `ScrapeOptions.proxy` maps to each free stealth
+  engine's native option (camoufox `proxy` dict, pydoll `--proxy-server`,
+  scrapling `proxy`); vendor engines that run their own fleet simply drop it.
+  The engine abstraction is untouched (engines still take one proxy) and the
+  whole layer is opt-in — with no proxies configured the router path is
+  byte-for-byte unchanged. Pool exhaustion never silently falls back to the real
+  IP: the engine is skipped so the walk escalates to vendor unlockers instead.
+- **Tests:** `tests/test_proxy.py` (12 unit tests: dedup, health-order acquire,
+  strike/retire/heal, exhaustion, masking) and
+  `tests/test_router.py::test_session_pool_retires_blocked_session_and_rotates_exit_ip`
+  (two proxies; first blocks → second chosen on retry; blocked one retired and
+  not reused), plus rotation-give-up and no-rotation-without-proxy-support, and
+  per-engine `proxy`-mapping tests for camoufox / pydoll / scrapling_stealth.
+
+### 15. Scrapy-style AutoThrottle for the crawler — RESOLVED (Unreleased)
+
+- **Where:** `src/scrapefold/crawler/throttle.py` (`AutoThrottle` + `host_of`),
+  wired into the `crawl()` walk in `src/scrapefold/crawler/__init__.py`; new
+  `ScrapeOptions.autothrottle` (+ `extra["autothrottle_*"]` tuning knobs).
+- **Resolution:** `crawl()` is a *serial* walk (not the fixed fan-out the
+  original sketch assumed), so the [Scrapy](https://github.com/scrapy/scrapy)
+  mechanism is adopted as its core primitive — an adaptive per-host *delay*
+  rather than a semaphore. When `opts.autothrottle` is set, `_build_throttle`
+  constructs an `AutoThrottle`; the loop sleeps `delay_for(host)` before each
+  fetch and folds `(latency, status_code)` back via `record(...)` after. Per
+  host it keeps an EWMA of latency, eases the delay toward
+  `ewma_latency / target_concurrency`, **never shrinks** the delay on a non-2xx
+  response, and applies an explicit exponential (2×) backoff on `429` / `503`
+  (and on a hard fetch failure via `failed=True`), all clamped to
+  `[min_delay, max_delay]`. Pure crawler-layer change: engines, `ScrapeResult`,
+  and single-URL `scrape()` are untouched, and the whole thing is opt-in
+  (`autothrottle=False` → not a single `asyncio.sleep`).
+- **Tests:** `tests/test_autothrottle.py` — the named
+  `test_autothrottle_backs_off_on_rising_latency` (rising synthetic latencies →
+  delay rises monotonically, `effective_throughput` falls), plus 429/503/failed
+  backoff, never-speed-up-on-error, min/max clamp, per-host isolation, and two
+  offline crawler-integration tests (delays sleep + latency/status recorded;
+  no sleeps when disabled).
+
+### 16. LLM-schema extraction (ScrapeGraphAI-shaped) via the user LLM callable — RESOLVED (Unreleased)
+
+- **Where:** `src/scrapefold/extract.py` (`extract`, `extract_into`,
+  `TextLLMCallable`, `ExtractionError`), exported from the package root.
+- **Resolution:** [ScrapeGraphAI](https://github.com/ScrapeGraphAI/Scrapegraph-ai)'s
+  "describe what you want, the LLM builds the extraction" hook, adopted as a
+  thin helper over the **user-provided** async callable — golden rule #5's
+  exact contract (`async def my_llm(prompt: str) -> str`), same injection
+  pattern as `vision.py` / pixelrag's `extra["reader"]`. No vendor LLM SDK, no
+  new dependency. `extract(source, schema=…, llm=…)` builds a deterministic
+  prompt from the result's markdown (falling back to `text`, or a raw string
+  source) + the schema — a JSON-Schema-style mapping *or* a natural-language
+  field description — plus optional `instructions`; parses the reply leniently
+  (code fences and surrounding prose stripped); runs a cheap dependency-free
+  structural check (top-level `type` object/array, top-level `required` keys);
+  and on a rejected reply **re-prompts with the failure reason fed back**
+  (`max_retries`, default 1) before raising `ExtractionError` (last raw reply
+  on `.raw_reply`). Content is capped at `max_content_chars` (default 150k)
+  before prompting. `extract_into(result, …)` returns a frozen copy with the
+  data landed in `ScrapeResult.json` + `meta["llm_extracted"]=True` — the same
+  slot native structured engines (Firecrawl `/extract`, AnySite, Apify) fill,
+  generalized to any engine's output.
+- **Tests:** `tests/test_extract.py` (19) — the named
+  `test_extract_fills_json_via_injected_llm` (stub llm; blob lands in
+  `result.json`; asserts no vendor LLM module imported), plus prompt
+  construction, fence/prose-tolerant parsing, self-correcting retry loop,
+  structural-check rejections, truncation, and frozen-copy semantics.
+
+### Deliberately NOT adopted
+
+Recorded so the next reviewer doesn't re-litigate:
+
+- **Crawlee (framework), Scrapy (framework):** whole crawling *frameworks* with
+  their own engine/scheduler/pipeline model — adopting either wholesale would
+  replace scrapefold's router+ladder, not extend it. We borrow their best
+  *ideas* (items 14–15) instead. Crawlee is also Node.js.
+- **Katana:** a Go link/endpoint-discovery crawler for pentest recon — it emits
+  URLs, not cleaned content, so it's out of scope for a URL→markdown library.
+  (If sitemap/BFS discovery ever needs a JS-aware endpoint harvester, revisit.)
+- **Selectolax:** a faster HTML parser (Lexbor). Pure optimization — would swap
+  BeautifulSoup/markdownify in `html_to_text.py` for throughput on massive
+  crawls. Deferred until parsing shows up in a profile; not a capability gap.
 
 ## How to add an item
 

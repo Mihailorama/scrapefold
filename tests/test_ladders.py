@@ -57,6 +57,8 @@ _VALID_ENGINES = frozenset(
         # new stealth browsers (open-source)
         "obscura",
         "cloakbrowser",
+        "pydoll",
+        "camoufox",
         # new paid SaaS
         "anysite",
         "scrapecreators",
@@ -406,6 +408,19 @@ def test_register_alias_can_be_overridden_temporarily() -> None:
             ENGINE_ALIASES["scrapling"] = original
 
 
+@pytest.mark.parametrize(
+    ("alias", "default_mode"),
+    [("scrapling", "scrapling_stealth"), ("apify", "apify_actor")],
+)
+def test_user_facing_alias_resolves_to_default_mode(alias: str, default_mode: str) -> None:
+    """P1 #6: every multi-mode engine's user-facing alias must resolve through
+    the registry to the canonical default-mode engine class."""
+    from scrapefold.engines import get_engine
+
+    engine_cls = get_engine(alias)
+    assert default_mode == engine_cls.NAME
+
+
 # ---------------------------------------------------------------------------
 # Visited-class loop guard
 # ---------------------------------------------------------------------------
@@ -456,3 +471,102 @@ def test_estimate_step_cost_gb_default_response_mb() -> None:
         billing_unit="gb",
     )
     assert estimate_step_cost(step) == pytest.approx(2.0 / 1024, rel=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# P1 #4 — race billing mode is derived from engine capabilities, not trusted
+# ---------------------------------------------------------------------------
+
+
+def test_derive_budget_accounting_flags_billed_engine() -> None:
+    from scrapefold.ladders import derive_budget_accounting
+
+    assert derive_budget_accounting(("scrapingbee", "scrapling_stealth")) == "sum_all"
+    assert derive_budget_accounting(("scrapling_stealth", "cloakbrowser")) == "winner_only"
+    # Declared-but-unshipped engines are skipped, not fatal.
+    assert derive_budget_accounting(("brightdata_unlocker_sync",)) == "winner_only"
+    assert derive_budget_accounting(("brightdata_unlocker_sync", "scrapingbee")) == "sum_all"
+
+
+def test_every_race_billing_mode_matches_engine_derivation() -> None:
+    """The P1 #4 golden test: every RaceStep's declared budget_accounting must
+    equal what its engines' bills_failed_attempts capabilities derive — a race
+    containing a vendor that bills failed attempts must be sum_all, an
+    all-free race must stay winner_only."""
+    from scrapefold.ladders import derive_budget_accounting
+
+    for site_class, ladder in LADDERS.items():
+        for step in ladder:
+            if not isinstance(step, RaceStep):
+                continue
+            expected = derive_budget_accounting(step.engines)
+            assert step.budget_accounting == expected, (
+                f"{site_class}: race {step.engines} declares "
+                f"{step.budget_accounting!r} but engine capabilities derive {expected!r}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# P1 #5 — per-engine avg_response_mb_estimate + bills_failed_attempts smoke
+# ---------------------------------------------------------------------------
+
+_BROWSER_SESSION_ENGINES = (
+    "selenium",
+    "cloakbrowser",
+    "scrapling_stealth",
+    "crawl4ai",
+    "pydoll",
+    "camoufox",
+    "pixelrag",
+)
+
+_LIGHT_PAYLOAD_ENGINES = (
+    "jina",
+    "firecrawl",
+    "serper",
+    "maxun",
+    "telegram",
+    "anysite",
+    "apify_actor",
+    "apify_linkedin",
+    "outscraper",
+    "scrapecreators",
+    "socialcrawl",
+    "exa",
+    "tgstat",
+    "telemetr",
+    "labelup",
+)
+
+
+@pytest.mark.parametrize("name", _BROWSER_SESSION_ENGINES)
+def test_browser_engines_declare_nondefault_avg_response_mb(name: str) -> None:
+    """P1 #5: full-browser-session engines must override the conservative
+    2 MB default — their sessions easily push 10-50 MB."""
+    from scrapefold.engines import get_engine
+
+    assert get_engine(name).CAPABILITIES.avg_response_mb_estimate >= 10.0
+
+
+@pytest.mark.parametrize("name", _LIGHT_PAYLOAD_ENGINES)
+def test_api_payload_engines_declare_light_avg_response_mb(name: str) -> None:
+    """P1 #5: markdown/JSON API engines return compact payloads, well under
+    the 2 MB default."""
+    from scrapefold.engines import get_engine
+
+    assert get_engine(name).CAPABILITIES.avg_response_mb_estimate <= 1.0
+
+
+def test_billed_paid_engines_declare_bills_failed_attempts() -> None:
+    """P1 #4 invariant: every per-call-billed paid engine flags
+    bills_failed_attempts; free/local (and self-hosted zero-cost) engines
+    must not."""
+    from scrapefold.engines import _REGISTRY, get_engine
+
+    for name in sorted(_REGISTRY):
+        caps = get_engine(name).CAPABILITIES
+        billed = caps.requires_api_key and caps.estimated_cost_usd > 0
+        assert caps.bills_failed_attempts == billed, (
+            f"{name}: bills_failed_attempts={caps.bills_failed_attempts} but "
+            f"requires_api_key={caps.requires_api_key}, cost={caps.estimated_cost_usd}"
+        )

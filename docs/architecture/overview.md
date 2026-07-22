@@ -21,12 +21,15 @@ src/scrapefold/
 │   ├── __init__.py      lazy engine registry
 │   └── <name>.py        one file per engine
 ├── router.py            (S7) auto-select + sequential fallback chain
+├── pool.py              (S7) EnginePool — engine-instance reuse across a walk
+├── proxy.py             SessionPool — health-scored proxy rotation ("proxy over proxy")
 ├── parallel.py          (S7) run-many + LLM-judge with injected callable
 ├── html_to_text.py      (S2) shared HTML → text / markdown
 ├── url_utils.py         (S2) scan_urls, classify_url, is_technical_url, formaturl
-├── crawler/             (S8) sitemap → BFS → filters → stitcher
+├── crawler/             (S8) sitemap → BFS → filters → stitcher (+ throttle.py: AutoThrottle)
 ├── cache.py             (S8) disk-backed TTL cache
 ├── vision.py            optional analyze_screenshot_with_llm(callable_llm)
+├── extract.py           LLM-schema extraction over the user LLM callable → ScrapeResult.json
 ├── cli.py               (S9) Typer entry — `scrapefold` console script
 └── mcp_server.py        (S10) MCP stdio server — `scrapefold-mcp` console script
 ```
@@ -204,6 +207,18 @@ _estimate_step_cost(step, avg_response_mb=2.0) -> float
 ### "Suspicious content" detection
 
 `scrapefold/detection.py` (S2) owns the heuristics (text length < `min_text_chars`, anti-bot phrases, `<noscript>`-dominant body, mostly-`<script>` body). The router calls `detection.is_suspicious(result)` and, on `True`, advances to the next step or reclassifies via `SIGNATURES`.
+
+### Proxy rotation — "proxy over proxy"
+
+`scrapefold/proxy.py` adds a health-scored `SessionPool` **above** each engine's own single-proxy setting. When the caller passes `opts.proxies=(…)` (or a crawl-spanning `extra["proxy_pool"]`), `router._resolve_session_pool` builds the pool once per walk. Before invoking a proxy-capable engine (`"proxy" in SUPPORTED_OPTIONS`), the router `acquire()`s the healthiest exit and threads it into the unified `opts.proxy`; after the call it `report()`s the outcome (`is_suspicious` / error → a strike). A blocked response triggers a **retry of the same engine behind a different exit IP** (up to `extra["proxy_max_rotations"]`, default 2) *before* escalating to the next, more expensive tier — the cheap win for datacenter/residential fleets. Sessions retire past `max_errors` (default 3) and heal one strike on a clean response. The engine abstraction is untouched (engines still take one proxy; the pool owns which), and the layer is fully opt-in — no proxies configured means the router path is unchanged. Pool exhaustion skips the engine rather than silently leaking the real IP, so the walk escalates to a vendor unlocker instead.
+
+### AutoThrottle — adaptive crawl politeness
+
+`scrapefold/crawler/throttle.py` adds a Scrapy-style per-host `AutoThrottle` controller for the (serial) `crawl()` walk. It holds no sockets: the loop sleeps `delay_for(host)` before each page fetch and calls `record(host, latency_s=…, status_code=…)` after. Per host it keeps an EWMA of response latency, eases the delay toward `ewma_latency / target_concurrency` (`new = (current + target) / 2`), **never decreases** the delay on a non-2xx response, and applies an explicit exponential (2×) backoff on `429` / `503` — or on a hard fetch failure (`failed=True`, engine ladder exhausted) — all clamped to `[min_delay, max_delay]`. Enabled with `opts.autothrottle=True`; tuned via `extra["autothrottle_target_concurrency" | "start_delay" | "max_delay" | "min_delay"]`. Fully opt-in and crawler-local: with `autothrottle=False` the loop never sleeps, and engines / `ScrapeResult` / single-URL `scrape()` are untouched. Keeps a large crawl from hammering a slow or rate-limiting origin (and inviting the blocks the stealth engines were added to dodge).
+
+### LLM-schema extraction — the `ScrapeResult.json` slot for any engine
+
+`scrapefold/extract.py` generalizes the structured-`json` slot (natively filled by Firecrawl `/extract`, AnySite, Apify) to *any* engine's output, ScrapeGraphAI-style — without ever importing a vendor LLM SDK (golden rule #5). The caller injects `async def my_llm(prompt: str) -> str`; `extract(source, schema=…, llm=…)` builds a deterministic prompt from the result's markdown (falling back to `text`, or a raw string) plus the schema — a JSON-Schema-style mapping *or* a natural-language description of the wanted fields — parses the reply leniently (code fences / surrounding prose tolerated), applies a cheap dependency-free structural check (top-level `type` object/array, top-level `required` keys), and re-prompts with the rejection reason fed back (`max_retries`) before raising `ExtractionError`. `extract_into(result, …)` returns a frozen copy with `json` populated and `meta["llm_extracted"]=True`. Content is capped at `max_content_chars` (default 150k) before prompting.
 
 ### Stopping rules — preventing overkill
 

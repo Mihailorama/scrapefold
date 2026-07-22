@@ -205,6 +205,7 @@ class TelegramEngine(ScrapeEngine):
         proxy_type="none",
         site_classified=True,
         output_native_markdown=False,
+        avg_response_mb_estimate=0.5,  # JSON payload
     )
     SUPPORTED_OPTIONS = frozenset(
         {"language", "user_agent", "custom_headers", "timeout_s", "extra"}

@@ -110,6 +110,8 @@ class AnySiteEngine(ScrapeEngine):
         js_rendering=True,
         stealth=True,
         output_native_markdown=True,
+        avg_response_mb_estimate=0.5,  # JSON payload
+        bills_failed_attempts=True,
     )
     SUPPORTED_OPTIONS = frozenset(
         {

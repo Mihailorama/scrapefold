@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import ClassVar, Literal
 
@@ -356,7 +357,7 @@ def _race(*engines: str, **kwargs: object) -> RaceStep:
 _GENERAL_LADDER: Ladder = (
     _seq("requests", cost=_FREE),  # T0
     _race("scrapling_stealth", "crawl4ai"),  # T1 free JS
-    _race("cloakbrowser", "obscura"),  # T2 free stealth
+    _race("cloakbrowser", "obscura", "pydoll", "camoufox"),  # T2 free stealth
     _race(
         "firecrawl",
         "scrapingbee",
@@ -535,7 +536,7 @@ LADDERS: dict[SiteClass, Ladder] = {
     "ecommerce_other": (
         _seq("requests"),
         _race("scrapling_stealth", "crawl4ai"),
-        _race("cloakbrowser", "obscura"),
+        _race("cloakbrowser", "obscura", "pydoll", "camoufox"),
         _race("firecrawl", "scrapingbee", budget_accounting="sum_all"),
     ),
     # Paywall — needs a real browser to get past front-page gate
@@ -551,7 +552,10 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Anti-bot vendor — reclassification targets
     "cloudflare_protected": (
-        _race("cloakbrowser", "obscura", "scrapling_stealth"),
+        # pydoll / camoufox specifically advertise clearing Cloudflare +
+        # Turnstile without plugins; race them alongside the other free stealth
+        # browsers before any paid fan-out.
+        _race("cloakbrowser", "obscura", "scrapling_stealth", "pydoll", "camoufox"),
         _race("firecrawl", "scrapingbee", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
@@ -570,7 +574,7 @@ LADDERS: dict[SiteClass, Ladder] = {
     # Difficulty class
     "js_spa": (
         _race("scrapling_stealth", "crawl4ai"),
-        _race("cloakbrowser", "obscura"),
+        _race("cloakbrowser", "obscura", "pydoll", "camoufox"),
         _seq("firecrawl", cost=_MED),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
@@ -642,6 +646,32 @@ def estimate_step_cost(
     return step.estimated_cost_usd
 
 
+def derive_budget_accounting(engine_names: Iterable[str]) -> Literal["winner_only", "sum_all"]:
+    """Derive a race's billing mode from its engines' capabilities (P1 #4).
+
+    ``"sum_all"`` when any resolvable engine declares
+    ``CAPABILITIES.bills_failed_attempts`` — a vendor that charges for
+    attempts the router later rejects must have every attempted request
+    counted against the walk budget (Codex R3-H1). All-free races stay
+    ``"winner_only"``. Engine names that don't resolve in the registry
+    (declared-but-unshipped, e.g. ``brightdata_*``) are skipped.
+
+    Used by the ladder golden test to keep every ``RaceStep``'s declared
+    ``budget_accounting`` consistent with its engines, and by any future
+    concurrent fan-out cycle as the data-driven default.
+    """
+    from scrapefold.engines import get_engine  # deferred: engines are lazy-imported
+
+    for name in engine_names:
+        try:
+            engine_cls = get_engine(name)
+        except KeyError:
+            continue
+        if engine_cls.CAPABILITIES.bills_failed_attempts:
+            return "sum_all"
+    return "winner_only"
+
+
 def check_budget(
     step: LadderStep,
     walk: WalkBudget,
@@ -689,6 +719,7 @@ __all__ = [
     "WalkBudget",
     "check_budget",
     "classify_url",
+    "derive_budget_accounting",
     "estimate_step_cost",
     "flatten_ladder",
     "get_default_policy",

@@ -65,6 +65,15 @@ class EngineCapabilities:
     """Expected response size for ``billing_unit == "gb"``. Browser/unlocker
     engines should override (sessions easily push 10-50 MB)."""
 
+    bills_failed_attempts: bool = False
+    """The vendor charges for attempts that don't yield a usable page.
+
+    True for paid per-call vendors: a 200-with-captcha the router later
+    rejects as suspicious was still billed vendor-side. Drives race billing —
+    ``ladders.derive_budget_accounting`` returns ``"sum_all"`` for any race
+    containing a flagged engine (Codex R3-H1). Keep ``False`` for free/local
+    engines and self-hosted paid ones with no per-call charge (maxun)."""
+
     # --- Vendor / geography / policy ---
     requires_api_key: bool = True
     geography: tuple[str, ...] = ()
@@ -148,7 +157,29 @@ class ScrapeEngine(ABC):
         # Patch elapsed_ms in case the engine didn't set it
         if result.elapsed_ms == 0:
             result = replace(result, elapsed_ms=elapsed)
+        # Optional main-content extraction is engine-agnostic: it runs on the
+        # HTML any engine returned, so it lives here rather than in each _fetch.
+        # Keyed off the ORIGINAL opts because main_content is not in any
+        # engine's SUPPORTED_OPTIONS and would be stripped before _fetch.
+        if opts.main_content and result.html:
+            result = self._apply_main_content(result)
         return result
+
+    @staticmethod
+    def _apply_main_content(result: ScrapeResult) -> ScrapeResult:
+        """Re-derive text/markdown from the main article body when possible.
+
+        No-op (returns ``result`` unchanged) when trafilatura is unavailable or
+        finds no extractable content — so enabling ``main_content`` can never
+        blank an otherwise-good result.
+        """
+        from scrapefold.html_to_text import html_to_main_content
+
+        extracted = html_to_main_content(result.html or "", base_url=result.url)
+        if extracted is None:
+            return result
+        text, markdown = extracted
+        return replace(result, text=text, markdown=markdown)
 
     # ------------------------------------------------------------------
     # Subclass hooks

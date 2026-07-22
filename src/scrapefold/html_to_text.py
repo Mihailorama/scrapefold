@@ -203,6 +203,48 @@ def html_to_both(html: str, *, base_url: str | None = None) -> tuple[str, str]:
     return _markdown_to_text(md, base_url=base_url), md
 
 
+def html_to_main_content(html: str, *, base_url: str | None = None) -> tuple[str, str] | None:
+    """Extract the main article body via Trafilatura, dropping boilerplate.
+
+    Returns ``(text, markdown)`` with navigation, ads, headers, and footers
+    removed, or ``None`` when extraction is unavailable or unusable:
+
+    - ``trafilatura`` is not installed (optional extra) → ``None``;
+    - the page has no extractable main content (e.g. a link list, a captcha
+      wall) → ``None``.
+
+    The ``None`` contract lets callers keep the engine's full-page conversion
+    as a fallback, so turning on ``main_content`` never blanks a result.
+    Lazy-imports trafilatura so scrapefold stays importable without the extra.
+    """
+    if not html or not html.strip():
+        return None
+    try:
+        import trafilatura  # lazy: optional extra
+    except ImportError:
+        _log.debug("trafilatura not installed; skipping main-content extraction")
+        return None
+
+    try:
+        markdown = trafilatura.extract(
+            html,
+            url=base_url,
+            output_format="markdown",
+            include_links=True,
+            include_images=True,
+            include_tables=True,
+        )
+    except Exception:  # never let extraction crash a scrape — fall back to full page
+        _log.debug("trafilatura extraction raised; keeping full-page output", exc_info=True)
+        return None
+
+    if not markdown or not markdown.strip():
+        return None
+
+    text = _markdown_to_text(markdown, base_url=base_url)
+    return text, markdown.strip()
+
+
 def json_to_scrape_text(data: object) -> tuple[str, str]:
     """Pretty-serialise structured JSON data for engines whose native form is
     already JSON (Apify, Outscraper). Returns ``(text, markdown)`` — text is
@@ -215,6 +257,7 @@ def json_to_scrape_text(data: object) -> tuple[str, str]:
 
 __all__ = [
     "html_to_both",
+    "html_to_main_content",
     "html_to_markdown",
     "html_to_text",
     "json_to_scrape_text",

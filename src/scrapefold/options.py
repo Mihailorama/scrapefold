@@ -46,6 +46,31 @@ class ScrapeOptions:
     custom_headers: dict[str, str] | None = None
     cookies: dict[str, str] | None = None
 
+    # --- Proxy (unified single exit + rotation pool) ---
+    proxy: str | None = None
+    """A single exit proxy URL, e.g. ``"http://user:pass@host:8000"``.
+
+    Unified across every proxy-capable engine: each maps it to its native proxy
+    option (Camoufox ``proxy`` dict, pydoll ``--proxy-server``, scrapling
+    ``proxy``). Vendor engines that manage their own proxy fleet
+    (``premium_proxy`` / ``country``) don't list it in ``SUPPORTED_OPTIONS``, so
+    it's dropped for them. Usually set by the rotation layer, not by hand — see
+    ``proxies`` below.
+    """
+
+    proxies: tuple[str, ...] | None = None
+    """A rotation pool of exit proxies ("proxy over proxy").
+
+    When set, the router builds a health-scored
+    :class:`~scrapefold.proxy.SessionPool` and, for each proxy-capable engine,
+    threads one exit into ``proxy`` per attempt — retrying the *same* engine
+    behind a *different* exit IP when a response looks blocked, before
+    escalating to the next (more expensive) tier. Retirement / rotation policy
+    is owned by the pool; the engine still sees just one ``proxy``. Pass a
+    pre-built, crawl-spanning pool via ``extra["proxy_pool"]`` instead for
+    advanced control.
+    """
+
     # --- Output shape ---
     output_format: Literal["text", "markdown", "html", "json", "auto"] = "auto"
     """Preferred return format.
@@ -64,10 +89,34 @@ class ScrapeOptions:
     include_links: bool = True
     include_external_links: bool = False
 
+    main_content: bool = False
+    """Extract only the main article body, dropping nav / ads / boilerplate.
+
+    When ``True`` and the engine returned HTML, ``ScrapeResult.text`` and
+    ``.markdown`` are re-derived from the main content via Trafilatura (needs
+    the ``trafilatura`` extra). Applied centrally in ``ScrapeEngine.scrape`` for
+    every HTML-producing engine, so any engine in a fallback chain honors it.
+    Degrades gracefully: if trafilatura is not installed or finds no article,
+    the engine's full-page text/markdown is kept unchanged.
+    """
+
     # --- Crawl scope (used by crawl_site, ignored by single scrape) ---
     max_pages: int = 50
     max_depth: int = 3
     follow_subdomains: bool = False
+
+    autothrottle: bool = False
+    """Adapt the per-host crawl delay to observed latency (Scrapy-style).
+
+    When ``True``, :func:`~scrapefold.crawler.crawl` sleeps an adaptive delay
+    before each page fetch and folds the response latency + status into a
+    per-host controller (:class:`~scrapefold.crawler.throttle.AutoThrottle`):
+    the delay eases toward ``latency / target_concurrency``, never shrinks on an
+    error, and backs off hard on ``429`` / ``503``. Keeps a large crawl polite
+    on slow or rate-limiting origins instead of hammering at a fixed rate.
+    Tuning knobs live in ``extra["autothrottle_*"]`` (``target_concurrency``,
+    ``start_delay``, ``max_delay``, ``min_delay``). Ignored by single scrape.
+    """
 
     # --- Engine selection / orchestration ---
     engines: tuple[str, ...] | None = None

@@ -67,11 +67,15 @@ anysite      = []
 scrapecreators = []
 socialcrawl = []
 maxun        = []
+# --- stealth browsers + content extraction ---
+pydoll       = ["pydoll-python>=2.0"]
+camoufox     = ["camoufox[geoip]>=0.4"]
+trafilatura  = ["trafilatura>=2.0"]
 # --- interfaces ---
 mcp          = ["mcp>=1.27"]
 # --- meta ---
 all = [
-    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,exa,pixelrag,selenium,scrapling,crawl4ai,outscraper,apify,cloakbrowser,socialcrawl,mcp]",
+    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,exa,pixelrag,selenium,scrapling,crawl4ai,pydoll,camoufox,trafilatura,outscraper,apify,cloakbrowser,socialcrawl,mcp]",
 ]
 test = [
     "pytest>=9.0",

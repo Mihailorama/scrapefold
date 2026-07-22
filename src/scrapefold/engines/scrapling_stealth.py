@@ -94,6 +94,11 @@ def _adapt(opts: ScrapeOptions, url: str) -> dict[str, Any]:
     # default cannot win silently — even when timeout_s matches our default.
     kwargs["timeout"] = opts.timeout_s * 1000  # StealthSession expects ms
 
+    # Unified proxy → StealthSession's `proxy` (the exit the rotation pool
+    # threads in). An explicit scrapling_proxy in extra still overrides it.
+    if opts.proxy:
+        kwargs["proxy"] = opts.proxy
+
     kwargs.update(strip_extra_prefix(opts.extra, "scrapling_stealth_"))
     kwargs.update(strip_extra_prefix(opts.extra, "scrapling_"))
     return kwargs
@@ -120,6 +125,7 @@ class ScraplingStealthEngine(ScrapeEngine):
         proxy_type="datacenter",
         output_native_markdown=False,
         default_timeout_s=60,
+        avg_response_mb_estimate=15.0,  # full browser session
     )
     SUPPORTED_OPTIONS = frozenset(
         {
@@ -132,6 +138,7 @@ class ScraplingStealthEngine(ScrapeEngine):
             "cookies",
             "output_format",
             "timeout_s",
+            "proxy",
             "extra",
         }
     )

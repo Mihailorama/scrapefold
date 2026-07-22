@@ -7,9 +7,14 @@ Public API (v0.2):
     res = await scrape("https://example.com")
     res = await scrape(url, opts=ScrapeOptions(language="ru", stealth=True))
     md_path = await crawl_site("https://docs.example.com", opts=ScrapeOptions(max_pages=50))
+    data = await extract(res, schema={...}, llm=my_llm)  # your LLM callable, no vendor SDK
 """
 
 from __future__ import annotations
+
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING, TypeVar
 
 from scrapefold.crawler.result import CrawlResult
 from scrapefold.engines.base import (
@@ -18,6 +23,7 @@ from scrapefold.engines.base import (
     RedirectScopeViolation,
     ScrapeEngine,
 )
+from scrapefold.extract import ExtractionError, TextLLMCallable, extract, extract_into
 from scrapefold.ladders import (
     AllEnginesFailed,
     BudgetExceeded,
@@ -54,6 +60,7 @@ __all__ = [
     "EngineCapabilities",
     "EngineError",
     "EnginePool",
+    "ExtractionError",
     "Media",
     "Policy",
     "Post",
@@ -66,13 +73,18 @@ __all__ = [
     "SequentialStep",
     "SiteClass",
     "SocialEntity",
+    "TextLLMCallable",
     "WalkBudget",
     "__version__",
     "classify_url",
     "crawl_site",
+    "crawl_site_sync",
+    "extract",
+    "extract_into",
     "get_ladder",
     "normalize_social",
     "scrape",
+    "scrape_sync",
 ]
 
 
@@ -123,3 +135,63 @@ async def crawl_site(
     from scrapefold.crawler import crawl
 
     return await crawl(url, opts=opts, output=output)  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Sync wrappers — safe under leaked event loops in the caller (TECH_DEBT #12)
+# ---------------------------------------------------------------------------
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+_T = TypeVar("_T")
+
+
+def _run_sync(coro: Coroutine[object, object, _T]) -> _T:
+    """Run *coro* to completion on a fresh event loop in a dedicated worker thread.
+
+    A bare ``asyncio.run(coro)`` in the caller's thread explodes with
+    ``RuntimeError: asyncio.run() cannot be called from a running event loop``
+    the moment the process has *any* loop leaked into the main thread — most
+    commonly by the Playwright Sync API. A single-use worker thread always has
+    a clean asyncio context, so the wrapper works regardless of the caller's
+    loop state. (Found in the wild by phynder's adapter, Mihailorama/phynder#62.)
+    """
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="scrapefold-sync") as executor:
+        return executor.submit(asyncio.run, coro).result()
+
+
+def scrape_sync(
+    url: str,
+    opts: ScrapeOptions | None = None,
+) -> ScrapeResult:
+    """Blocking :func:`scrape` for sync codebases.
+
+    Runs the async walk on a fresh event loop in a dedicated worker thread, so
+    it keeps working even when the calling thread already has a (possibly
+    leaked) running event loop — the case where ``asyncio.run(scrape(...))``
+    raises ``RuntimeError``.
+
+    Unlike :func:`scrape`, there is no ``pool`` parameter: each call runs in
+    its own short-lived event loop, and an :class:`EnginePool` holds network
+    clients bound to the loop they were created on — reusing one across calls
+    would hand out clients tied to a dead loop. Sync callers who need
+    connection reuse across many URLs should use :func:`crawl_site_sync`
+    (one loop for the whole crawl) or the async API.
+    """
+    return _run_sync(scrape(url, opts))
+
+
+def crawl_site_sync(
+    url: str,
+    opts: ScrapeOptions | None = None,
+    output: object | None = None,
+    **kwargs: object,
+) -> CrawlResult:
+    """Blocking :func:`crawl_site` for sync codebases.
+
+    Same worker-thread isolation as :func:`scrape_sync`; the whole crawl —
+    discovery, per-page scrapes, engine-pool reuse, stitching — runs inside
+    one fresh event loop and the finished :class:`CrawlResult` is returned.
+    """
+    return _run_sync(crawl_site(url, opts, output, **kwargs))

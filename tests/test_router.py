@@ -2039,3 +2039,285 @@ async def test_router_walk_closes_ephemeral_pool_on_exception(
         await walk("https://example.com/")
 
     assert close_calls == ["aclose"], "ephemeral pool must be closed even on exception"
+
+
+# ---------------------------------------------------------------------------
+# Proxy rotation layer ("proxy over proxy") — TECH_DEBT #14
+# ---------------------------------------------------------------------------
+
+
+def _proxy_stub(
+    seen: list[str | None],
+    *,
+    block_proxies: set[str | None],
+) -> type[ScrapeEngine]:
+    """A proxy-capable stub that records each exit it's called with and returns
+    a blocked (empty) result for any proxy in ``block_proxies``, else a good one."""
+
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        seen.append(opts.proxy)
+        if opts.proxy in block_proxies:
+            return _empty_result("stub_proxy", url)
+        return _make_result("stub_proxy", url=url)
+
+    return type(
+        "_Stub_proxy",
+        (ScrapeEngine,),
+        {
+            "NAME": "stub_proxy",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset({"proxy"}),  # opts into the rotation layer
+            "_fetch": _fetch,
+        },
+    )
+
+
+_P1 = "http://p1.example:8000"
+_P2 = "http://p2.example:8000"
+
+
+async def test_session_pool_retires_blocked_session_and_rotates_exit_ip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.proxy import SessionPool
+    from scrapefold.router import walk
+
+    seen: list[str | None] = []
+    monkeypatch.setitem(_REGISTRY, "stub_proxy", lambda: _proxy_stub(seen, block_proxies={_P1}))
+
+    # max_errors=1 → the first block retires the exit for the rest of the walk.
+    pool = SessionPool([_P1, _P2], max_errors=1)
+    opts = ScrapeOptions(engines=("stub_proxy",), extra={"proxy_pool": pool})
+
+    result = await walk("https://example.com/", opts)
+
+    # The good result comes back — same engine, second exit IP.
+    assert result.engine == "stub_proxy"
+    assert result.text == _GOOD_TEXT
+    # First exit blocked → rotated to the second; blocked exit not reused.
+    assert seen == [_P1, _P2]
+    assert seen[1:].count(_P1) == 0
+    # The blocked session is retired and no longer usable.
+    assert pool.usable_count == 1
+    assert pool.stats()["retired"] == [_P1]
+
+
+async def test_router_rotation_gives_up_after_all_exits_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.proxy import SessionPool
+    from scrapefold.router import walk
+
+    seen: list[str | None] = []
+    # Both exits always block.
+    monkeypatch.setitem(
+        _REGISTRY, "stub_proxy", lambda: _proxy_stub(seen, block_proxies={_P1, _P2})
+    )
+
+    pool = SessionPool([_P1, _P2], max_errors=1)
+    opts = ScrapeOptions(engines=("stub_proxy",), extra={"proxy_pool": pool})
+
+    # Single engine, every exit blocked → the walk fails (nothing to escalate to).
+    with pytest.raises(scrapefold.AllEnginesFailed):
+        await walk("https://example.com/", opts)
+
+    # Both exits were tried once, then the pool was exhausted (no infinite loop).
+    assert set(seen) == {_P1, _P2}
+    assert pool.usable_count == 0
+
+
+async def test_router_does_not_rotate_engines_without_proxy_support(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.proxy import SessionPool
+    from scrapefold.router import walk
+
+    seen: list[str | None] = []
+
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        seen.append(opts.proxy)  # stripped to None — engine doesn't support proxy
+        return _make_result("stub_noproxy", url=url)
+
+    stub = type(
+        "_Stub_noproxy",
+        (ScrapeEngine,),
+        {
+            "NAME": "stub_noproxy",
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "SUPPORTED_OPTIONS": frozenset(),  # no "proxy" → rotation layer inert
+            "_fetch": _fetch,
+        },
+    )
+    monkeypatch.setitem(_REGISTRY, "stub_noproxy", lambda: stub)
+
+    pool = SessionPool([_P1, _P2])
+    opts = ScrapeOptions(engines=("stub_noproxy",), extra={"proxy_pool": pool})
+    result = await walk("https://example.com/", opts)
+
+    assert result.engine == "stub_noproxy"
+    # proxy was stripped (unsupported) and the engine ran exactly once, no rotation.
+    assert seen == [None]
+    assert pool.usable_count == 2  # untouched — no session was ever acquired
+
+
+# ---------------------------------------------------------------------------
+# P1 #1 — budget_mode wiring (_apply_budget_mode at the top of each step)
+# ---------------------------------------------------------------------------
+
+
+def _costed_engine(name: str, behavior: str, cost: float) -> type[ScrapeEngine]:
+    """Stub engine with a per-call cost estimate (requires_api_key stays False
+    so the paid-policy gate never interferes with cost-accounting tests)."""
+
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        if behavior == "empty":
+            return _empty_result(name, url)
+        return _make_result(name, url=url)
+
+    return type(
+        f"_Stub_{name}",
+        (ScrapeEngine,),
+        {
+            "NAME": name,
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False, estimated_cost_usd=cost),
+            "SUPPORTED_OPTIONS": frozenset(),
+            "_fetch": _fetch,
+        },
+    )
+
+
+async def test_router_applies_reset_fresh_session(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """The named P1 #1 test: a step declaring reset_fresh_session gets fresh
+    engine-count headroom after an earlier tier consumed the whole budget."""
+    from scrapefold.router import walk
+
+    stub_ladder(
+        (
+            SequentialStep(engine="stub_empty"),
+            SequentialStep(engine="stub_good", budget_mode="reset_fresh_session"),
+        )
+    )
+    opts = ScrapeOptions(extra={"max_engines": 1})
+
+    result = await walk("https://example.com/", opts)
+    assert result.engine == "stub_good"
+
+
+async def test_router_without_budget_mode_halts_on_max_engines(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+) -> None:
+    """Control for the reset test: same ladder minus the budget_mode declaration
+    halts at the max_engines ceiling before reaching the second step."""
+    from scrapefold.ladders import AllEnginesFailed
+    from scrapefold.router import walk
+
+    stub_ladder(
+        (
+            SequentialStep(engine="stub_empty"),
+            SequentialStep(engine="stub_good"),
+        )
+    )
+    opts = ScrapeOptions(extra={"max_engines": 1})
+
+    with pytest.raises(AllEnginesFailed) as excinfo:
+        await walk("https://example.com/", opts)
+    assert "budget:max_engines" in excinfo.value.failures
+
+
+async def test_router_reset_user_fast_track_zeroes_cost(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """reset_user_fast_track grants fresh cost headroom: an expensive earlier
+    tier no longer starves the fast-tracked step's cost gate."""
+    from scrapefold.router import walk
+
+    for name, behavior, cost in (
+        ("bill_first", "empty", 0.04),
+        ("bill_fast_track", "good", 0.03),
+    ):
+        cls = _costed_engine(name, behavior, cost)
+        monkeypatch.setitem(_REGISTRY, name, lambda cls=cls: cls)
+
+    stub_ladder(
+        (
+            SequentialStep(engine="bill_first"),
+            SequentialStep(engine="bill_fast_track", budget_mode="reset_user_fast_track"),
+        )
+    )
+    opts = ScrapeOptions(extra={"max_cost_usd": 0.05})
+
+    result = await walk("https://example.com/", opts)
+    assert result.engine == "bill_fast_track"
+
+
+# ---------------------------------------------------------------------------
+# P1 #2 — race billing: every invoked engine credits the walk budget (sum_all)
+# ---------------------------------------------------------------------------
+
+
+async def test_router_race_step_bills_all_engines_when_sum_all(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The named P1 #2 test: both members of a sum_all race return blocked
+    pages; their combined cost depletes the budget so the next tier's cost
+    gate rejects an engine that would otherwise fit."""
+    from scrapefold.ladders import AllEnginesFailed
+    from scrapefold.router import walk
+
+    for name, behavior, cost in (
+        ("bill_race_a", "empty", 0.02),
+        ("bill_race_b", "empty", 0.02),
+        ("bill_next_tier", "good", 0.02),
+    ):
+        cls = _costed_engine(name, behavior, cost)
+        monkeypatch.setitem(_REGISTRY, name, lambda cls=cls: cls)
+
+    stub_ladder(
+        (
+            RaceStep(engines=("bill_race_a", "bill_race_b"), budget_accounting="sum_all"),
+            SequentialStep(engine="bill_next_tier"),
+        )
+    )
+    # 0.02 + 0.02 billed by the race → 0.04; next tier's 0.02 would breach 0.05.
+    opts = ScrapeOptions(extra={"max_cost_usd": 0.05})
+
+    with pytest.raises(AllEnginesFailed) as excinfo:
+        await walk("https://example.com/", opts)
+    failures = excinfo.value.failures
+    assert "bill_race_a:empty" in failures
+    assert "bill_race_b:empty" in failures
+    assert "bill_next_tier:skipped:budget:cost" in failures
+
+
+async def test_router_race_billing_control_with_headroom(
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Control for the sum_all test: with 0.02 more headroom the same walk
+    escalates past the billed race and the next tier wins."""
+    from scrapefold.router import walk
+
+    for name, behavior, cost in (
+        ("bill_race_a", "empty", 0.02),
+        ("bill_race_b", "empty", 0.02),
+        ("bill_next_tier", "good", 0.02),
+    ):
+        cls = _costed_engine(name, behavior, cost)
+        monkeypatch.setitem(_REGISTRY, name, lambda cls=cls: cls)
+
+    stub_ladder(
+        (
+            RaceStep(engines=("bill_race_a", "bill_race_b"), budget_accounting="sum_all"),
+            SequentialStep(engine="bill_next_tier"),
+        )
+    )
+    opts = ScrapeOptions(extra={"max_cost_usd": 0.07})
+
+    result = await walk("https://example.com/", opts)
+    assert result.engine == "bill_next_tier"

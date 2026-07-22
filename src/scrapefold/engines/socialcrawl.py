@@ -227,6 +227,8 @@ class SocialCrawlEngine(ScrapeEngine):
         proxy_type="residential",
         site_classified=True,
         output_native_markdown=False,
+        avg_response_mb_estimate=0.5,  # JSON payload
+        bills_failed_attempts=True,
     )
     SUPPORTED_OPTIONS = frozenset({"output_format", "timeout_s", "extra"})
 

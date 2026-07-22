@@ -5,6 +5,7 @@ Public entry point: ``async def crawl(root, opts, output) -> CrawlResult``.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import tempfile
@@ -19,6 +20,7 @@ from scrapefold._host_utils import same_host as _same_host
 from scrapefold.cache import Cache, make_key
 from scrapefold.crawler.result import CrawlResult
 from scrapefold.crawler.stitcher import write_stitched
+from scrapefold.crawler.throttle import AutoThrottle, host_of
 from scrapefold.options import ScrapeOptions
 from scrapefold.pool import EnginePool
 from scrapefold.result import ScrapeResult
@@ -147,6 +149,32 @@ async def _preflight_head(
     return False
 
 
+def _build_throttle(opts: ScrapeOptions) -> AutoThrottle | None:
+    """Construct an :class:`AutoThrottle` when ``opts.autothrottle`` is set.
+
+    Tuning knobs are read from ``opts.extra["autothrottle_*"]`` so the crawl
+    stays configurable without widening the top-level schema for a niche knob.
+    Returns ``None`` when adaptive throttling is disabled.
+    """
+    if not opts.autothrottle:
+        return None
+
+    def _num(key: str, default: float) -> float:
+        raw = opts.extra.get(f"autothrottle_{key}")
+        try:
+            return float(raw) if raw is not None else default
+        except (TypeError, ValueError):
+            logger.debug("crawler: bad autothrottle_%s=%r — using default %s", key, raw, default)
+            return default
+
+    return AutoThrottle(
+        target_concurrency=_num("target_concurrency", 1.0),
+        start_delay=_num("start_delay", 1.0),
+        max_delay=_num("max_delay", 60.0),
+        min_delay=_num("min_delay", 0.0),
+    )
+
+
 async def crawl(
     root: str,
     opts: ScrapeOptions | None = None,
@@ -226,6 +254,7 @@ async def crawl(
     results: list[ScrapeResult] = []
     failures: list[str] = []
     follow_subdomains = opts.follow_subdomains
+    throttle = _build_throttle(opts)
 
     discovery_fetcher = _make_engine_aware_fetcher(crawl_opts, pool)
 
@@ -256,12 +285,28 @@ async def crawl(
                         results.append(cached)
                         continue
 
+                if throttle is not None:
+                    delay = throttle.delay_for(host_of(url))
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+
                 try:
                     result = await scrape(url, crawl_opts, pool=pool)
                 except Exception as exc:  # broad — per-URL failures must not abort the crawl
                     logger.warning("crawler: scrape failed url=%s err=%s", url, exc)
                     failures.append(f"{url}:{type(exc).__name__}:{exc}")
+                    if throttle is not None:
+                        # A failed fetch is a slow/blocked signal — back off; no
+                        # latency sample, so leave the EWMA untouched.
+                        throttle.record(host_of(url), latency_s=None, status_code=None, failed=True)
                     continue
+
+                if throttle is not None:
+                    throttle.record(
+                        host_of(url),
+                        latency_s=result.elapsed_ms / 1000.0,
+                        status_code=result.status_code,
+                    )
 
                 results.append(result)
                 if cache is not None and cache_key is not None:

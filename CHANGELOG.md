@@ -6,6 +6,122 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- **pydoll engine** (`pydoll`) — free, local, stealth-first Chromium driven
+  directly over the Chrome DevTools Protocol with **no WebDriver** and no
+  `navigator.webdriver` flag, built to clear Cloudflare / Turnstile challenges
+  without plugins. Maps `user_agent`, `language`, `cookies` (injected before
+  navigation), `wait_ms`, `wait_for_selector`, `take_screenshot`, `timeout_s`;
+  extra raw Chrome flags via `extra["pydoll_args"]` and an explicit browser
+  path via `extra["pydoll_binary"]` (for containers where auto-detection
+  fails). Duplicate / pydoll-reserved flags (e.g. `--no-first-run`) are
+  de-duplicated and never crash the scrape. Lazy-imported SDK
+  (`pip install scrapefold[pydoll]`), `cost_usd=0.0`. Raced into the free
+  stealth tier of the general, `js_spa`, `ecommerce_other`, and
+  `cloudflare_protected` ladders.
+- **Camoufox engine** (`camoufox`) — free, local anti-detect **Firefox** whose
+  fingerprint is coherent at the browser source level, passing anti-bot walls
+  that patched-Chromium engines leak on. scrapefold's only Firefox-based
+  stealth path, giving the ladder fingerprint diversity a second Chromium can't.
+  A drop-in Playwright browser: maps `language`→`locale` + `Accept-Language`,
+  `custom_headers`, `cookies`, `wait_until`, `wait_ms`, `wait_for_selector`,
+  `take_screenshot`, `timeout_s`; `camoufox_*` launch-option passthrough via
+  `extra` (proxy, os, geoip, fingerprint). `user_agent` is intentionally
+  dropped to keep the fingerprint coherent. Lazy-imported SDK
+  (`pip install scrapefold[camoufox]` + `python -m camoufox fetch`),
+  `cost_usd=0.0`. Raced alongside pydoll in the free stealth tier.
+- **Main-content extraction** — `ScrapeOptions(main_content=True)` re-derives
+  `ScrapeResult.text`/`.markdown` from the main article body (nav / ads /
+  boilerplate stripped) via [Trafilatura](https://github.com/adbar/trafilatura),
+  applied **centrally** in `ScrapeEngine.scrape` so every HTML-producing engine
+  in a fallback chain honors it. Degrades gracefully: if `trafilatura` is not
+  installed or finds no article, the engine's full-page output is kept
+  unchanged (never blanks a result). New helper
+  `scrapefold.html_to_text.html_to_main_content`; optional extra
+  `pip install scrapefold[trafilatura]`.
+- **Proxy rotation layer — "proxy over proxy"** (`scrapefold.proxy`). A
+  health-scored `SessionPool` that sits *above* each engine's single-proxy
+  setting: pass `ScrapeOptions(proxies=(...))` (or a crawl-spanning
+  `extra["proxy_pool"]`) and, when a response looks blocked, the router retries
+  the **same** engine behind a **different exit IP** before escalating to the
+  next (more expensive) tier — the cheaper win for datacenter / residential
+  fleets. Sessions accrue strikes on blocks (Crawlee-style), retire past a
+  threshold (`max_errors`, default 3), and heal one strike on a clean response;
+  rotation is capped per engine by `extra["proxy_max_rotations"]` (default 2).
+  New unified `ScrapeOptions.proxy` maps to each proxy-capable engine's native
+  option (Camoufox `proxy` dict, pydoll `--proxy-server`, scrapling `proxy`);
+  vendor engines that manage their own fleet drop it. The engine abstraction is
+  untouched — engines still take one proxy, the pool owns which. Fully opt-in:
+  with no proxies configured, the router path is unchanged. Resolves
+  TECH_DEBT #14.
+- **AutoThrottle — adaptive crawl politeness** (`scrapefold.crawler.throttle`).
+  A [Scrapy](https://github.com/scrapy/scrapy)-style per-host controller: set
+  `ScrapeOptions(autothrottle=True)` and `crawl()` sleeps an adaptive delay
+  before each page fetch, easing toward `latency / target_concurrency` from an
+  EWMA of observed latency, **never speeding up** on a non-2xx response, and
+  backing off hard (2×) on `429` / `503` or a hard fetch failure — clamped to
+  `[min_delay, max_delay]`. Keeps a large crawl from hammering a slow or
+  rate-limiting origin (and inviting the blocks the stealth engines were added
+  to dodge). Tuning via `extra["autothrottle_target_concurrency" | "start_delay"
+  | "max_delay" | "min_delay"]`. Pure crawler-layer, opt-in (default off →
+  zero sleeps); engines, `ScrapeResult`, and single-URL `scrape()` untouched.
+  Resolves TECH_DEBT #15.
+- **LLM-schema extraction** (`scrapefold.extract`) — ScrapeGraphAI-shaped
+  "describe what you want, the LLM extracts it", built strictly on a
+  **user-provided** async callable (`async def my_llm(prompt: str) -> str`);
+  no vendor LLM SDK, no new dependency (golden rule #5).
+  `extract(source, schema=…, llm=…)` prompts with the result's markdown (or a
+  raw string) + the schema — a JSON-Schema-style mapping or a plain
+  natural-language field description — and returns the parsed JSON;
+  `extract_into(result, …)` lands it in a frozen copy's `ScrapeResult.json`
+  (+ `meta["llm_extracted"]=True`) — the same slot native structured engines
+  (Firecrawl `/extract`, AnySite, Apify) fill, generalized to any engine's
+  output. Lenient reply parsing (code fences / surrounding prose), a cheap
+  dependency-free structural check (top-level `type`, `required` keys), a
+  self-correcting retry loop that feeds the rejection reason back to the LLM
+  (`max_retries`, default 1), content capped at `max_content_chars` (default
+  150k chars), and `ExtractionError` carrying the last raw reply. Resolves
+  TECH_DEBT #16.
+- **Sync wrappers** — `scrape_sync(url, opts=None)` and
+  `crawl_site_sync(url, opts=None, output=None, **kwargs)` for sync codebases.
+  Each call runs the async API on a fresh event loop in a dedicated worker
+  thread, so they keep working even when the calling thread has a running or
+  *leaked* event loop (the Playwright-Sync-API failure mode where a bare
+  `asyncio.run(scrape(...))` raises `RuntimeError`). `scrape_sync`
+  deliberately takes no `pool` — engine-pool clients are bound to the loop
+  they were created on; use `crawl_site_sync` (one loop spans the whole
+  crawl) or the async API for connection reuse. Resolves TECH_DEBT #12.
+- **Router budget & billing correctness** (P1 cluster, TECH_DEBT #1–#5):
+  - `budget_mode` is now wired: a ladder step declaring
+    `reset_user_fast_track` gets fresh `cost_usd`/`engines_tried` headroom
+    (clock and reclassification guard kept); `reset_fresh_session`
+    additionally resets `elapsed_ms`/`reclassifications`. No ladder sets a
+    non-`inherit` mode yet, so default walks are unchanged (#1).
+  - Race billing documented + pinned by tests: under the sequential race
+    walk every invoked engine credits its cost to the walk budget — `sum_all`
+    semantics matching real vendor spend (a blocked 200 was still billed);
+    `winner_only`/`max` become distinct only with future concurrent fan-out
+    (#2).
+  - New `EngineCapabilities.bills_failed_attempts`, set on all 17
+    per-call-billed paid engines, and
+    `ladders.derive_budget_accounting(engines)` deriving a race's billing
+    mode from those flags; a golden test asserts every `RaceStep` in
+    `LADDERS` declares exactly the derived mode — billing modes are now
+    data-checked, not trusted (#4).
+  - Per-engine `avg_response_mb_estimate` set across the registry: browser
+    session engines 15 MB, rendered-HTML proxy APIs 3 MB, markdown/JSON API
+    engines 0.5 MB — feeding the router's per-engine cost gate, which reads
+    each engine's own estimate (#3, #5).
+
+### Changed
+
+- Engine count 27 → 29 (pydoll, camoufox). README engine tables and
+  `_VALID_ENGINES` ladder guard updated.
+- The free stealth engines (`camoufox`, `pydoll`, `scrapling_stealth`) now read
+  the unified `ScrapeOptions.proxy`, so a rotation pool can thread an exit IP
+  into each.
+
 ## [0.4.0] - 2026-07-09
 
 ### Added

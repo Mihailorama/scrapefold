@@ -62,6 +62,8 @@ class ScrapingdogEngine(ScrapeEngine):
         requires_api_key=True,
         proxy_type="datacenter",
         default_timeout_s=60,
+        avg_response_mb_estimate=3.0,  # rendered-HTML proxy API response
+        bills_failed_attempts=True,
     )
     SUPPORTED_OPTIONS = frozenset(
         {
