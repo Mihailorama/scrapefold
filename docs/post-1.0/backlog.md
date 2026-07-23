@@ -136,8 +136,9 @@ The project site is live at **[scrapefold.com](https://scrapefold.com)**
 Source: reddit.com/r/opencodeCLI/comments/1v1hfhk (458↑, 70 comments). Items
 already shipped: idempotent agent setup prompt (`docs/install.md`),
 `scrapefold install <client>`, `scrapefold doctor`, small-tool-count MCP
-positioning, "engines not competitors" comparison section in README.
-Deferred items below.
+positioning, "engines not competitors" comparison section in README, the
+`wayback` fallback engine, and `focus=` BM25 extraction (CLI `--focus` +
+MCP `scrape_url(focus=...)`). Deferred items below.
 
 ### `scrapefold update` self-update + update check
 
@@ -157,25 +158,6 @@ Deferred items below.
 - **What:** a `ScrapeResult.error`/`degraded` slot set when the best
   available response still looks like a block/error page, so MCP/CLI
   consumers can tell "real content" from "best effort".
-
-### Wayback Machine fallback engine
-
-- **Why:** hound auto-recovers dead links (404/451/500) from the Internet
-  Archive and honestly marks `source=archive.org` + snapshot date. Loved in
-  the thread.
-- **What:** a free `wayback` engine at the end of ladders for 404-class
-  failures, filling `ScrapeResult.json` with `{"source": "archive.org",
-  "snapshot_date": ...}`.
-
-### Focused extraction parameter (`focus=`)
-
-- **Why:** the deepest thread subdiscussion: agents waste context fetching
-  whole pages/PDFs. hound's `focus="query"` BM25-filters to relevant blocks;
-  claimed >5-10% context savings; "if the agent doesn't discover the
-  feature, the feature might as well not exist" — must be prominent in the
-  MCP tool description.
-- **What:** `scrape_url(..., focus="query")` in the MCP server + `--focus`
-  CLI flag, BM25 over markdown blocks (stdlib-only, no new deps).
 
 ### Token-cost transparency for MCP tool definitions
 

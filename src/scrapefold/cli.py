@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +69,11 @@ def scrape(
     output: Path | None = typer.Option(  # noqa: B008
         None, "--output", help="Write markdown to PATH instead of stdout."
     ),
+    focus: str | None = typer.Option(
+        None,
+        "--focus",
+        help="Keep only markdown blocks relevant to this query (BM25), saving tokens.",
+    ),
 ) -> None:
     """Scrape a single URL and print the markdown (or full JSON with --json)."""
     opts = ScrapeOptions(engines=_engines_arg(engines))
@@ -78,6 +83,11 @@ def scrape(
     except AllEnginesFailed as exc:
         typer.echo(f"all engines failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+
+    if focus:
+        from scrapefold.focus import focus_markdown
+
+        result = replace(result, markdown=focus_markdown(result.markdown, focus))
 
     if json_out:
         typer.echo(json.dumps(asdict(result), default=str))

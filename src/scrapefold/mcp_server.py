@@ -66,8 +66,13 @@ def build_server() -> FastMCP:
         engines: str | None = None,
         render_js: bool = True,
         stealth: bool = False,
+        focus: str | None = None,
     ) -> dict[str, Any]:
         """Scrape a single URL and return LLM-ready markdown.
+
+        TIP: when you need one fact from a long page, pass focus="your
+        question" — the response keeps only the relevant markdown blocks
+        and costs a fraction of the tokens of the full page.
 
         Args:
             url: The URL to scrape.
@@ -75,13 +80,23 @@ def build_server() -> FastMCP:
                 (e.g. "jina,firecrawl"). Default: router auto-selects.
             render_js: Render JavaScript before extracting content.
             stealth: Prefer anti-bot/stealth-capable engines.
+            focus: Keyword query — return only markdown blocks relevant to
+                it (BM25-ranked, with governing headings, in page order).
         """
         engine_tuple = (
             tuple(e.strip() for e in engines.split(",") if e.strip()) if engines else None
         )
         opts = ScrapeOptions(engines=engine_tuple, render_js=render_js, stealth=stealth)
         result = await scrapefold.scrape(url, opts)
-        return _result_payload(result)
+        payload = _result_payload(result)
+        if focus:
+            from scrapefold.focus import focus_markdown
+
+            payload["markdown"] = focus_markdown(payload["markdown"], focus)
+            payload["text"] = ""
+            payload["html"] = None
+            payload["focus"] = focus
+        return payload
 
     @server.tool()
     async def crawl_site(

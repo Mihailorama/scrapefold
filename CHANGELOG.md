@@ -22,6 +22,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   place for Cursor, or prints the standard `mcpServers` JSON. `--print-only`
   previews, `--json` emits the config alone. Logic lives in
   `scrapefold/install.py` (pure, unit-tested planning + JSON merge).
+- **Wayback engine** (`wayback`) — free, keyless dead-link recovery via the
+  Internet Archive: availability-API lookup → raw (`id_`) snapshot fetch →
+  markdown, with the result honestly marked in the `json` slot
+  (`{"source": "archive.org", "snapshot_timestamp", "snapshot_url"}`) and
+  `meta["archived"] = True`. Pin a date with `extra["wayback_timestamp"]`.
+  Raises a clean `EngineError` when no snapshot exists — never fake content.
+- **Focused extraction** (`--focus` / MCP `scrape_url(focus=...)`) — BM25
+  block filtering of the final markdown (stdlib-only): keeps only blocks
+  relevant to the query plus their governing headings, in page order, with
+  `[...]` omission markers and a relative-score threshold; falls back to the
+  full page when nothing matches. Saves most of the context tokens when an
+  agent needs one fact from a long page.
 - **`scrapefold doctor`** — post-install health check: version, Python,
   MCP-extra presence, and per-engine importability (`--json` for agents).
   Referenced as the verify step in the agent setup prompt.

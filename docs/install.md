@@ -1,7 +1,7 @@
 # scrapefold — agent setup instructions
 
 You are an AI agent setting up **scrapefold** for your user. scrapefold turns
-any URL into clean, LLM-ready markdown through one interface over 27 scraping
+any URL into clean, LLM-ready markdown through one interface over 30 scraping
 engines, with automatic anti-bot escalation. Follow the steps below **exactly
 and in order**, then report what you installed and verified.
 

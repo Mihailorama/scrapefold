@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 29 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 30 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <strong>29 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>952 tests</strong> · <strong>MIT</strong>
+  <strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>952 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -84,6 +84,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Exa**](https://exa.ai/) | ✅ | SaaS | Paid | ★★★ | ★★☆ | ★★☆ | Fast | $$ |
 | [**Serper**](https://serper.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★☆☆ | Fast | $ |
 | [**Maxun**](https://github.com/getmaxun/maxun) | ✅ | Local | AGPL | ★★★ | ★★★ | ★★☆ | Medium | Free (self-hosted) |
+| [**Wayback**](https://web.archive.org/) | ✅ | Local | — | ★★☆ | ☆☆☆ | ☆☆☆ | Fast | Free |
 
 **★★★** Excellent **★★☆** Good **★☆☆** Basic **☆☆☆** Not supported — **$** ~$0.1–0.5/1K req **$$** ~$1–3/1K req **$$$** ~$5–15/1K req
 
@@ -103,6 +104,8 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | Structured JSON from any page, via **your** LLM | `extract(result, schema=..., llm=my_llm)` — ScrapeGraphAI-style schema extraction over a user-provided callable; no vendor LLM SDK |
 | Sync codebase (no `async`/`await`) | `scrape_sync(url)` / `crawl_site_sync(root)` — blocking wrappers that survive leaked event loops (e.g. Playwright Sync API in the same process) |
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
+| Page is dead (404) or changed since you saw it | **wayback** — archive.org snapshot, honestly marked `source=archive.org` + timestamp |
+| One fact from a long page (agents) | `scrapefold scrape <url> --focus "query"` or MCP `scrape_url(focus=...)` — BM25 keeps only relevant blocks |
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
 | Social profiles, posts, channels, comments | **SocialCrawl** gateway + **Scrape Creators** structured JSON |

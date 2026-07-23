@@ -386,3 +386,27 @@ def test_doctor_marks_unimportable_engine(
     result = runner.invoke(app, ["doctor", "--json"])
     data = json.loads(result.stdout)
     assert data["engines"]["requests"].startswith("unavailable:")
+
+
+# ---------------------------------------------------------------------------
+# 13. `--focus` filters scrape output
+# ---------------------------------------------------------------------------
+
+
+def test_scrape_focus_filters_markdown(runner: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
+    from scrapefold.options import ScrapeOptions
+    from scrapefold.result import ScrapeResult
+
+    long_md = "## Pricing\n\nThe plan costs 42 dollars.\n\n## Other\n\nUnrelated text here."
+
+    async def _fake_scrape(url: str, opts: ScrapeOptions | None = None) -> ScrapeResult:
+        return ScrapeResult(
+            url=url, text="t", markdown=long_md, html=None, engine="stub", elapsed_ms=1
+        )
+
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+    result = runner.invoke(app, ["scrape", "https://example.com/", "--focus", "price dollars cost"])
+    assert result.exit_code == 0
+    assert "42 dollars" in result.stdout
+    assert "Unrelated text" not in result.stdout

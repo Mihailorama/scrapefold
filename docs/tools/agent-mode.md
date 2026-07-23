@@ -185,7 +185,7 @@ Exposed tools:
 
 | Tool | Args | Returns |
 |---|---|---|
-| `scrape_url` | `url`, `engines?` (comma-separated), `render_js?`, `stealth?` | `ScrapeResult` JSON (screenshot dropped, oversized `html` nulled) |
+| `scrape_url` | `url`, `engines?` (comma-separated), `render_js?`, `stealth?`, `focus?` | `ScrapeResult` JSON (screenshot dropped, oversized `html` nulled). With `focus="query"`, only BM25-relevant markdown blocks are returned — a fraction of the tokens of the full page |
 | `crawl_site` | `url`, `max_pages?` (default 25) | `{url, pages, markdown, failures}` — `markdown` is the stitched crawl |
 | `list_engines` | — | engine name list |
 | `classify_url` | `url` | `{url, site_class}` |

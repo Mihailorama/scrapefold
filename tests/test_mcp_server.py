@@ -186,3 +186,37 @@ async def test_classify_url_tool() -> None:
         "classify_url", {"url": "https://www.linkedin.com/in/someone"}
     )
     assert structured["site_class"] == "linkedin_profile"
+
+
+# ---------------------------------------------------------------------------
+# 7. scrape_url focus= trims the payload
+# ---------------------------------------------------------------------------
+
+
+@requires_mcp
+async def test_scrape_url_focus_filters_markdown(monkeypatch: pytest.MonkeyPatch) -> None:
+    long_md = "## Pricing\n\nThe plan costs 42 dollars.\n\n## Other\n\nUnrelated text here."
+
+    async def _fake_scrape(url: str, opts: Any = None) -> ScrapeResult:
+        return ScrapeResult(
+            url=url,
+            text="full text",
+            markdown=long_md,
+            html="<p>full html</p>",
+            engine="stub",
+            elapsed_ms=1,
+        )
+
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+    server = mcp_server.build_server()
+    _content, structured = await server.call_tool(
+        "scrape_url",
+        {"url": "https://example.com/", "focus": "price dollars cost"},
+    )
+
+    assert "42 dollars" in structured["markdown"]
+    assert "Unrelated text" not in structured["markdown"]
+    assert structured["text"] == ""
+    assert structured["html"] is None
+    assert structured["focus"] == "price dollars cost"
