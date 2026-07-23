@@ -257,6 +257,10 @@ scrapefold install claude
 
 # Health check: version, MCP extra, per-engine availability
 scrapefold doctor
+
+# Self-update (or just check): pip upgrade via the running interpreter
+scrapefold update --check
+scrapefold update --extras mcp
 ```
 
 ## MCP Server (for Claude Code, Cursor, agents)
@@ -278,7 +282,7 @@ Or drop into any client's MCP config manually:
 { "mcpServers": { "scrapefold": { "command": "scrapefold-mcp", "args": [] } } }
 ```
 
-Exposes `scrape_url`, `crawl_site`, `list_engines`, `classify_url` tools over stdio.
+Exposes `scrape_url`, `crawl_site`, `list_engines`, `classify_url` tools over stdio — all 4 tool definitions + instructions cost your agent **≈750 tokens** (budget-tested). Failures come back structured (`{"error", "failures"}`), never as error-page HTML posing as content.
 
 **Setting up with an AI agent?** Just tell it:
 

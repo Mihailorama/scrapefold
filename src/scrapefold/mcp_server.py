@@ -54,7 +54,7 @@ def build_server() -> FastMCP:
     from mcp.server.fastmcp import FastMCP
 
     import scrapefold
-    from scrapefold import ScrapeOptions
+    from scrapefold import AllEnginesFailed, ScrapeOptions
     from scrapefold import classify_url as _classify
     from scrapefold.engines import list_engine_names
 
@@ -87,7 +87,11 @@ def build_server() -> FastMCP:
             tuple(e.strip() for e in engines.split(",") if e.strip()) if engines else None
         )
         opts = ScrapeOptions(engines=engine_tuple, render_js=render_js, stealth=stealth)
-        result = await scrapefold.scrape(url, opts)
+        try:
+            result = await scrapefold.scrape(url, opts)
+        except AllEnginesFailed as exc:
+            # Honest structured failure — never error-page HTML posing as content.
+            return {"url": url, "error": "all engines failed", "failures": exc.failures}
         payload = _result_payload(result)
         if focus:
             from scrapefold.focus import focus_markdown

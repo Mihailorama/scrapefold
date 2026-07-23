@@ -86,6 +86,17 @@ scrapefold doctor            # human-readable
 scrapefold doctor --json     # {"version": ..., "mcp_extra": true, "engines": {...}}
 ```
 
+### `scrapefold update`
+
+Self-update via the running interpreter's pip:
+
+```bash
+scrapefold update --check           # compare installed vs latest on PyPI
+scrapefold update --check --json    # {"current": ..., "latest": ..., "update_available": ...}
+scrapefold update                   # pip install --upgrade scrapefold
+scrapefold update --extras mcp      # upgrade as scrapefold[mcp]
+```
+
 ### `scrapefold install [client]`
 
 One-click MCP registration — see [MCP server → One-click registration](#one-click-registration) below.
@@ -189,6 +200,15 @@ Exposed tools:
 | `crawl_site` | `url`, `max_pages?` (default 25) | `{url, pages, markdown, failures}` — `markdown` is the stitched crawl |
 | `list_engines` | — | engine name list |
 | `classify_url` | `url` | `{url, site_class}` |
+
+Error honesty: when every engine fails, `scrape_url` returns a structured
+`{"url", "error": "all engines failed", "failures": [...]}` — never an
+error page posing as content. (The router itself never returns a
+suspicious/blocked page: it escalates, and raises when the ladder is
+exhausted.)
+
+Token cost: all 4 tool definitions + server instructions ≈ **750 tokens**
+(estimate, chars/4) — pinned by a budget test so they stay tight.
 
 Planned (not yet implemented): `inspect_options` tool, `scrapefold://cache/{sha}`
 and `scrapefold://engines` resources.

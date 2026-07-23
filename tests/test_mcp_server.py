@@ -220,3 +220,51 @@ async def test_scrape_url_focus_filters_markdown(monkeypatch: pytest.MonkeyPatch
     assert structured["text"] == ""
     assert structured["html"] is None
     assert structured["focus"] == "price dollars cost"
+
+
+# ---------------------------------------------------------------------------
+# 8. AllEnginesFailed → honest structured failure, not an exception blob
+# ---------------------------------------------------------------------------
+
+
+@requires_mcp
+async def test_scrape_url_all_engines_failed_structured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold import AllEnginesFailed
+
+    async def _raise(url: str, opts: Any = None) -> ScrapeResult:
+        raise AllEnginesFailed(url, ["requests:403", "jina:timeout"])
+
+    monkeypatch.setattr("scrapefold.scrape", _raise)
+
+    server = mcp_server.build_server()
+    _content, structured = await server.call_tool("scrape_url", {"url": "https://example.com/"})
+
+    assert structured["error"] == "all engines failed"
+    assert structured["failures"] == ["requests:403", "jina:timeout"]
+    assert "markdown" not in structured
+
+
+# ---------------------------------------------------------------------------
+# 9. Token budget — tool definitions stay tight (the hound lesson)
+# ---------------------------------------------------------------------------
+
+_TOKEN_BUDGET = 1200
+"""Rough-estimate token ceiling (chars/4) for all tool defs + instructions.
+
+If this fails, a tool description got bloated — trim it rather than raising
+the budget. Advertised as "~750 tokens" in the docs; keep them honest."""
+
+
+@requires_mcp
+async def test_tool_definitions_within_token_budget() -> None:
+    import json as _json
+
+    server = mcp_server.build_server()
+    tools = await server.list_tools()
+    blob = _json.dumps([t.model_dump(exclude_none=True) for t in tools]) + mcp_server._INSTRUCTIONS
+    estimated_tokens = len(blob) // 4
+    assert estimated_tokens <= _TOKEN_BUDGET, (
+        f"tool definitions estimate {estimated_tokens} tokens > budget {_TOKEN_BUDGET}"
+    )

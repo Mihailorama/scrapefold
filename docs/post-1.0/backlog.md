@@ -137,34 +137,11 @@ Source: reddit.com/r/opencodeCLI/comments/1v1hfhk (458↑, 70 comments). Items
 already shipped: idempotent agent setup prompt (`docs/install.md`),
 `scrapefold install <client>`, `scrapefold doctor`, small-tool-count MCP
 positioning, "engines not competitors" comparison section in README, the
-`wayback` fallback engine, and `focus=` BM25 extraction (CLI `--focus` +
-MCP `scrape_url(focus=...)`). Deferred items below.
-
-### `scrapefold update` self-update + update check
-
-- **Why:** hound ships `-v` (version + update status), `-u` (self-update),
-  `--reinstall`. Keeps installs current without users tracking PyPI.
-- **What:** `scrapefold doctor` gains a PyPI latest-version check (network,
-  opt-in); `scrapefold update` runs `pip install -U scrapefold[...]`
-  preserving installed extras.
-
-### Error honesty in `ScrapeResult`
-
-- **Why:** hound v10.4.0's headline fix — 4xx/5xx error pages used to flow
-  through as "content" and agents mistook error-page HTML for data. Their
-  fix: flag it and replace content with the error message. scrapefold's
-  `is_suspicious` already gates escalation, but the *final* result of an
-  exhausted ladder can still be an error page presented as content.
-- **What:** a `ScrapeResult.error`/`degraded` slot set when the best
-  available response still looks like a block/error page, so MCP/CLI
-  consumers can tell "real content" from "best effort".
-
-### Token-cost transparency for MCP tool definitions
-
-- **Why:** hound advertises "2,746 tokens for all 6 tools + instructions".
-  A concrete, checkable number that lands well with agent users.
-- **What:** measure scrapefold's 4 tool defs + instructions, pin with a test
-  budget (e.g. < 1,500 tokens), publish the number in README/landing.
+`wayback` fallback engine, `focus=` BM25 extraction (CLI `--focus` +
+MCP `scrape_url(focus=...)`), `scrapefold update` self-update, structured
+MCP failures (`{"error", "failures"}` instead of raw exceptions), and a
+pinned token budget for MCP tool definitions (~750-token estimate,
+`test_tool_definitions_within_token_budget`). Deferred items below.
 
 ### MCP web-tools benchmark
 

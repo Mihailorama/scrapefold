@@ -1,6 +1,6 @@
 """scrapefold — Typer CLI entry point.
 
-Six subcommands: scrape, crawl, list-engines, classify, install, doctor.
+Subcommands: scrape, crawl, list-engines, classify, install, doctor, update.
 --json flag everywhere; errors fatal with non-zero exit code.
 """
 
@@ -235,6 +235,58 @@ def doctor(
     typer.echo(f"engines: {len(ok)}/{len(report['engines'])} importable")
     for name, status in missing.items():
         typer.echo(f"  {name}: {status}")
+
+
+# ---------------------------------------------------------------------------
+# update
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def update(
+    check: bool = typer.Option(
+        False, "--check", help="Only check PyPI for a newer version; don't install."
+    ),
+    extras: str | None = typer.Option(
+        None,
+        "--extras",
+        help='Comma-separated extras to include in the upgrade (e.g. "mcp,firecrawl").',
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON to stdout (with --check)."),
+) -> None:
+    """Self-update: check PyPI and upgrade scrapefold via pip."""
+    import subprocess
+
+    from scrapefold import update as update_mod
+
+    current = scrapefold.__version__
+
+    if check:
+        try:
+            latest = update_mod.latest_version()
+        except Exception as exc:
+            typer.echo(f"update check failed: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        newer = update_mod.is_newer(latest, current)
+        if json_out:
+            typer.echo(
+                json.dumps({"current": current, "latest": latest, "update_available": newer})
+            )
+            return
+        if newer:
+            typer.echo(f"update available: {current} → {latest} (run: scrapefold update)")
+        else:
+            typer.echo(f"up to date: {current}")
+        return
+
+    argv = update_mod.build_update_argv(extras)
+    typer.echo(f"running: {' '.join(argv)}", err=True)
+    try:
+        subprocess.run(argv, check=True)
+    except Exception as exc:
+        typer.echo(f"update failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo("updated — run 'scrapefold doctor' to verify")
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   place for Cursor, or prints the standard `mcpServers` JSON. `--print-only`
   previews, `--json` emits the config alone. Logic lives in
   `scrapefold/install.py` (pure, unit-tested planning + JSON merge).
+- **`scrapefold update`** — self-update command: `--check` compares the
+  installed version against the latest PyPI release (`--json` for agents),
+  the default action upgrades via the running interpreter's pip, with
+  `--extras "mcp,firecrawl"` to keep extras in the requirement.
+- **Structured MCP failures + token budget** — `scrape_url` returns
+  `{"url", "error": "all engines failed", "failures": [...]}` instead of a
+  raw exception when the ladder is exhausted; a budget test pins all four
+  tool definitions + instructions at ≈750 estimated tokens so they stay
+  agent-cheap.
 - **Wayback engine** (`wayback`) — free, keyless dead-link recovery via the
   Internet Archive: availability-API lookup → raw (`id_`) snapshot fetch →
   markdown, with the result honestly marked in the `json` slot
