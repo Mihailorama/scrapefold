@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 29 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 30 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -16,13 +16,13 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-952%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-1064%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <strong>29 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>952 tests</strong> · <strong>MIT</strong>
+  <strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1064 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -84,6 +84,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Exa**](https://exa.ai/) | ✅ | SaaS | Paid | ★★★ | ★★☆ | ★★☆ | Fast | $$ |
 | [**Serper**](https://serper.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★☆☆ | Fast | $ |
 | [**Maxun**](https://github.com/getmaxun/maxun) | ✅ | Local | AGPL | ★★★ | ★★★ | ★★☆ | Medium | Free (self-hosted) |
+| [**Wayback**](https://web.archive.org/) | ✅ | Local | — | ★★☆ | ☆☆☆ | ☆☆☆ | Fast | Free |
 
 **★★★** Excellent **★★☆** Good **★☆☆** Basic **☆☆☆** Not supported — **$** ~$0.1–0.5/1K req **$$** ~$1–3/1K req **$$$** ~$5–15/1K req
 
@@ -103,6 +104,8 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | Structured JSON from any page, via **your** LLM | `extract(result, schema=..., llm=my_llm)` — ScrapeGraphAI-style schema extraction over a user-provided callable; no vendor LLM SDK |
 | Sync codebase (no `async`/`await`) | `scrape_sync(url)` / `crawl_site_sync(root)` — blocking wrappers that survive leaked event loops (e.g. Playwright Sync API in the same process) |
 | Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
+| Page is dead (404) or changed since you saw it | **wayback** — archive.org snapshot, honestly marked `source=archive.org` + timestamp |
+| One fact from a long page (agents) | `scrapefold scrape <url> --focus "query"` or MCP `scrape_url(focus=...)` — BM25 keeps only relevant blocks |
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
 | Social profiles, posts, channels, comments | **SocialCrawl** gateway + **Scrape Creators** structured JSON |
@@ -248,22 +251,56 @@ scrapefold list-engines
 
 # Classify a URL's site class (cloudflare_protected / datadome_protected / etc.)
 scrapefold classify https://example.com
+
+# One-click MCP registration into your AI client (see below)
+scrapefold install claude
+
+# Health check: version, MCP extra, per-engine availability
+scrapefold doctor
+
+# Self-update (or just check): pip upgrade via the running interpreter
+scrapefold update --check
+scrapefold update --extras mcp
 ```
 
 ## MCP Server (for Claude Code, Cursor, agents)
 
+One-click install:
+
 ```bash
 pip install "scrapefold[mcp]"
-scrapefold-mcp
+scrapefold install claude    # Claude Code
+scrapefold install codex     # Codex CLI
+scrapefold install cursor    # Cursor
+scrapefold install vscode    # VS Code
+scrapefold install generic   # print JSON config for any other client
 ```
 
-Drop into your MCP config:
+Or drop into any client's MCP config manually:
 
 ```json
 { "mcpServers": { "scrapefold": { "command": "scrapefold-mcp", "args": [] } } }
 ```
 
-Exposes `scrape_url`, `crawl_site`, `list_engines`, `classify_url` tools and `scrapefold://cache/*`, `scrapefold://engines` resources.
+Exposes `scrape_url`, `crawl_site`, `list_engines`, `classify_url` tools over stdio — all 4 tool definitions + instructions cost your agent **≈750 tokens** (budget-tested). Failures come back structured (`{"error", "failures"}`), never as error-page HTML posing as content.
+
+**Setting up with an AI agent?** Just tell it:
+
+```
+fetch https://scrapefold.com/install.md
+```
+
+— a complete, agent-readable setup instruction (install → verify CLI → register MCP). It's idempotent: safe to run on a machine where scrapefold is already set up.
+
+## How is this different from Firecrawl / Crawl4AI / Scrapling / Jina?
+
+They're not competitors — **they're engines inside scrapefold.** Firecrawl, Crawl4AI, Scrapling, Jina Reader, ScrapingBee, and 20+ others are all wrapped behind one `ScrapeOptions`/`ScrapeResult` interface. scrapefold's job is the layer above any single vendor:
+
+- **Routing** — classify the URL (Cloudflare-protected? LinkedIn? plain blog?) and walk a per-class ladder from free local engines to paid APIs, stopping at the first good response.
+- **Honesty** — block pages and CAPTCHA shells are detected as suspicious and trigger escalation instead of being returned as "content".
+- **One interface** — switching vendors is a one-string change, not a pipeline rewrite. The MCP server stays deliberately small: 4 tight tools, no bloat in your agent's context.
+
+If you love one vendor, pin it: `--engines firecrawl`. If you don't want to choose, don't: `scrape(url)` picks the cheapest tier that works.
 
 ## Unified Result Format
 

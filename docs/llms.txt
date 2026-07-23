@@ -1,0 +1,18 @@
+# scrapefold
+
+> Unified Python interface over 30 web-scraping engines — single URL or whole
+> site → clean, LLM-ready markdown, with automatic anti-bot escalation
+> (Cloudflare, Datadome, PerimeterX, Akamai). Open source, MIT. Ships a CLI
+> (`scrapefold`) and an MCP server (`scrapefold-mcp`).
+
+## Setup
+
+- [Agent setup instructions](https://scrapefold.com/install.md): install,
+  verify the CLI, and register the MCP server in one command
+  (`scrapefold install claude|codex|cursor|vscode|generic`).
+
+## Docs
+
+- [README](https://github.com/mihailorama/scrapefold/blob/main/README.md)
+- [Agent mode (CLI + MCP)](https://github.com/mihailorama/scrapefold/blob/main/docs/tools/agent-mode.md)
+- [Architecture overview](https://github.com/mihailorama/scrapefold/blob/main/docs/architecture/overview.md)

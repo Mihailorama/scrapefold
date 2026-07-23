@@ -114,6 +114,9 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
         __import__("scrapefold.engines.labelup", fromlist=["LabelUpEngine"]).LabelUpEngine
     ),
     "maxun": lambda: __import__("scrapefold.engines.maxun", fromlist=["MaxunEngine"]).MaxunEngine,
+    "wayback": lambda: (
+        __import__("scrapefold.engines.wayback", fromlist=["WaybackEngine"]).WaybackEngine
+    ),
 }
 
 

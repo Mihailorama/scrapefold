@@ -1,6 +1,6 @@
 ---
 purpose: "Engines + features intentionally deferred after the v0.3.0 release."
-updated: "2026-06-29"
+updated: "2026-07-23"
 related:
   - ../TECH_DEBT.md
   - ../../CHANGELOG.md
@@ -130,3 +130,24 @@ The project site is live at **[scrapefold.com](https://scrapefold.com)**
 - **Plan:** Add a privacy-light, cookieless snippet (e.g. Plausible or a
   self-hosted equivalent) to `docs/index.html`. Confirm consent/footprint
   expectations before adding any third-party script.
+
+## Distribution / agent-DX (adopted from the hound-mcp r/opencodeCLI thread, 2026-07)
+
+Source: reddit.com/r/opencodeCLI/comments/1v1hfhk (458↑, 70 comments). Items
+already shipped: idempotent agent setup prompt (`docs/install.md`),
+`scrapefold install <client>`, `scrapefold doctor`, small-tool-count MCP
+positioning, "engines not competitors" comparison section in README, the
+`wayback` fallback engine, `focus=` BM25 extraction (CLI `--focus` +
+MCP `scrape_url(focus=...)`), `scrapefold update` self-update, structured
+MCP failures (`{"error", "failures"}` instead of raw exceptions), and a
+pinned token budget for MCP tool definitions (~750-token estimate,
+`test_tool_definitions_within_token_budget`). Deferred items below.
+
+### MCP web-tools benchmark
+
+- **Why:** OP + commenter agreed a standardized eval (fetch accuracy, search
+  recall, crawl completeness, anti-bot success, token efficiency) is an
+  ecosystem gap. scrapefold already has per-engine ratings; a public bench
+  would be strong distribution content.
+- **What:** ties into the existing evaluation ideas in ragfold; could reuse
+  its metrics runner against a fixed URL corpus.

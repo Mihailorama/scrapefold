@@ -76,6 +76,36 @@ scrapefold classify https://www.linkedin.com/in/someone --json
 # → {"url": "...", "site_class": "linkedin_profile"}
 ```
 
+### `scrapefold doctor`
+
+Post-install health check — version, Python, MCP extra presence, and
+per-engine availability (which optional extras are importable):
+
+```bash
+scrapefold doctor            # human-readable
+scrapefold doctor --json     # {"version": ..., "mcp_extra": true, "engines": {...}}
+```
+
+### `scrapefold update`
+
+Self-update via the running interpreter's pip:
+
+```bash
+scrapefold update --check           # compare installed vs latest on PyPI
+scrapefold update --check --json    # {"current": ..., "latest": ..., "update_available": ...}
+scrapefold update                   # pip install --upgrade scrapefold
+scrapefold update --extras mcp      # upgrade as scrapefold[mcp]
+```
+
+### `scrapefold install [client]`
+
+One-click MCP registration — see [MCP server → One-click registration](#one-click-registration) below.
+
+```bash
+scrapefold install claude          # register in Claude Code
+scrapefold install --json          # print mcpServers config JSON
+```
+
 ## CLI agent flags
 
 | Flag | Behavior |
@@ -105,15 +135,45 @@ Exit codes:
 
 ## MCP server
 
-`scrapefold-mcp` exists today as a console-script scaffold and exits with a
-non-zero status until the S10 MCP implementation lands. The contract below is
-the target implementation.
+`scrapefold-mcp` is a stdio MCP server built on the official `mcp` SDK
+(FastMCP). Without the `mcp` extra installed it exits with code 2 and an
+install hint.
 
 ```bash
 pip install "scrapefold[mcp]"
-scrapefold-mcp                          # stdio, default
-scrapefold-mcp --http :8765             # HTTP/SSE
+scrapefold-mcp                          # stdio transport
 ```
+
+### One-click registration
+
+`scrapefold install <client>` registers the server for you:
+
+```bash
+scrapefold install claude    # runs: claude mcp add scrapefold -- scrapefold-mcp
+scrapefold install codex     # runs: codex mcp add scrapefold -- scrapefold-mcp
+scrapefold install cursor    # merges ~/.cursor/mcp.json in place
+scrapefold install vscode    # runs: code --add-mcp '{"name":"scrapefold",...}'
+scrapefold install generic   # prints the mcpServers JSON for any client
+scrapefold install --json    # emits the config JSON alone (machine-parseable)
+scrapefold install claude --print-only   # show the command without executing
+```
+
+If the client's own CLI (`claude` / `codex` / `code`) is not on PATH, the
+command to run is printed instead of executed — nothing fails silently.
+
+### Agent setup prompt
+
+Agents can self-install from a single fetchable instruction page:
+
+```
+fetch https://scrapefold.com/install.md
+```
+
+(Source: [docs/install.md](../install.md), served raw via GitHub Pages —
+`docs/.nojekyll` keeps `.md` files unprocessed. `https://scrapefold.com/llms.txt`
+indexes it for LLM crawlers.)
+
+### Manual configuration
 
 Drop this into `~/.claude/mcp.json` or a project-local `.mcp.json`:
 
@@ -132,19 +192,26 @@ Drop this into `~/.claude/mcp.json` or a project-local `.mcp.json`:
 }
 ```
 
-Exposed tools (S10):
+Exposed tools:
 
 | Tool | Args | Returns |
 |---|---|---|
-| `scrape_url` | `url` + flattened `ScrapeOptions` fields | `ScrapeResult` JSON |
-| `crawl_site` | `url`, `max_pages`, `max_depth`, `strategy`, `engines`, `output_path?` | `{output_path, pages_fetched, …}` |
-| `list_engines` | — | engine table with availability flags |
-| `inspect_options` | `engine` | supported opts + adapter mapping |
+| `scrape_url` | `url`, `engines?` (comma-separated), `render_js?`, `stealth?`, `focus?` | `ScrapeResult` JSON (screenshot dropped, oversized `html` nulled). With `focus="query"`, only BM25-relevant markdown blocks are returned — a fraction of the tokens of the full page |
+| `crawl_site` | `url`, `max_pages?` (default 25) | `{url, pages, markdown, failures}` — `markdown` is the stitched crawl |
+| `list_engines` | — | engine name list |
+| `classify_url` | `url` | `{url, site_class}` |
 
-Resources (read-only):
+Error honesty: when every engine fails, `scrape_url` returns a structured
+`{"url", "error": "all engines failed", "failures": [...]}` — never an
+error page posing as content. (The router itself never returns a
+suspicious/blocked page: it escalates, and raises when the ladder is
+exhausted.)
 
-- `scrapefold://cache/{sha}` — cached scrape result without re-scraping
-- `scrapefold://engines` — same as `list_engines` as a static resource
+Token cost: all 4 tool definitions + server instructions ≈ **750 tokens**
+(estimate, chars/4) — pinned by a budget test so they stay tight.
+
+Planned (not yet implemented): `inspect_options` tool, `scrapefold://cache/{sha}`
+and `scrapefold://engines` resources.
 
 ## Why no `--dry-run` flag
 

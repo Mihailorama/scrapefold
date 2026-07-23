@@ -6,7 +6,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-23
+
 ### Added
+
+- **MCP server implemented** (`scrapefold-mcp`) — the console-script scaffold
+  is now a real stdio server built on the official `mcp` SDK (FastMCP), with
+  four tools: `scrape_url` (single URL → `ScrapeResult` JSON, with
+  `engines`/`render_js`/`stealth` args), `crawl_site` (whole site → stitched
+  markdown), `list_engines`, and `classify_url`. Payloads stay LLM-friendly:
+  `screenshot_b64` is dropped and oversized `html` is nulled. Without the
+  `mcp` extra the entry point exits 2 with an install hint.
+- **One-click MCP registration** — new `scrapefold install <client>` CLI
+  command (`claude` / `codex` / `cursor` / `vscode` / `generic`): invokes the
+  client's own registration CLI when on PATH (`claude mcp add …`,
+  `codex mcp add …`, `code --add-mcp …`), merges `~/.cursor/mcp.json` in
+  place for Cursor, or prints the standard `mcpServers` JSON. `--print-only`
+  previews, `--json` emits the config alone. Logic lives in
+  `scrapefold/install.py` (pure, unit-tested planning + JSON merge).
+- **`scrapefold update`** — self-update command: `--check` compares the
+  installed version against the latest PyPI release (`--json` for agents),
+  the default action upgrades via the running interpreter's pip, with
+  `--extras "mcp,firecrawl"` to keep extras in the requirement.
+- **Structured MCP failures + token budget** — `scrape_url` returns
+  `{"url", "error": "all engines failed", "failures": [...]}` instead of a
+  raw exception when the ladder is exhausted; a budget test pins all four
+  tool definitions + instructions at ≈750 estimated tokens so they stay
+  agent-cheap.
+- **Wayback engine** (`wayback`) — free, keyless dead-link recovery via the
+  Internet Archive: availability-API lookup → raw (`id_`) snapshot fetch →
+  markdown, with the result honestly marked in the `json` slot
+  (`{"source": "archive.org", "snapshot_timestamp", "snapshot_url"}`) and
+  `meta["archived"] = True`. Pin a date with `extra["wayback_timestamp"]`.
+  Raises a clean `EngineError` when no snapshot exists — never fake content.
+- **Focused extraction** (`--focus` / MCP `scrape_url(focus=...)`) — BM25
+  block filtering of the final markdown (stdlib-only): keeps only blocks
+  relevant to the query plus their governing headings, in page order, with
+  `[...]` omission markers and a relative-score threshold; falls back to the
+  full page when nothing matches. Saves most of the context tokens when an
+  agent needs one fact from a long page.
+- **`scrapefold doctor`** — post-install health check: version, Python,
+  MCP-extra presence, and per-engine importability (`--json` for agents).
+  Referenced as the verify step in the agent setup prompt.
+- **Agent setup prompt page** — `docs/install.md`, served raw at
+  `https://scrapefold.com/install.md` (new `docs/.nojekyll`), gives any AI
+  agent a complete fetchable install instruction; `docs/llms.txt` indexes it.
+  The landing page gained a here.now-style "Copy setup prompt for my agent"
+  button (with a visible `fetch https://scrapefold.com/install.md` fallback
+  line), an "One-click install for AI agents" section with an Add-to-Cursor
+  deeplink, and a copyable MCP config JSON.
 
 - **pydoll engine** (`pydoll`) — free, local, stealth-first Chromium driven
   directly over the Chrome DevTools Protocol with **no WebDriver** and no
@@ -578,7 +626,9 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/mihailorama/scrapefold/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/mihailorama/scrapefold/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/mihailorama/scrapefold/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mihailorama/scrapefold/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mihailorama/scrapefold/compare/v0.1.0...v0.1.1

@@ -1,6 +1,6 @@
 """scrapefold — Typer CLI entry point.
 
-Four subcommands: scrape, crawl, list-engines, classify.
+Subcommands: scrape, crawl, list-engines, classify, install, doctor, update.
 --json flag everywhere; errors fatal with non-zero exit code.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +69,11 @@ def scrape(
     output: Path | None = typer.Option(  # noqa: B008
         None, "--output", help="Write markdown to PATH instead of stdout."
     ),
+    focus: str | None = typer.Option(
+        None,
+        "--focus",
+        help="Keep only markdown blocks relevant to this query (BM25), saving tokens.",
+    ),
 ) -> None:
     """Scrape a single URL and print the markdown (or full JSON with --json)."""
     opts = ScrapeOptions(engines=_engines_arg(engines))
@@ -78,6 +83,11 @@ def scrape(
     except AllEnginesFailed as exc:
         typer.echo(f"all engines failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+
+    if focus:
+        from scrapefold.focus import focus_markdown
+
+        result = replace(result, markdown=focus_markdown(result.markdown, focus))
 
     if json_out:
         typer.echo(json.dumps(asdict(result), default=str))
@@ -173,6 +183,148 @@ def classify(
         typer.echo(json.dumps({"url": url, "site_class": site_class}))
         return
     typer.echo(site_class)
+
+
+# ---------------------------------------------------------------------------
+# doctor
+# ---------------------------------------------------------------------------
+
+
+def _doctor_report() -> dict[str, Any]:
+    """Collect the health-check data for ``scrapefold doctor``."""
+    import importlib.util
+    import platform
+
+    from scrapefold.engines import get_engine
+
+    engines: dict[str, str] = {}
+    for name in list_engine_names():
+        try:
+            get_engine(name)
+            engines[name] = "ok"
+        except Exception as exc:
+            engines[name] = f"unavailable: {exc}"
+
+    return {
+        "version": scrapefold.__version__,
+        "python": platform.python_version(),
+        "mcp_extra": importlib.util.find_spec("mcp") is not None,
+        "engines": engines,
+    }
+
+
+@app.command()
+def doctor(
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON report to stdout."),
+) -> None:
+    """Health check: version, MCP extra, and per-engine availability."""
+    report = _doctor_report()
+
+    if json_out:
+        typer.echo(json.dumps(report))
+        return
+
+    typer.echo(f"scrapefold {report['version']} · python {report['python']}")
+    if report["mcp_extra"]:
+        typer.echo("mcp extra: installed (scrapefold-mcp ready)")
+    else:
+        typer.echo('mcp extra: NOT installed — pip install "scrapefold[mcp]" for the MCP server')
+
+    ok = [name for name, status in report["engines"].items() if status == "ok"]
+    missing = {n: s for n, s in report["engines"].items() if s != "ok"}
+    typer.echo(f"engines: {len(ok)}/{len(report['engines'])} importable")
+    for name, status in missing.items():
+        typer.echo(f"  {name}: {status}")
+
+
+# ---------------------------------------------------------------------------
+# update
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def update(
+    check: bool = typer.Option(
+        False, "--check", help="Only check PyPI for a newer version; don't install."
+    ),
+    extras: str | None = typer.Option(
+        None,
+        "--extras",
+        help='Comma-separated extras to include in the upgrade (e.g. "mcp,firecrawl").',
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON to stdout (with --check)."),
+) -> None:
+    """Self-update: check PyPI and upgrade scrapefold via pip."""
+    import subprocess
+
+    from scrapefold import update as update_mod
+
+    current = scrapefold.__version__
+
+    if check:
+        try:
+            latest = update_mod.latest_version()
+        except Exception as exc:
+            typer.echo(f"update check failed: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        newer = update_mod.is_newer(latest, current)
+        if json_out:
+            typer.echo(
+                json.dumps({"current": current, "latest": latest, "update_available": newer})
+            )
+            return
+        if newer:
+            typer.echo(f"update available: {current} → {latest} (run: scrapefold update)")
+        else:
+            typer.echo(f"up to date: {current}")
+        return
+
+    argv = update_mod.build_update_argv(extras)
+    typer.echo(f"running: {' '.join(argv)}", err=True)
+    try:
+        subprocess.run(argv, check=True)
+    except Exception as exc:
+        typer.echo(f"update failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo("updated — run 'scrapefold doctor' to verify")
+
+
+# ---------------------------------------------------------------------------
+# install
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def install(
+    client: str = typer.Argument(
+        "generic",
+        help="Where to register the MCP server: claude | codex | cursor | vscode | generic.",
+    ),
+    print_only: bool = typer.Option(
+        False, "--print-only", help="Show what would be done without executing."
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit the generic mcpServers config JSON and exit."
+    ),
+) -> None:
+    """One-click registration of the scrapefold MCP server into an AI client."""
+    from scrapefold import install as install_mod
+
+    if json_out:
+        typer.echo(json.dumps(install_mod.mcp_config(), indent=2))
+        return
+
+    try:
+        plan = install_mod.plan_install(client)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    try:
+        typer.echo(install_mod.apply_plan(plan, print_only=print_only))
+    except Exception as exc:
+        typer.echo(f"install failed for {client}: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 def main() -> None:
