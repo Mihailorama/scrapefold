@@ -75,4 +75,19 @@ Conventional-ish prefixes: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refacto
 
 ## Release
 
-See `.claude/commands/release-scrapefold.md` (lands in S12). TL;DR: bump version in `pyproject.toml`, update `CHANGELOG.md`, tag `vX.Y.Z`, push — GitHub Actions publishes via PyPI trusted publishing.
+1. Bump `__version__` in `src/scrapefold/__init__.py` (the single source of
+   truth — `pyproject.toml` reads it via hatch's dynamic version).
+2. Move the `## [Unreleased]` entries in `CHANGELOG.md` under a new
+   `## [X.Y.Z] - YYYY-MM-DD` heading and update the compare links at the
+   bottom.
+3. Run `./scripts/check.sh` (its version-equality step needs a fresh
+   `pip install -e .` so package metadata matches).
+4. Merge to `main`, then tag the release commit `vX.Y.Z` and push the tag —
+   the `v*` tag build in `ci.yml` publishes to PyPI via trusted publishing.
+   - If you cannot push tags directly, dispatch the **Tag release** workflow
+     (`.github/workflows/tag-release.yml`) with `tag: vX.Y.Z`; it verifies the
+     tag matches `__version__` and pushes it. A tag pushed by that workflow's
+     `GITHUB_TOKEN` does not trigger CI automatically — follow up with
+     `gh workflow run ci.yml --ref vX.Y.Z`.
+5. Verify: PyPI shows the new version and the GitHub Pages landing
+   (`docs/`, served at scrapefold.com) redeployed from `main`.
