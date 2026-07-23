@@ -113,9 +113,14 @@
   .pip .copy { color: var(--dim); font-size: 12px; margin-left: 4px; }
   .copy.ok { color: var(--ok); }
 
-  /* Agent setup prompt (here.now-style one-click) */
-  .agent-cta { margin-top: 18px; }
+  /* Agent setup prompt (here.now-style one-click) — the primary CTA */
+  .agent-cta { margin-top: 30px; }
   .agent-cta .btn { cursor: pointer; font-family: inherit; }
+  .btn-lg { font-size: 17px; padding: 16px 28px; }
+  .btn-primary .copy { color: rgba(255, 255, 255, .75); }
+  .hero-links { color: var(--dim); font-size: 14px; margin: 10px 0 0; }
+  .hero-links a { color: var(--dim); font-weight: 600; }
+  .hero-links a:hover { color: var(--muted); }
   .agent-fetch { color: var(--dim); font-size: 13.5px; margin-top: 10px; }
   .agent-fetch code {
     color: var(--muted); background: var(--bg-soft);
@@ -209,9 +214,12 @@
   <h1>Turn any URL into clean markdown.</h1>
   <p class="tag">One async Python interface over <strong>30 scraping engines</strong> — with automatic anti-bot escalation and LLM-ready output. Open source, MIT.</p>
 
-  <div class="cta-row">
-    <a class="btn btn-primary" href="https://github.com/mihailorama/scrapefold">⭐ Star on GitHub</a>
-    <a class="btn btn-ghost" href="https://pypi.org/project/scrapefold/">View on PyPI</a>
+  <div class="agent-cta">
+    <button class="btn btn-primary btn-lg" id="agentPrompt" title="Click to copy"
+      data-copy="Fetch https://scrapefold.com/install.md and follow the instructions: install scrapefold, verify the CLI, and register the scrapefold MCP server in this coding agent.">
+      🤖 Copy setup prompt for my agent <span class="copy" id="agentPromptLabel" aria-live="polite">copy</span>
+    </button>
+    <div class="agent-fetch">or just tell your agent: <code>fetch https://scrapefold.com/install.md</code></div>
   </div>
 
   <div>
@@ -220,15 +228,8 @@
     </button>
   </div>
 
-  <div class="agent-cta">
-    <button class="btn btn-ghost" id="agentPrompt" title="Click to copy"
-      data-copy="Fetch https://scrapefold.com/install.md and follow the instructions: install scrapefold, verify the CLI, and register the scrapefold MCP server in this coding agent.">
-      🤖 Copy setup prompt for my agent <span class="copy" id="agentPromptLabel" aria-live="polite">copy</span>
-    </button>
-    <div class="agent-fetch">or just tell your agent: <code>fetch https://scrapefold.com/install.md</code></div>
-  </div>
-
   <p class="stats"><strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1064 tests</strong> · <strong>MIT</strong></p>
+  <p class="hero-links"><a href="https://github.com/mihailorama/scrapefold">⭐ Star on GitHub</a> · <a href="https://pypi.org/project/scrapefold/">PyPI</a></p>
 
   <div class="hero-demo">
     <img src="assets/demo.svg" alt="scrapefold scrape https://example.com producing clean markdown and auto-escalating past Cloudflare">
