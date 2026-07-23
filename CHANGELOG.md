@@ -8,6 +8,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- **MCP server implemented** (`scrapefold-mcp`) — the console-script scaffold
+  is now a real stdio server built on the official `mcp` SDK (FastMCP), with
+  four tools: `scrape_url` (single URL → `ScrapeResult` JSON, with
+  `engines`/`render_js`/`stealth` args), `crawl_site` (whole site → stitched
+  markdown), `list_engines`, and `classify_url`. Payloads stay LLM-friendly:
+  `screenshot_b64` is dropped and oversized `html` is nulled. Without the
+  `mcp` extra the entry point exits 2 with an install hint.
+- **One-click MCP registration** — new `scrapefold install <client>` CLI
+  command (`claude` / `codex` / `cursor` / `vscode` / `generic`): invokes the
+  client's own registration CLI when on PATH (`claude mcp add …`,
+  `codex mcp add …`, `code --add-mcp …`), merges `~/.cursor/mcp.json` in
+  place for Cursor, or prints the standard `mcpServers` JSON. `--print-only`
+  previews, `--json` emits the config alone. Logic lives in
+  `scrapefold/install.py` (pure, unit-tested planning + JSON merge).
+- **Agent setup prompt page** — `docs/install.md`, served raw at
+  `https://scrapefold.com/install.md` (new `docs/.nojekyll`), gives any AI
+  agent a complete fetchable install instruction; `docs/llms.txt` indexes it.
+  The landing page gained a here.now-style "Copy setup prompt for my agent"
+  button (with a visible `fetch https://scrapefold.com/install.md` fallback
+  line), an "One-click install for AI agents" section with an Add-to-Cursor
+  deeplink, and a copyable MCP config JSON.
+
 - **pydoll engine** (`pydoll`) — free, local, stealth-first Chromium driven
   directly over the Chrome DevTools Protocol with **no WebDriver** and no
   `navigator.webdriver` flag, built to clear Cloudflare / Turnstile challenges

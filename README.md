@@ -248,22 +248,39 @@ scrapefold list-engines
 
 # Classify a URL's site class (cloudflare_protected / datadome_protected / etc.)
 scrapefold classify https://example.com
+
+# One-click MCP registration into your AI client (see below)
+scrapefold install claude
 ```
 
 ## MCP Server (for Claude Code, Cursor, agents)
 
+One-click install:
+
 ```bash
 pip install "scrapefold[mcp]"
-scrapefold-mcp
+scrapefold install claude    # Claude Code
+scrapefold install codex     # Codex CLI
+scrapefold install cursor    # Cursor
+scrapefold install vscode    # VS Code
+scrapefold install generic   # print JSON config for any other client
 ```
 
-Drop into your MCP config:
+Or drop into any client's MCP config manually:
 
 ```json
 { "mcpServers": { "scrapefold": { "command": "scrapefold-mcp", "args": [] } } }
 ```
 
-Exposes `scrape_url`, `crawl_site`, `list_engines`, `classify_url` tools and `scrapefold://cache/*`, `scrapefold://engines` resources.
+Exposes `scrape_url`, `crawl_site`, `list_engines`, `classify_url` tools over stdio.
+
+**Setting up with an AI agent?** Just tell it:
+
+```
+fetch https://scrapefold.com/install.md
+```
+
+— a complete, agent-readable setup instruction (install → verify CLI → register MCP).
 
 ## Unified Result Format
 

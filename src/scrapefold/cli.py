@@ -1,6 +1,6 @@
 """scrapefold — Typer CLI entry point.
 
-Four subcommands: scrape, crawl, list-engines, classify.
+Five subcommands: scrape, crawl, list-engines, classify, install.
 --json flag everywhere; errors fatal with non-zero exit code.
 """
 
@@ -173,6 +173,44 @@ def classify(
         typer.echo(json.dumps({"url": url, "site_class": site_class}))
         return
     typer.echo(site_class)
+
+
+# ---------------------------------------------------------------------------
+# install
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def install(
+    client: str = typer.Argument(
+        "generic",
+        help="Where to register the MCP server: claude | codex | cursor | vscode | generic.",
+    ),
+    print_only: bool = typer.Option(
+        False, "--print-only", help="Show what would be done without executing."
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit the generic mcpServers config JSON and exit."
+    ),
+) -> None:
+    """One-click registration of the scrapefold MCP server into an AI client."""
+    from scrapefold import install as install_mod
+
+    if json_out:
+        typer.echo(json.dumps(install_mod.mcp_config(), indent=2))
+        return
+
+    try:
+        plan = install_mod.plan_install(client)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    try:
+        typer.echo(install_mod.apply_plan(plan, print_only=print_only))
+    except Exception as exc:
+        typer.echo(f"install failed for {client}: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 def main() -> None:
