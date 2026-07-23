@@ -162,7 +162,7 @@
     <div class="agent-fetch">or just tell your agent: <code>fetch https://scrapefold.com/install.md</code></div>
   </div>
 
-  <p class="stats"><strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>952 tests</strong> · <strong>MIT</strong></p>
+  <p class="stats"><strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1064 tests</strong> · <strong>MIT</strong></p>
 
   <div class="hero-demo">
     <img src="assets/demo.svg" alt="scrapefold scrape https://example.com producing clean markdown and auto-escalating past Cloudflare">
@@ -286,15 +286,18 @@ asyncio.run(main())</pre>
 
 <pre><span class="c"># CLI</span>
 <span class="k">$</span> scrapefold scrape https://example.com
+<span class="k">$</span> scrapefold scrape https://example.com --focus <span class="s">"pricing"</span>  <span class="c"># only relevant blocks — saves tokens</span>
 <span class="k">$</span> scrapefold crawl https://docs.example.com --max-pages 50 --output site.md
-<span class="k">$</span> scrapefold list-engines</pre>
+<span class="k">$</span> scrapefold list-engines
+<span class="k">$</span> scrapefold doctor            <span class="c"># health check: engines, MCP extra</span>
+<span class="k">$</span> scrapefold update --check    <span class="c"># self-update via PyPI</span></pre>
   </div>
 </section>
 
 <section id="agents">
   <div class="wrap">
     <h2>One-click install for AI agents</h2>
-    <p class="lead">scrapefold ships a CLI (<code>scrapefold</code>) and an MCP server (<code>scrapefold-mcp</code>) with four tools — <code>scrape_url</code>, <code>crawl_site</code>, <code>list_engines</code>, <code>classify_url</code>. One command registers it in your client:</p>
+    <p class="lead">scrapefold ships a CLI (<code>scrapefold</code>) and an MCP server (<code>scrapefold-mcp</code>) with four tools — <code>scrape_url</code>, <code>crawl_site</code>, <code>list_engines</code>, <code>classify_url</code>. All four definitions cost your agent <strong>≈750 tokens</strong> (budget-tested). Need one fact from a long page? <code>scrape_url(focus="query")</code> returns only the relevant blocks. Failures come back structured — never error-page HTML posing as content. One command registers it in your client:</p>
 <pre><span class="k">$</span> pip install <span class="s">"scrapefold[mcp]"</span>
 <span class="k">$</span> scrapefold install claude   <span class="c"># Claude Code</span>
 <span class="k">$</span> scrapefold install codex    <span class="c"># Codex CLI</span>

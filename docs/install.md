@@ -53,6 +53,7 @@ scrapefold list-engines [--json]
 scrapefold classify <url> [--json]
 scrapefold install [claude|codex|cursor|vscode|generic]
 scrapefold doctor [--json]
+scrapefold update [--check] [--extras mcp]
 ```
 
 `--json` makes every command emit a single machine-parseable JSON document.

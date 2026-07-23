@@ -16,13 +16,13 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-952%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-1064%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>952 tests</strong> · <strong>MIT</strong>
+  <strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1064 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
