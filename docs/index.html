@@ -171,6 +171,26 @@
 
 <main>
 
+<section id="agents">
+  <div class="wrap">
+    <h2>One-click install for AI agents</h2>
+    <p class="lead">scrapefold ships a CLI (<code>scrapefold</code>) and an MCP server (<code>scrapefold-mcp</code>) with four tools — <code>scrape_url</code>, <code>crawl_site</code>, <code>list_engines</code>, <code>classify_url</code>. All four definitions cost your agent <strong>≈750 tokens</strong> (budget-tested). Need one fact from a long page? <code>scrape_url(focus="query")</code> returns only the relevant blocks. Failures come back structured — never error-page HTML posing as content. One command registers it in your client:</p>
+<pre><span class="k">$</span> pip install <span class="s">"scrapefold[mcp]"</span>
+<span class="k">$</span> scrapefold install claude   <span class="c"># Claude Code</span>
+<span class="k">$</span> scrapefold install codex    <span class="c"># Codex CLI</span>
+<span class="k">$</span> scrapefold install cursor   <span class="c"># Cursor</span>
+<span class="k">$</span> scrapefold install vscode   <span class="c"># VS Code</span></pre>
+    <div class="cta-row" style="justify-content:flex-start">
+      <a class="btn btn-ghost" href="cursor://anysphere.cursor-deeplink/mcp/install?name=scrapefold&amp;config=eyJjb21tYW5kIjogInNjcmFwZWZvbGQtbWNwIiwgImFyZ3MiOiBbXX0=">Add to Cursor</a>
+      <button class="btn btn-ghost" id="mcpConfig" title="Click to copy"
+        data-copy='{"mcpServers":{"scrapefold":{"command":"scrapefold-mcp","args":[]}}}'>
+        Copy MCP config JSON <span class="copy" id="mcpConfigLabel">copy</span>
+      </button>
+    </div>
+    <p class="lead" style="margin-top:18px">Any other client: paste the config JSON above into its MCP settings. Full agent instructions live at <a href="install.md">scrapefold.com/install.md</a> — fetchable by any agent.</p>
+  </div>
+</section>
+
 <section id="why">
   <div class="wrap">
     <h2>Why Scrapefold?</h2>
@@ -291,26 +311,6 @@ asyncio.run(main())</pre>
 <span class="k">$</span> scrapefold list-engines
 <span class="k">$</span> scrapefold doctor            <span class="c"># health check: engines, MCP extra</span>
 <span class="k">$</span> scrapefold update --check    <span class="c"># self-update via PyPI</span></pre>
-  </div>
-</section>
-
-<section id="agents">
-  <div class="wrap">
-    <h2>One-click install for AI agents</h2>
-    <p class="lead">scrapefold ships a CLI (<code>scrapefold</code>) and an MCP server (<code>scrapefold-mcp</code>) with four tools — <code>scrape_url</code>, <code>crawl_site</code>, <code>list_engines</code>, <code>classify_url</code>. All four definitions cost your agent <strong>≈750 tokens</strong> (budget-tested). Need one fact from a long page? <code>scrape_url(focus="query")</code> returns only the relevant blocks. Failures come back structured — never error-page HTML posing as content. One command registers it in your client:</p>
-<pre><span class="k">$</span> pip install <span class="s">"scrapefold[mcp]"</span>
-<span class="k">$</span> scrapefold install claude   <span class="c"># Claude Code</span>
-<span class="k">$</span> scrapefold install codex    <span class="c"># Codex CLI</span>
-<span class="k">$</span> scrapefold install cursor   <span class="c"># Cursor</span>
-<span class="k">$</span> scrapefold install vscode   <span class="c"># VS Code</span></pre>
-    <div class="cta-row" style="justify-content:flex-start">
-      <a class="btn btn-ghost" href="cursor://anysphere.cursor-deeplink/mcp/install?name=scrapefold&amp;config=eyJjb21tYW5kIjogInNjcmFwZWZvbGQtbWNwIiwgImFyZ3MiOiBbXX0=">Add to Cursor</a>
-      <button class="btn btn-ghost" id="mcpConfig" title="Click to copy"
-        data-copy='{"mcpServers":{"scrapefold":{"command":"scrapefold-mcp","args":[]}}}'>
-        Copy MCP config JSON <span class="copy" id="mcpConfigLabel">copy</span>
-      </button>
-    </div>
-    <p class="lead" style="margin-top:18px">Any other client: paste the config JSON above into its MCP settings. Full agent instructions live at <a href="install.md">scrapefold.com/install.md</a> — fetchable by any agent.</p>
   </div>
 </section>
 
