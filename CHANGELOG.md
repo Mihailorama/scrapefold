@@ -6,6 +6,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- **Tag release workflow** (`.github/workflows/tag-release.yml`) — creates an
+  annotated release tag via `workflow_dispatch` after verifying it matches
+  `__version__`; for environments that cannot push tags directly. Documented
+  in the CONTRIBUTING release checklist (which now also reflects that the
+  version lives in `src/scrapefold/__init__.py`, not `pyproject.toml`).
+
+### Changed
+
+- **Landing page UX** (docs-only, scrapefold.com):
+  - "One-click install for AI agents" is the first section after the hero.
+  - Hero CTA hierarchy reordered for onboarding: primary "Copy setup prompt
+    for my agent" button + `fetch scrapefold.com/install.md` line, then the
+    `pip install` chip; Star-on-GitHub / PyPI demoted to small links.
+  - Sticky top nav with anchor links, skip link, `:focus-visible` outlines,
+    `aria-live` copy feedback, keyboard-operable copy chips, higher-contrast
+    dim text, `prefers-reduced-motion` support, hover micro-interactions.
+  - Social card served as PNG (`assets/social-card.png`) — SVG `og:image` is
+    not rendered by most platforms.
+
 ## [0.5.0] - 2026-07-23
 
 ### Added
