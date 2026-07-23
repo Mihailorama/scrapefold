@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-23
+
 ### Added
 
 - **MCP server implemented** (`scrapefold-mcp`) — the console-script scaffold
@@ -624,7 +626,9 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/mihailorama/scrapefold/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/mihailorama/scrapefold/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/mihailorama/scrapefold/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mihailorama/scrapefold/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mihailorama/scrapefold/compare/v0.1.0...v0.1.1
