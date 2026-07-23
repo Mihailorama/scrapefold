@@ -2,10 +2,26 @@
 
 You are an AI agent setting up **scrapefold** for your user. scrapefold turns
 any URL into clean, LLM-ready markdown through one interface over 27 scraping
-engines, with automatic anti-bot escalation. Follow the steps below, then
-report what you installed and verified.
+engines, with automatic anti-bot escalation. Follow the steps below **exactly
+and in order**, then report what you installed and verified.
 
-## 1. Install
+Ground rules:
+
+- **Idempotent:** check before you change. Never reinstall what is installed,
+  never overwrite an existing config — only add to it.
+- **Honest:** if a step fails, say which step and show the error. Do not
+  pretend a step succeeded.
+
+## 1. Check if scrapefold is already installed
+
+```bash
+scrapefold --version
+```
+
+If this prints a version, scrapefold is installed — **do NOT reinstall**,
+skip to step 3.
+
+## 2. Install
 
 ```bash
 pip install "scrapefold[mcp]"
@@ -19,14 +35,16 @@ Notes:
   `pip install "scrapefold[firecrawl,scrapingbee]"` or `"scrapefold[all]"`.
   The free local engines work with no extras and no API keys.
 
-## 2. Verify the CLI
+## 3. Verify the CLI
 
 ```bash
-scrapefold --version
+scrapefold doctor
 scrapefold scrape https://example.com
 ```
 
-The second command should print markdown for the page. All subcommands:
+`doctor` prints the version, whether the MCP extra is present, and per-engine
+availability. The second command should print markdown for the page. All
+subcommands:
 
 ```bash
 scrapefold scrape <url> [--engines jina,firecrawl] [--json] [--output page.md]
@@ -34,12 +52,13 @@ scrapefold crawl <url> [--max-pages 50] [--output site.md] [--per-page-dir ./pag
 scrapefold list-engines [--json]
 scrapefold classify <url> [--json]
 scrapefold install [claude|codex|cursor|vscode|generic]
+scrapefold doctor [--json]
 ```
 
 `--json` makes every command emit a single machine-parseable JSON document.
 Errors are fatal with a non-zero exit code.
 
-## 3. Register the MCP server (one command)
+## 4. Register the MCP server (one command)
 
 Pick the client you are running in:
 
@@ -51,7 +70,12 @@ scrapefold install vscode    # VS Code      (runs: code --add-mcp ...)
 scrapefold install generic   # prints the JSON below for any other client
 ```
 
-If your client is not listed, add this to its MCP settings:
+`scrapefold install` is safe to re-run: it merges configs in place,
+preserves every existing server, and is a no-op if scrapefold is already
+registered.
+
+If your client is not listed, **read the client's MCP config first, then add
+this entry to it — preserve all existing content**:
 
 ```json
 {
@@ -73,13 +97,24 @@ The server speaks stdio and exposes four tools:
 | `list_engines()` | Registered engine names |
 | `classify_url(url)` | SiteClass the router would assign |
 
-## 4. Verify the MCP server
+## 5. Verify the MCP server
 
-Restart the client if needed, then confirm the `scrapefold` server is
-connected and call `list_engines` — it should return engine names such as
-`requests`, `jina`, `firecrawl`.
+Tell the user to restart the client (MCP servers load on startup). After
+restart, confirm the `scrapefold` server is connected and call
+`list_engines` — it should return engine names such as `requests`, `jina`,
+`firecrawl`.
 
-## 5. Python API (optional)
+## 6. Report what you did
+
+End with a short setup report:
+
+- Installed scrapefold, or found version X already installed (step 1/2)
+- `scrapefold doctor` result: N/M engines importable, MCP extra yes/no (step 3)
+- Which client you registered the MCP server in, and how (step 4)
+- Whether the MCP connection was verified, or that a client restart is
+  still pending (step 5)
+
+## 7. Python API (optional)
 
 ```python
 import asyncio

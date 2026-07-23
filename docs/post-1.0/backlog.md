@@ -1,6 +1,6 @@
 ---
 purpose: "Engines + features intentionally deferred after the v0.3.0 release."
-updated: "2026-06-29"
+updated: "2026-07-23"
 related:
   - ../TECH_DEBT.md
   - ../../CHANGELOG.md
@@ -130,3 +130,65 @@ The project site is live at **[scrapefold.com](https://scrapefold.com)**
 - **Plan:** Add a privacy-light, cookieless snippet (e.g. Plausible or a
   self-hosted equivalent) to `docs/index.html`. Confirm consent/footprint
   expectations before adding any third-party script.
+
+## Distribution / agent-DX (adopted from the hound-mcp r/opencodeCLI thread, 2026-07)
+
+Source: reddit.com/r/opencodeCLI/comments/1v1hfhk (458↑, 70 comments). Items
+already shipped: idempotent agent setup prompt (`docs/install.md`),
+`scrapefold install <client>`, `scrapefold doctor`, small-tool-count MCP
+positioning, "engines not competitors" comparison section in README.
+Deferred items below.
+
+### `scrapefold update` self-update + update check
+
+- **Why:** hound ships `-v` (version + update status), `-u` (self-update),
+  `--reinstall`. Keeps installs current without users tracking PyPI.
+- **What:** `scrapefold doctor` gains a PyPI latest-version check (network,
+  opt-in); `scrapefold update` runs `pip install -U scrapefold[...]`
+  preserving installed extras.
+
+### Error honesty in `ScrapeResult`
+
+- **Why:** hound v10.4.0's headline fix — 4xx/5xx error pages used to flow
+  through as "content" and agents mistook error-page HTML for data. Their
+  fix: flag it and replace content with the error message. scrapefold's
+  `is_suspicious` already gates escalation, but the *final* result of an
+  exhausted ladder can still be an error page presented as content.
+- **What:** a `ScrapeResult.error`/`degraded` slot set when the best
+  available response still looks like a block/error page, so MCP/CLI
+  consumers can tell "real content" from "best effort".
+
+### Wayback Machine fallback engine
+
+- **Why:** hound auto-recovers dead links (404/451/500) from the Internet
+  Archive and honestly marks `source=archive.org` + snapshot date. Loved in
+  the thread.
+- **What:** a free `wayback` engine at the end of ladders for 404-class
+  failures, filling `ScrapeResult.json` with `{"source": "archive.org",
+  "snapshot_date": ...}`.
+
+### Focused extraction parameter (`focus=`)
+
+- **Why:** the deepest thread subdiscussion: agents waste context fetching
+  whole pages/PDFs. hound's `focus="query"` BM25-filters to relevant blocks;
+  claimed >5-10% context savings; "if the agent doesn't discover the
+  feature, the feature might as well not exist" — must be prominent in the
+  MCP tool description.
+- **What:** `scrape_url(..., focus="query")` in the MCP server + `--focus`
+  CLI flag, BM25 over markdown blocks (stdlib-only, no new deps).
+
+### Token-cost transparency for MCP tool definitions
+
+- **Why:** hound advertises "2,746 tokens for all 6 tools + instructions".
+  A concrete, checkable number that lands well with agent users.
+- **What:** measure scrapefold's 4 tool defs + instructions, pin with a test
+  budget (e.g. < 1,500 tokens), publish the number in README/landing.
+
+### MCP web-tools benchmark
+
+- **Why:** OP + commenter agreed a standardized eval (fetch accuracy, search
+  recall, crawl completeness, anti-bot success, token efficiency) is an
+  ecosystem gap. scrapefold already has per-engine ratings; a public bench
+  would be strong distribution content.
+- **What:** ties into the existing evaluation ideas in ragfold; could reuse
+  its metrics runner against a fixed URL corpus.

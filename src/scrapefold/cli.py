@@ -1,6 +1,6 @@
 """scrapefold — Typer CLI entry point.
 
-Five subcommands: scrape, crawl, list-engines, classify, install.
+Six subcommands: scrape, crawl, list-engines, classify, install, doctor.
 --json flag everywhere; errors fatal with non-zero exit code.
 """
 
@@ -173,6 +173,58 @@ def classify(
         typer.echo(json.dumps({"url": url, "site_class": site_class}))
         return
     typer.echo(site_class)
+
+
+# ---------------------------------------------------------------------------
+# doctor
+# ---------------------------------------------------------------------------
+
+
+def _doctor_report() -> dict[str, Any]:
+    """Collect the health-check data for ``scrapefold doctor``."""
+    import importlib.util
+    import platform
+
+    from scrapefold.engines import get_engine
+
+    engines: dict[str, str] = {}
+    for name in list_engine_names():
+        try:
+            get_engine(name)
+            engines[name] = "ok"
+        except Exception as exc:
+            engines[name] = f"unavailable: {exc}"
+
+    return {
+        "version": scrapefold.__version__,
+        "python": platform.python_version(),
+        "mcp_extra": importlib.util.find_spec("mcp") is not None,
+        "engines": engines,
+    }
+
+
+@app.command()
+def doctor(
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON report to stdout."),
+) -> None:
+    """Health check: version, MCP extra, and per-engine availability."""
+    report = _doctor_report()
+
+    if json_out:
+        typer.echo(json.dumps(report))
+        return
+
+    typer.echo(f"scrapefold {report['version']} · python {report['python']}")
+    if report["mcp_extra"]:
+        typer.echo("mcp extra: installed (scrapefold-mcp ready)")
+    else:
+        typer.echo('mcp extra: NOT installed — pip install "scrapefold[mcp]" for the MCP server')
+
+    ok = [name for name, status in report["engines"].items() if status == "ok"]
+    missing = {n: s for n, s in report["engines"].items() if s != "ok"}
+    typer.echo(f"engines: {len(ok)}/{len(report['engines'])} importable")
+    for name, status in missing.items():
+        typer.echo(f"  {name}: {status}")
 
 
 # ---------------------------------------------------------------------------

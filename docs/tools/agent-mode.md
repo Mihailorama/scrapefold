@@ -76,6 +76,16 @@ scrapefold classify https://www.linkedin.com/in/someone --json
 # → {"url": "...", "site_class": "linkedin_profile"}
 ```
 
+### `scrapefold doctor`
+
+Post-install health check — version, Python, MCP extra presence, and
+per-engine availability (which optional extras are importable):
+
+```bash
+scrapefold doctor            # human-readable
+scrapefold doctor --json     # {"version": ..., "mcp_extra": true, "engines": {...}}
+```
+
 ### `scrapefold install [client]`
 
 One-click MCP registration — see [MCP server → One-click registration](#one-click-registration) below.

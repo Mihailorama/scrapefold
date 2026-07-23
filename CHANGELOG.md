@@ -22,6 +22,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   place for Cursor, or prints the standard `mcpServers` JSON. `--print-only`
   previews, `--json` emits the config alone. Logic lives in
   `scrapefold/install.py` (pure, unit-tested planning + JSON merge).
+- **`scrapefold doctor`** — post-install health check: version, Python,
+  MCP-extra presence, and per-engine importability (`--json` for agents).
+  Referenced as the verify step in the agent setup prompt.
 - **Agent setup prompt page** — `docs/install.md`, served raw at
   `https://scrapefold.com/install.md` (new `docs/.nojekyll`), gives any AI
   agent a complete fetchable install instruction; `docs/llms.txt` indexes it.

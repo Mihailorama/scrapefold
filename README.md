@@ -251,6 +251,9 @@ scrapefold classify https://example.com
 
 # One-click MCP registration into your AI client (see below)
 scrapefold install claude
+
+# Health check: version, MCP extra, per-engine availability
+scrapefold doctor
 ```
 
 ## MCP Server (for Claude Code, Cursor, agents)
@@ -280,7 +283,17 @@ Exposes `scrape_url`, `crawl_site`, `list_engines`, `classify_url` tools over st
 fetch https://scrapefold.com/install.md
 ```
 
-— a complete, agent-readable setup instruction (install → verify CLI → register MCP).
+— a complete, agent-readable setup instruction (install → verify CLI → register MCP). It's idempotent: safe to run on a machine where scrapefold is already set up.
+
+## How is this different from Firecrawl / Crawl4AI / Scrapling / Jina?
+
+They're not competitors — **they're engines inside scrapefold.** Firecrawl, Crawl4AI, Scrapling, Jina Reader, ScrapingBee, and 20+ others are all wrapped behind one `ScrapeOptions`/`ScrapeResult` interface. scrapefold's job is the layer above any single vendor:
+
+- **Routing** — classify the URL (Cloudflare-protected? LinkedIn? plain blog?) and walk a per-class ladder from free local engines to paid APIs, stopping at the first good response.
+- **Honesty** — block pages and CAPTCHA shells are detected as suspicious and trigger escalation instead of being returned as "content".
+- **One interface** — switching vendors is a one-string change, not a pipeline rewrite. The MCP server stays deliberately small: 4 tight tools, no bloat in your agent's context.
+
+If you love one vendor, pin it: `--engines firecrawl`. If you don't want to choose, don't: `scrape(url)` picks the cheapest tier that works.
 
 ## Unified Result Format
 

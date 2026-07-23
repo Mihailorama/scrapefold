@@ -346,3 +346,43 @@ def test_crawl_per_page_dir_works_alongside_stitched_output(
     # Per-page files written
     written = list(per_page_dir.glob("*.md"))
     assert len(written) == 1
+
+
+# ---------------------------------------------------------------------------
+# 12. `scrapefold doctor` health check
+# ---------------------------------------------------------------------------
+
+
+def test_doctor_reports_version_and_engines(runner: CliRunner) -> None:
+    import scrapefold
+
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert scrapefold.__version__ in result.stdout
+    assert "engines:" in result.stdout
+
+
+def test_doctor_json_output(runner: CliRunner) -> None:
+    result = runner.invoke(app, ["doctor", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert "version" in data
+    assert "python" in data
+    assert isinstance(data["mcp_extra"], bool)
+    assert data["engines"]["requests"] == "ok"
+
+
+def test_doctor_marks_unimportable_engine(
+    runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scrapefold import engines as engines_mod
+
+    def _fake_get_engine(name: str):
+        if name == "requests":
+            raise ImportError("No module named 'nope'")
+        return object
+
+    monkeypatch.setattr(engines_mod, "get_engine", _fake_get_engine)
+    result = runner.invoke(app, ["doctor", "--json"])
+    data = json.loads(result.stdout)
+    assert data["engines"]["requests"].startswith("unavailable:")
