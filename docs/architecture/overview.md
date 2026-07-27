@@ -165,7 +165,7 @@ LinkedIn ladders skip plain HTTP and lead with a paid race over vendor-specializ
 
 ```python
 (
-    RaceStep(engines=("apify_linkedin", "anysite", "scrapingdog", "exa"),
+    RaceStep(engines=("enrichlayer", "apify_linkedin", "anysite", "scrapingdog", "exa"),
              budget_accounting="sum_all"),
     SequentialStep(engine="brightdata_unlocker_sync", cost=0.0015),
 )
@@ -173,6 +173,7 @@ LinkedIn ladders skip plain HTTP and lead with a paid race over vendor-specializ
 
 `test_linkedin_never_starts_with_requests` enforces the no-plain-HTTP rule across all five LinkedIn classes.
 Exa uses public people/company search defaults for LinkedIn profile/company URLs; Sales Navigator remains outside the automatic Exa path.
+EnrichLayer serves person/company/school/job profiles as Proxycurl-compatible structured JSON (`ENRICHLAYER_API_KEY`); it joins the `linkedin_profile`, `linkedin_company` and `linkedin_job` races but has no post or Sales Navigator endpoint.
 
 ### Difficulty classes
 

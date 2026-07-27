@@ -8,6 +8,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- **EnrichLayer engine** (`enrichlayer`) — pure-httpx adapter for the
+  EnrichLayer REST API (https://enrichlayer.com, the Proxycurl successor):
+  LinkedIn person (`/in/`), company (`/company/`, `/showcase/`), school
+  (`/school/`) and job (`/jobs/view/`) URLs are routed to the matching
+  `/api/v2/*` endpoint and returned as structured `ScrapeResult.json`; person
+  profiles can also be resolved from Twitter/X and Facebook profile URLs.
+  Auth via `Authorization: Bearer` with the key read from
+  `ENRICHLAYER_API_KEY`. `opts.extra["enrichlayer_endpoint"]` forces any
+  other endpoint (person lookup, reverse email, …) and other
+  `enrichlayer_*` extras pass through as query params (`use_cache`,
+  `live_fetch`, `extra`, …). Joins the `linkedin_profile`,
+  `linkedin_company` and `linkedin_job` ladder races ahead of
+  `apify_linkedin`. Person/company/school payloads normalize into
+  `ScrapeResult.social` (new `public_identifier` / `follower_count` aliases
+  in `scrapefold.social`).
+
 - **Tag release workflow** (`.github/workflows/tag-release.yml`) — creates an
   annotated release tag via `workflow_dispatch` after verifying it matches
   `__version__`; for environments that cannot push tags directly. Documented
