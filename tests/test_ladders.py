@@ -64,6 +64,7 @@ _VALID_ENGINES = frozenset(
         "scrapecreators",
         "socialcrawl",
         "exa",
+        "enrichlayer",
     }
 )
 

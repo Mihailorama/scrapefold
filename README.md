@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1064 tests</strong> · <strong>MIT</strong>
+  <strong>31 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1103 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -75,6 +75,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Anysite**](https://anysite.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**Scrape Creators**](https://scrapecreators.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
 | [**SocialCrawl**](https://www.socialcrawl.dev/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
+| [**EnrichLayer**](https://enrichlayer.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$$ |
 | [**Telegram**](https://telegram.org/) | ✅ | Local | — | ★★☆ | ☆☆☆ | ☆☆☆ | Fast | Free |
 | [**TGStat**](https://tgstat.com/) | ✅ | SaaS | Paid | — | — | ★★☆ | Fast | $$ |
 | [**Telemetr**](https://telemetr.io/) | ✅ | SaaS | Paid | — | — | ★★☆ | Fast | $$ |
@@ -196,6 +197,7 @@ asyncio.run(main())
 | [**Anysite**](https://anysite.dev/) | SaaS | Paid | General-purpose vendor | `pip install scrapefold[anysite]` |
 | [**Scrape Creators**](https://scrapecreators.com/) | SaaS | Paid | Social-media JSON API (TikTok, IG, YouTube, X, Reddit) | (built-in — pure httpx) |
 | [**SocialCrawl**](https://www.socialcrawl.dev/) | SaaS | Paid | Social-data JSON gateway (TikTok, IG, YouTube, Facebook, X, LinkedIn, Reddit, plus endpoint overrides) | (built-in — pure httpx) |
+| [**EnrichLayer**](https://enrichlayer.com/) | SaaS | Paid | LinkedIn person/company/school/job enrichment JSON, Proxycurl-compatible (person also via X/Facebook URL, plus endpoint overrides) | (built-in — pure httpx) |
 | **Telegram** | Local | — | Public Telegram channel/message preview parser | (built-in) |
 | **TGStat** | SaaS | Paid | Telegram channel/posts/post REST data | (built-in — pure httpx) |
 | **Telemetr** | SaaS | Paid | Telegram channel/message analytics REST data | (built-in — pure httpx) |
@@ -543,6 +545,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `oxylabs` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | trial | $2.80 |
 | `outscraper` | SaaS · site | ✓ | ✓ | — | — | datacenter | ✓ | ✓ | $3.00 |
 | `scraperapi` | SaaS | ✓ | — | — | ✓ | datacenter | ✓ | ✓ | $0.49–4.90 |
+| `enrichlayer` | SaaS · site | — | ✓ | — | — | residential | ✓ | trial | $20.00 |
 
 `SaaS · site` = ships site-specialized endpoints (LinkedIn, Google Maps, …). `jina` and `cloakbrowser` set `requires_api_key=False`; a key is optional (Jina raises free-tier rate limits).
 

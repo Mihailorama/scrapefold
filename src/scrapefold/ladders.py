@@ -374,6 +374,7 @@ LADDERS: dict[SiteClass, Ladder] = {
     # LinkedIn — vendor-specialized endpoints first, never plain HTTP.
     "linkedin_profile": (
         _race(
+            "enrichlayer",
             "apify_linkedin",
             "anysite",
             "scrapingdog",
@@ -385,6 +386,7 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     "linkedin_company": (
         _race(
+            "enrichlayer",
             "apify_linkedin",
             "anysite",
             "scrapingdog",
@@ -399,7 +401,13 @@ LADDERS: dict[SiteClass, Ladder] = {
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "linkedin_job": (
-        _race("apify_linkedin", "anysite", "scrapingdog", budget_accounting="sum_all"),
+        _race(
+            "enrichlayer",
+            "apify_linkedin",
+            "anysite",
+            "scrapingdog",
+            budget_accounting="sum_all",
+        ),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "linkedin_sales_navigator": (

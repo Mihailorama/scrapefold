@@ -43,6 +43,7 @@ _HANDLE = (
     "ownerUsername",
     "uniqueId",
     "publicIdentifier",
+    "public_identifier",
     "nickname",
 )
 _FIRST_NAME = ("firstName", "first_name")
@@ -54,6 +55,7 @@ _FOLLOWERS = (
     "followersCount",
     "followers_count",
     "followerCount",
+    "follower_count",
     "followers",
     "fan_count",
     "subscriberCount",

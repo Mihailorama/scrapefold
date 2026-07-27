@@ -71,6 +71,11 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "outscraper": lambda: (
         __import__("scrapefold.engines.outscraper", fromlist=["OutscraperEngine"]).OutscraperEngine
     ),
+    "enrichlayer": lambda: (
+        __import__(
+            "scrapefold.engines.enrichlayer", fromlist=["EnrichLayerEngine"]
+        ).EnrichLayerEngine
+    ),
     "scrapling_stealth": lambda: (
         __import__(
             "scrapefold.engines.scrapling_stealth", fromlist=["ScraplingStealthEngine"]

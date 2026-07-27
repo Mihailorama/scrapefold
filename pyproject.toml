@@ -66,6 +66,7 @@ cloakbrowser = ["cloakbrowser>=0.3"]
 anysite      = []
 scrapecreators = []
 socialcrawl = []
+enrichlayer  = []
 maxun        = []
 # --- stealth browsers + content extraction ---
 pydoll       = ["pydoll-python>=2.0"]
