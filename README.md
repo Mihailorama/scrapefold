@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 30 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 32 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -16,7 +16,7 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-1064%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-1120%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
