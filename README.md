@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 32 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 33 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <strong>32 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1120 tests</strong> · <strong>MIT</strong>
+  <strong>33 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1120 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -76,6 +76,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Scrape Creators**](https://scrapecreators.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
 | [**SocialCrawl**](https://www.socialcrawl.dev/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
 | [**EnrichLayer**](https://enrichlayer.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$$ |
+| [**SpyTrend**](https://spytrend.com/) | ✅ | SaaS | Free tier | — | — | ★★★ | Fast | $ |
 | [**Telegram**](https://telegram.org/) | ✅ | Local | — | ★★☆ | ☆☆☆ | ☆☆☆ | Fast | Free |
 | [**TGStat**](https://tgstat.com/) | ✅ | SaaS | Paid | — | — | ★★☆ | Fast | $$ |
 | [**Telemetr**](https://telemetr.io/) | ✅ | SaaS | Paid | — | — | ★★☆ | Fast | $$ |
@@ -200,6 +201,7 @@ asyncio.run(main())
 | [**Scrape Creators**](https://scrapecreators.com/) | SaaS | Paid | Social-media JSON API (TikTok, IG, YouTube, X, Reddit) | (built-in — pure httpx) |
 | [**SocialCrawl**](https://www.socialcrawl.dev/) | SaaS | Paid | Social-data JSON gateway (TikTok, IG, YouTube, Facebook, X, LinkedIn, Reddit, plus endpoint overrides) | (built-in — pure httpx) |
 | [**EnrichLayer**](https://enrichlayer.com/) | SaaS | Paid | LinkedIn person/company/school/job enrichment JSON, Proxycurl-compatible (person also via X/Facebook URL, plus endpoint overrides) | (built-in — pure httpx) |
+| [**SpyTrend**](https://spytrend.com/) | SaaS | Free tier | Facebook/TikTok ad-intelligence via MCP — ads, advertisers, webmaster networks, creatives | (built-in — pure httpx) |
 | **Telegram** | Local | — | Public Telegram channel/message preview parser | (built-in) |
 | **TGStat** | SaaS | Paid | Telegram channel/posts/post REST data | (built-in — pure httpx) |
 | **Telemetr** | SaaS | Paid | Telegram channel/message analytics REST data | (built-in — pure httpx) |
@@ -541,6 +543,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `anysite` | SaaS | ✓ | ✓ | — | ✓ | residential | ✓ | ✓ | $2.00 |
 | `scrapecreators` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
 | `socialcrawl` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
+| `spytrend` | SaaS · ads | — | ✓ | — | — | none | ✓ | ✓ | $0 |
 | `telegram` | local · social | — | — | — | — | none | no | ✓ | $0 |
 | `tgstat` | SaaS · site | — | ✓ | — | — | none | ✓ | — | $2.00 |
 | `telemetr` | SaaS · site | — | ✓ | — | — | none | ✓ | — | $2.00 |
