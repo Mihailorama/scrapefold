@@ -115,6 +115,9 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "telemetr": lambda: (
         __import__("scrapefold.engines.telemetr", fromlist=["TelemetrEngine"]).TelemetrEngine
     ),
+    "twingly": lambda: (
+        __import__("scrapefold.engines.twingly", fromlist=["TwinglyEngine"]).TwinglyEngine
+    ),
     "labelup": lambda: (
         __import__("scrapefold.engines.labelup", fromlist=["LabelUpEngine"]).LabelUpEngine
     ),

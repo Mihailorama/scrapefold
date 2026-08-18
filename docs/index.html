@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scrapefold — turn any URL into clean markdown</title>
-<meta name="description" content="One async Python interface over 30 web-scraping engines, with automatic anti-bot escalation (Cloudflare, Datadome, PerimeterX, Akamai) and LLM-ready markdown output. Open source, MIT.">
+<meta name="description" content="One async Python interface over 32 web-scraping engines, with automatic anti-bot escalation (Cloudflare, Datadome, PerimeterX, Akamai) and LLM-ready markdown output. Open source, MIT.">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="canonical" href="https://scrapefold.com/">
 
 <!-- Open Graph / Twitter -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Scrapefold — turn any URL into clean markdown">
-<meta property="og:description" content="One async Python interface over 30 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
+<meta property="og:description" content="One async Python interface over 32 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
 <meta property="og:url" content="https://scrapefold.com/">
 <meta property="og:image" content="https://scrapefold.com/assets/social-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Scrapefold — turn any URL into clean markdown">
-<meta name="twitter:description" content="One async Python interface over 30 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
+<meta name="twitter:description" content="One async Python interface over 32 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
 <meta name="twitter:image" content="https://scrapefold.com/assets/social-card.png">
 
 <style>
@@ -212,7 +212,7 @@
 <header class="hero" id="top">
   <img class="logo" src="assets/logo-dark.svg" alt="Scrapefold">
   <h1>Turn any URL into clean markdown.</h1>
-  <p class="tag">One async Python interface over <strong>30 scraping engines</strong> — with automatic anti-bot escalation and LLM-ready output. Open source, MIT.</p>
+  <p class="tag">One async Python interface over <strong>32 scraping engines</strong> — with automatic anti-bot escalation and LLM-ready output. Open source, MIT.</p>
 
   <div class="agent-cta">
     <button class="btn btn-primary btn-lg" id="agentPrompt" title="Click to copy"
@@ -228,7 +228,7 @@
     </button>
   </div>
 
-  <p class="stats"><strong>30 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1064 tests</strong> · <strong>MIT</strong></p>
+  <p class="stats"><strong>32 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1120 tests</strong> · <strong>MIT</strong></p>
   <p class="hero-links"><a href="https://github.com/mihailorama/scrapefold">⭐ Star on GitHub</a> · <a href="https://pypi.org/project/scrapefold/">PyPI</a></p>
 
   <div class="hero-demo">
@@ -289,7 +289,7 @@
 
 <section id="engines">
   <div class="wrap">
-    <h2>30 engines, one interface</h2>
+    <h2>32 engines, one interface</h2>
     <p class="lead">Local engines are free and fast; SaaS engines add premium proxies and stealth. The router picks the cheapest tier that works. Ratings: ★★★ excellent · ★★☆ good · ★☆☆ basic.</p>
     <div class="engines">
       <div class="engine"><span class="name">requests</span> <span class="type">local</span><div class="caps">Static HTML · ultra-fast · <span class="stars">★★★</span></div></div>
@@ -306,6 +306,7 @@
       <div class="engine"><span class="name">ScraperAPI</span> <span class="type">saas</span><div class="caps">Proxy + JS render · native markdown · AI Parser → JSON · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Exa</span> <span class="type">saas · search</span><div class="caps">Search · Contents · Answer · Agent · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Serper</span> <span class="type">saas</span><div class="caps">Fast, cheap scrape · native markdown + JSON-LD · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Twingly</span> <span class="type">saas · search</span><div class="caps">Blog Search API · blogosphere index → posts JSON + markdown · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Maxun</span> <span class="type">local · self-hosted</span><div class="caps">No-code robot runs → structured JSON · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Cloudflare BR</span> <span class="type">saas</span><div class="caps">Browser rendering at the edge · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Oxylabs</span> <span class="type">saas</span><div class="caps">Web Scraper API · residential geo · <span class="stars">★★★</span></div></div>
@@ -319,6 +320,7 @@
       <div class="engine"><span class="name">Apify Actor</span> <span class="type">saas · site</span><div class="caps">Universal social actors · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Apify (LinkedIn)</span> <span class="type">saas · site</span><div class="caps">Vendor-managed actor runs · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Outscraper</span> <span class="type">saas · site</span><div class="caps">Niche aggregator scrapes · <span class="stars">★★☆</span></div></div>
+      <div class="engine"><span class="name">EnrichLayer</span> <span class="type">saas · site</span><div class="caps">LinkedIn person/company enrichment JSON · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Wayback</span> <span class="type">local · fallback</span><div class="caps">Dead-link recovery via archive.org, honestly marked · <span class="stars">★★☆</span></div></div>
     </div>
   </div>
@@ -335,6 +337,7 @@
       <li><span class="sit">Site that emits clean markdown via API</span><span class="rec"><strong>Jina Reader</strong> — direct markdown, no parsing</span></li>
       <li><span class="sit">Visual layouts, tables, charts, or screenshots</span><span class="rec"><strong>PixelRAG</strong> — local <code>pixelshot</code> tiles + reader markdown / JSON</span></li>
       <li><span class="sit">LinkedIn / niche social</span><span class="rec"><strong>Exa</strong> public people/company search + <strong>Apify (LinkedIn)</strong> actor fallback</span></li>
+      <li><span class="sit">Blog posts by keyword, brand mentions</span><span class="rec"><strong>Twingly</strong> — blog-search index; query (<code>"datatera lang:en"</code>) or blog URL</span></li>
       <li><span class="sit">Structured fields straight from a page</span><span class="rec"><strong>ScraperAPI</strong> — AI Parser fills the <code>json</code> slot</span></li>
       <li><span class="sit">IP-geofenced targets</span><span class="rec"><strong>Oxylabs</strong> — residential pool + <code>geo_location</code></span></li>
       <li><span class="sit">Page is gone (404) or paywalled now</span><span class="rec"><strong>wayback</strong> — archive.org snapshot, marked <code>source=archive.org</code></span></li>

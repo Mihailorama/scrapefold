@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 30 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 32 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -16,13 +16,13 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-1064%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-1120%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <strong>31 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1103 tests</strong> · <strong>MIT</strong>
+  <strong>32 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1120 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -84,6 +84,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**ScraperAPI**](https://www.scraperapi.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Exa**](https://exa.ai/) | ✅ | SaaS | Paid | ★★★ | ★★☆ | ★★☆ | Fast | $$ |
 | [**Serper**](https://serper.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★☆☆ | Fast | $ |
+| [**Twingly**](https://www.twingly.com/) | ✅ | SaaS | Paid | — | — | ★★☆ | Fast | $$$ |
 | [**Maxun**](https://github.com/getmaxun/maxun) | ✅ | Local | AGPL | ★★★ | ★★★ | ★★☆ | Medium | Free (self-hosted) |
 | [**Wayback**](https://web.archive.org/) | ✅ | Local | — | ★★☆ | ☆☆☆ | ☆☆☆ | Fast | Free |
 
@@ -111,6 +112,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | LLM-ready output, complex layouts | **Firecrawl** or **scrapling_stealth** |
 | Social profiles, posts, channels, comments | **SocialCrawl** gateway + **Scrape Creators** structured JSON |
 | Telegram analytics | **Telegram** free preview → **TGStat** / **Telemetr** structured APIs |
+| Blog posts by keyword, brand mentions across the blogosphere | **Twingly** — Blog Search API; pass a query (`"datatera lang:en tspan:3m"`) or a blog URL for its recent posts |
 | Cross-platform social stats | **LabelUp** normalized social profile/statistics output |
 | LinkedIn / niche social | **Exa** (`people` / `company` public search) + **Apify (LinkedIn)** + **SocialCrawl** fallback |
 | IP-geofenced targets | **Oxylabs** (`geo_location` via residential pool) — or **brightdata_unlocker** (tracked) |
@@ -206,6 +208,7 @@ asyncio.run(main())
 | [**ScraperAPI**](https://www.scraperapi.com/) | SaaS | Paid | Proxy + JS render, native markdown, AI Parser (`json`) | `pip install scrapefold[scraperapi]` |
 | [**Exa**](https://exa.ai/) | SaaS | Paid | Search, Contents, Answer, Agent; LinkedIn people/company defaults | (built-in — pure httpx) |
 | [**Serper**](https://serper.dev/) | SaaS | Paid | Fast, cheap page scrape — native markdown + JSON-LD | (built-in — pure httpx) |
+| [**Twingly**](https://www.twingly.com/) | SaaS | Paid | Blog Search API — query-language search over the global blogosphere, posts as JSON + markdown digest | (built-in — pure httpx) |
 | [**Maxun**](https://github.com/getmaxun/maxun) | Local | AGPL | Self-hosted no-code robot runs → structured JSON | (built-in — pure httpx) |
 
 > **Adding your own engine?** Implement the `ScrapeEngine` interface — see [Adding a Custom Engine](#adding-a-custom-engine) below and [CONTRIBUTING.md](CONTRIBUTING.md) for the 5-step checklist.
@@ -545,9 +548,10 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `oxylabs` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | trial | $2.80 |
 | `outscraper` | SaaS · site | ✓ | ✓ | — | — | datacenter | ✓ | ✓ | $3.00 |
 | `scraperapi` | SaaS | ✓ | — | — | ✓ | datacenter | ✓ | ✓ | $0.49–4.90 |
+| `twingly` | SaaS · search | — | ✓ | — | — | none | ✓ | trial | $5.00 |
 | `enrichlayer` | SaaS · site | — | ✓ | — | — | residential | ✓ | trial | $20.00 |
 
-`SaaS · site` = ships site-specialized endpoints (LinkedIn, Google Maps, …). `jina` and `cloakbrowser` set `requires_api_key=False`; a key is optional (Jina raises free-tier rate limits).
+`SaaS · site` = ships site-specialized endpoints (LinkedIn, Google Maps, …). `SaaS · search` = query-driven search index rather than a page fetcher (the target is a search query or a blog URL). `jina` and `cloakbrowser` set `requires_api_key=False`; a key is optional (Jina raises free-tier rate limits).
 
 ### SERP APIs
 

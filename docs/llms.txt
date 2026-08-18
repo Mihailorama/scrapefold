@@ -1,6 +1,6 @@
 # scrapefold
 
-> Unified Python interface over 30 web-scraping engines — single URL or whole
+> Unified Python interface over 32 web-scraping engines — single URL or whole
 > site → clean, LLM-ready markdown, with automatic anti-bot escalation
 > (Cloudflare, Datadome, PerimeterX, Akamai). Open source, MIT. Ships a CLI
 > (`scrapefold`) and an MCP server (`scrapefold-mcp`).
