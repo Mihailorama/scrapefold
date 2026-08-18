@@ -8,6 +8,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Added
 
+- **Twingly engine** (`twingly`) — pure-httpx adapter for the Twingly Blog
+  Search API v3 (https://app.twingly.com): query-driven blog search over the
+  global blogosphere. The scrape target is either a query in Twingly's search
+  language (passed through verbatim, e.g. `"ai agents lang:en tspan:3m"`) or
+  a blog URL / bare host (routed to a `blog.url:<scheme>://<host>` posts-from-
+  this-blog query). `opts.extra["twingly_q"]` overrides the routed query;
+  other `twingly_*` extras append as query-language operators
+  (`twingly_page_size=30` → `page-size:30`) and `opts.language` maps to
+  `lang:`. The XML envelope is parsed into `ScrapeResult.json`
+  (match counts + `posts` list) and rendered as an LLM-ready markdown digest
+  into `markdown`/`text`. Auth via the `apiKey` query parameter with the key
+  read from `TWINGLY_SEARCH_KEY`; in-band `<error code>` responses raise
+  `EngineError` so the router can escalate.
+
 - **EnrichLayer engine** (`enrichlayer`) — pure-httpx adapter for the
   EnrichLayer REST API (https://enrichlayer.com, the Proxycurl successor):
   LinkedIn person (`/in/`), company (`/company/`, `/showcase/`), school

@@ -105,6 +105,7 @@ See [../../CONTRIBUTING.md](../../CONTRIBUTING.md) § "Add an engine". Five-step
 | `TGSTAT_API_TOKEN` | tgstat |
 | `TELEMETR_API_TOKEN`, `TELEMETR_BASE_URL` | telemetr |
 | `LABELUP_API_TOKEN`, `LABELUP_BASE_URL` | labelup |
+| `TWINGLY_SEARCH_KEY` | twingly |
 | `OXYLABS_USERNAME`, `OXYLABS_PASSWORD` | oxylabs |
 | `PIXELRAG_BIN` | pixelrag |
 

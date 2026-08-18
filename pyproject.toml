@@ -67,6 +67,7 @@ anysite      = []
 scrapecreators = []
 socialcrawl = []
 enrichlayer  = []
+twingly      = []
 maxun        = []
 # --- stealth browsers + content extraction ---
 pydoll       = ["pydoll-python>=2.0"]
