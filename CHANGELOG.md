@@ -13,8 +13,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   pass-through (`search_ads`, `get_ad`, `search_advertisers`,
   `search_webmasters`, `search_creatives`, `get_trends`, …) driven by
   `opts.extra` (`spytrend_tool` + `spytrend_args`); OAuth `client_credentials`
-  or a pre-obtained Bearer token; JSON and SSE response handling. Query-based
-  rather than URL→markdown — the target URL is a placeholder.
+  (token minted with the required `audience` + `scope=mcp:read`) or a
+  pre-obtained Bearer token; JSON and SSE response handling. Live-validated
+  end-to-end. Query-based rather than URL→markdown — the target URL is a
+  placeholder.
+
+### Fixed
+
+- **SpyTrend token request** now sends the required `audience`
+  (`https://mcp.spytrend.com/mcp`) and `scope=mcp:read` — an empty `aud` mints
+  a token `/mcp` rejects with `401`. Overridable via `SPYTREND_AUDIENCE` /
+  `SPYTREND_SCOPE`.
 
 ## [0.6.0] - 2026-08-18
 

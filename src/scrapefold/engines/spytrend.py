@@ -18,14 +18,23 @@ and is ignored unless a tool needs it as an argument.
 Pinned contract (as of 2026-08):
   MCP endpoint : https://mcp.spytrend.com/mcp   (POST, JSON-RPC 2.0)
   Token endpoint: https://mcp.spytrend.com/oauth2/token  (client_credentials)
+                  form fields: grant_type, scope=mcp:read,
+                  audience=https://mcp.spytrend.com/mcp (REQUIRED — empty aud
+                  => /mcp 401), client_id, client_secret. Tokens live 24h;
+                  a 401 invalid_token triggers one refresh.
   Auth         : Authorization: Bearer <token>
   Accept       : application/json, text/event-stream  (server may reply SSE)
   Method call  : {"method":"tools/call","params":{"name":<tool>,"arguments":{…}}}
   Billing      : token-metered (Meta rows free; TikTok consumes tokens).
 
-Tools (names only — arguments passed through verbatim): ``search_ads``,
-``get_ad``, ``get_trends``, ``search_advertisers``, ``search_webmasters``,
-``get_webmaster``, ``search_creatives``, ``search_hubs``, ``get_usage``.
+Tools (27; names only — arguments passed through verbatim): ``search_ads``,
+``get_ad``, ``get_advertiser``, ``search_advertisers``, ``search_creatives``,
+``get_creative``, ``find_similar_ads``, ``find_similar_creatives``,
+``search_webmasters``, ``get_webmaster``, ``find_similar_webmasters``,
+``search_hubs``, ``search_shops``, ``get_shop``, ``get_media``, ``get_trends``,
+``get_usage``, ``list_favorites``, ``add_to_favorites``, plus ``admin_*``.
+Note ``search_ads``/``search_creatives`` take ``source`` (``meta`` — default,
+rows FREE; ``tiktok`` — PAID, 100 tokens/row, Pro plan).
 
 Credentials (either works; env fallbacks in parens):
   - Pre-obtained Bearer token  → ``api_key`` / ``SPYTREND_TOKEN``.
@@ -66,6 +75,11 @@ logger = logging.getLogger(__name__)
 
 _MCP_URL = "https://mcp.spytrend.com/mcp"
 _TOKEN_URL = "https://mcp.spytrend.com/oauth2/token"
+# ``audience`` is REQUIRED: omit it and the token is minted with an empty ``aud``,
+# after which /mcp answers 401. ``scope`` is minted read-only. Both overridable
+# via SPYTREND_AUDIENCE / SPYTREND_SCOPE.
+_AUDIENCE = "https://mcp.spytrend.com/mcp"
+_SCOPE = "mcp:read"
 
 
 def _adapt(opts: ScrapeOptions) -> tuple[str, dict[str, Any]]:
@@ -145,6 +159,8 @@ class SpyTrendEngine(ScrapeEngine):
         super().__init__(api_key or os.getenv("SPYTREND_TOKEN"))
         self._client_id = client_id or os.getenv("SPYTREND_CLIENT_ID")
         self._client_secret = client_secret or os.getenv("SPYTREND_CLIENT_SECRET")
+        self._audience = os.getenv("SPYTREND_AUDIENCE", _AUDIENCE)
+        self._scope = os.getenv("SPYTREND_SCOPE", _SCOPE)
         self._token: str | None = self.api_key  # cached bearer; may be refreshed via OAuth
 
     def is_available(self) -> bool:
@@ -163,6 +179,8 @@ class SpyTrendEngine(ScrapeEngine):
             _TOKEN_URL,
             data={
                 "grant_type": "client_credentials",
+                "scope": self._scope,
+                "audience": self._audience,
                 "client_id": self._client_id,
                 "client_secret": self._client_secret,
             },
