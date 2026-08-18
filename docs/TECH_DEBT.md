@@ -1,6 +1,6 @@
 ---
 purpose: "Prioritized register of known follow-up items deferred from earlier PRs."
-updated: "2026-07-09"
+updated: "2026-08-18"
 related:
   - architecture/overview.md
   - ../CHANGELOG.md
@@ -338,6 +338,25 @@ Recorded so the next reviewer doesn't re-litigate:
 - **Selectolax:** a faster HTML parser (Lexbor). Pure optimization — would swap
   BeautifulSoup/markdownify in `html_to_text.py` for throughput on massive
   crawls. Deferred until parsing shows up in a profile; not a capability gap.
+
+## P3 — verification follow-ups
+
+### 17. Twingly engine has not been exercised against the live API
+
+- **Where:** `src/scrapefold/engines/twingly.py` (v0.6.0, PR #16).
+- **Status:** The engine's contract (endpoint, `apiKey`/`q` params, XML
+  envelope, error shape) is pinned from Twingly's official-but-archived
+  clients and covered by 17 offline tests, but no live request has been made —
+  no `TWINGLY_SEARCH_KEY` exists in any environment yet. The `blog.url:`
+  operator used for URL-target routing could not be verified against current
+  vendor docs (app.twingly.com requires a login), and the `$5/1k` cost
+  estimate is a placeholder for "contact us" pricing.
+- **Fix:** once a trial key is provisioned, run
+  `scrapefold scrape "datatera lang:en" --engines twingly` plus one blog-URL
+  target; confirm the `blog.url:` routed query returns that blog's posts and
+  correct `_build_query` / the cost estimate if wrong.
+- **Priority:** P3 — the engine is inert without a key
+  (`is_available() == False`), no impact on the rest of the library.
 
 ## How to add an item
 
