@@ -125,6 +125,9 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "wayback": lambda: (
         __import__("scrapefold.engines.wayback", fromlist=["WaybackEngine"]).WaybackEngine
     ),
+    "spytrend": lambda: (
+        __import__("scrapefold.engines.spytrend", fromlist=["SpyTrendEngine"]).SpyTrendEngine
+    ),
 }
 
 

@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- **SpyTrend engine** (`spytrend`) — Facebook/TikTok ad-intelligence over
+  SpyTrend's MCP endpoint (it has no REST API). Generic JSON-RPC `tools/call`
+  pass-through (`search_ads`, `get_ad`, `search_advertisers`,
+  `search_webmasters`, `search_creatives`, `get_trends`, …) driven by
+  `opts.extra` (`spytrend_tool` + `spytrend_args`); OAuth `client_credentials`
+  or a pre-obtained Bearer token; JSON and SSE response handling. Query-based
+  rather than URL→markdown — the target URL is a placeholder.
+
 ## [0.6.0] - 2026-08-18
 
 ### Added
