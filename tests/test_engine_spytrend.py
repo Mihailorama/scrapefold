@@ -115,6 +115,9 @@ async def test_client_credentials_fetches_token(httpx_mock: HTTPXMock) -> None:
 
     token_req = httpx_mock.get_requests(url=_TOKEN_URL)[0]
     assert b"grant_type=client_credentials" in token_req.content
+    # audience is REQUIRED (empty aud => /mcp 401); scope is minted read-only.
+    assert b"audience=https%3A%2F%2Fmcp.spytrend.com%2Fmcp" in token_req.content
+    assert b"scope=mcp%3Aread" in token_req.content
     call_req = httpx_mock.get_requests(url=_MCP)[0]
     assert call_req.headers["Authorization"] == "Bearer fetched-tok"
 
