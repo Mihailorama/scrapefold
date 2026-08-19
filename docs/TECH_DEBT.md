@@ -358,6 +358,25 @@ Recorded so the next reviewer doesn't re-litigate:
 - **Priority:** P3 — the engine is inert without a key
   (`is_available() == False`), no impact on the rest of the library.
 
+### 18. SpyTrend engine — only the free Meta path is live-validated
+
+- **Where:** `src/scrapefold/engines/spytrend.py` (PR #18, fix PR #19).
+- **Status:** Live-validated end-to-end against the real MCP endpoint with agent
+  credentials — token (`audience` + `scope=mcp:read`) then a stateless
+  `tools/call search_ads(source=meta)` returning `{analysis, data, meta,
+  pagination}` via `structuredContent`. Two gaps remain: (a) no committed live
+  test — validation was manual, offline mocks cover the code path; (b) the
+  **`source=tiktok` path is PAID (100 tokens/row, Pro plan) and was never
+  exercised**, so the response shape for TikTok rows and for the other ~26 tools
+  (`get_webmaster`, `search_creatives`, `find_similar_*`, `admin_*`) is assumed
+  to match, not confirmed.
+- **Fix:** add a `@pytest.mark.paid` e2e that reads `SPYTREND_CLIENT_ID` /
+  `SPYTREND_CLIENT_SECRET` from env and asserts `search_ads` returns `data`;
+  when a Pro plan is available, run one `source=tiktok` call and confirm the
+  parser still lands the payload in `.json`.
+- **Priority:** P3 — the free Meta path works; the engine is inert without
+  credentials (`is_available() == False`).
+
 ## How to add an item
 
 1. Open a row here with **P-priority**, **where** (file/function), **status**, **fix sketch**, **test**.
