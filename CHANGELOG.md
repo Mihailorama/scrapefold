@@ -6,7 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-09
+
 ### Added
+
+- **Keenable engine** (`keenable`) — pure-httpx adapter for indexed or live
+  URL-to-markdown fetch plus web search. Uses `KEENABLE_API_KEY` when present
+  and falls back to the rate-limited public endpoints without a key; supports
+  fetch/search parameters through `keenable_*` extras. Keyed `fetch` and
+  `search` were live-validated against the production API.
 
 - **SpyTrend engine** (`spytrend`) — Facebook/TikTok ad-intelligence over
   SpyTrend's MCP endpoint (it has no REST API). Generic JSON-RPC `tools/call`
@@ -698,7 +706,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/mihailorama/scrapefold/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/mihailorama/scrapefold/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/mihailorama/scrapefold/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/mihailorama/scrapefold/compare/v0.3.0...v0.4.0

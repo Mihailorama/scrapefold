@@ -1,6 +1,6 @@
 """scrapefold — unified interface for web scraping engines.
 
-Public API (v0.2):
+Public API:
 
     from scrapefold import scrape, crawl_site, ScrapeOptions, ScrapeResult, ScrapeEngine
 
@@ -49,7 +49,7 @@ from scrapefold.social import (
     normalize_social,
 )
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 __all__ = [
     "AllEnginesFailed",

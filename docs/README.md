@@ -10,7 +10,7 @@ related:
 
 # scrapefold docs
 
-Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, visual screenshot capture, and LLM-ready output. Wraps 33 engines across vendor APIs, local stealth browsers, visual capture tools, search indexes, and a baseline `requests` engine behind one async interface.
+Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, visual screenshot capture, and LLM-ready output. Wraps 34 engines across vendor APIs, local stealth browsers, visual capture tools, search indexes, and a baseline `requests` engine behind one async interface.
 
 ## Where to look
 
@@ -27,7 +27,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 
 ## Project status
 
-**v0.3.0 — shipped on 2026-06-28.** `pip install scrapefold`.
+**v0.7.0 — shipped on 2026-09-09.** `pip install scrapefold`.
 
 | PR / Pack | Engines / features | Version |
 |---|---|---|
@@ -47,6 +47,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | PR #5 ✅ | PixelRAG engine (local `pixelshot` visual screenshot tiles plus injected VLM/OCR reader for markdown / JSON, optional Python 3.12 extra) | 0.3.0 |
 | PR #6 ✅ | `socialcrawl` engine for SocialCrawl's social-data JSON gateway plus auto-router coverage for social / LinkedIn classes | 0.3.0 |
 | PR #7 ✅ | Normalized social entities plus `apify_actor`, Telegram, TGStat, Telemetr, LabelUp, and TikTok/Telegram/VK/Max site classes | 0.3.0 |
+| Release ✅ | Keenable indexed/live fetch and web-search engine, keyed or keyless | 0.7.0 |
 
 ## What's next
 

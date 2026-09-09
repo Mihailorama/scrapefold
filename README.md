@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 33 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 34 scraping engines — with automatic anti-bot escalation and LLM-ready output.
 </p>
 
 <p align="center">
@@ -16,13 +16,13 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-1120%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-1132%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <strong>33 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1120 tests</strong> · <strong>MIT</strong>
+  <strong>34 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1132 tests</strong> · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -65,6 +65,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**cloakbrowser**](https://github.com/) | ✅ | Local | MIT | ★★☆ | ★★★ | ★★★ | Slow | Free |
 | [**selenium**](https://github.com/SeleniumHQ/selenium) | ✅ | Local | Apache | ★★☆ | ★★★ | ★☆☆ | Slow | Free |
 | [**Jina Reader**](https://jina.ai/reader/) | ✅ | SaaS | Free tier | ★★★ | ★★★ | ★★☆ | Fast | Free / $ |
+| [**Keenable**](https://keenable.ai/) | ✅ | SaaS | Free tier | ★★★ | ★☆☆ | ★☆☆ | Fast | Free / $ |
 | [**Firecrawl**](https://www.firecrawl.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**ScrapingBee**](https://www.scrapingbee.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Scrapingdog**](https://www.scrapingdog.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
@@ -106,7 +107,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | Large crawl of a slow / rate-limiting origin | `ScrapeOptions(autothrottle=True)` — Scrapy-style adaptive per-host delay: eases toward observed latency, backs off hard on 429/503 |
 | Structured JSON from any page, via **your** LLM | `extract(result, schema=..., llm=my_llm)` — ScrapeGraphAI-style schema extraction over a user-provided callable; no vendor LLM SDK |
 | Sync codebase (no `async`/`await`) | `scrape_sync(url)` / `crawl_site_sync(root)` — blocking wrappers that survive leaked event loops (e.g. Playwright Sync API in the same process) |
-| Site that emits clean markdown via API | **Jina Reader** — direct markdown, no parsing |
+| Site that emits clean markdown via API | **Jina Reader** or **Keenable** — direct markdown, no parsing |
 | Page is dead (404) or changed since you saw it | **wayback** — archive.org snapshot, honestly marked `source=archive.org` + timestamp |
 | One fact from a long page (agents) | `scrapefold scrape <url> --focus "query"` or MCP `scrape_url(focus=...)` — BM25 keeps only relevant blocks |
 | Visual layouts, tables, charts, or screenshots | **PixelRAG** — local `pixelshot` tiles + injected VLM/OCR reader → markdown / JSON |
@@ -190,6 +191,7 @@ asyncio.run(main())
 | [**cloakbrowser**](https://github.com/) | Local | MIT | Anti-fingerprint browser | `pip install scrapefold[cloakbrowser]` |
 | [**selenium**](https://github.com/SeleniumHQ/selenium) | Local | Apache | Classic JS rendering (deprecated) | `pip install scrapefold[selenium]` |
 | [**Jina Reader**](https://jina.ai/reader/) | SaaS | Free tier | Direct markdown, no parsing | `pip install scrapefold[jina]` |
+| [**Keenable**](https://keenable.ai/) | SaaS | Free tier | Web search + indexed/live URL-to-markdown fetch | (built-in — pure httpx) |
 | [**Firecrawl**](https://www.firecrawl.dev/) | SaaS | Paid | LLM-ready markdown + stealth | `pip install scrapefold[firecrawl]` |
 | [**ScrapingBee**](https://www.scrapingbee.com/) | SaaS | Paid | Premium proxy + JS rendering | `pip install scrapefold[scrapingbee]` |
 | [**Scrapingdog**](https://www.scrapingdog.com/) | SaaS | Paid | Cheaper proxy alternative | `pip install scrapefold[scrapingdog]` |
@@ -534,6 +536,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `cloakbrowser` | local | ✓ | ✓ | ✓ | — | residential | no | ✓ | $0 |
 | `selenium` | local | ✓ | — | ✓ | — | datacenter | no | ✓ | $0 |
 | `jina` | SaaS | ✓ | — | ✓ | ✓ | none | optional | ✓ | ~$0 |
+| `keenable` | SaaS · search | — | — | — | ✓ | none | optional | ✓ | $4.00 |
 | `scrapingdog` | SaaS | ✓ | — | — | — | datacenter | ✓ | ✓ | $0.50 |
 | `firecrawl` | SaaS | ✓ | ✓ | ✓ | ✓ | datacenter | ✓ | ✓ | $1.00 |
 | `scrapingbee` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | ✓ | $1.00 |
@@ -554,7 +557,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `twingly` | SaaS · search | — | ✓ | — | — | none | ✓ | trial | $5.00 |
 | `enrichlayer` | SaaS · site | — | ✓ | — | — | residential | ✓ | trial | $20.00 |
 
-`SaaS · site` = ships site-specialized endpoints (LinkedIn, Google Maps, …). `SaaS · search` = query-driven search index rather than a page fetcher (the target is a search query or a blog URL). `jina` and `cloakbrowser` set `requires_api_key=False`; a key is optional (Jina raises free-tier rate limits).
+`SaaS · site` = ships site-specialized endpoints (LinkedIn, Google Maps, …). `SaaS · search` = query-driven search index rather than a page fetcher (the target is a search query or a blog URL). `jina`, `keenable`, and `cloakbrowser` set `requires_api_key=False`; keys are optional and raise free-tier rate limits.
 
 ### SERP APIs
 
