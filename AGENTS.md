@@ -6,7 +6,7 @@ This file mirrors [CLAUDE.md](CLAUDE.md) — pointers, not content. Read the doc
 
 ## What this project is
 
-`scrapefold` — unified Python library for web scraping with one async API across 16 engines and a built-in anti-bot escalation ladder.
+`scrapefold` — unified Python library for web scraping with one async API across 34 engines and a built-in anti-bot escalation ladder.
 
 ## Start here
 
