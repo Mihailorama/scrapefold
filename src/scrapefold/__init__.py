@@ -2,12 +2,21 @@
 
 Public API:
 
-    from scrapefold import scrape, crawl_site, ScrapeOptions, ScrapeResult, ScrapeEngine
+    from scrapefold import scrape, crawl_site, search, ScrapeOptions, ScrapeResult
 
     res = await scrape("https://example.com")
     res = await scrape(url, opts=ScrapeOptions(language="ru", stealth=True))
     md_path = await crawl_site("https://docs.example.com", opts=ScrapeOptions(max_pages=50))
     data = await extract(res, schema={...}, llm=my_llm)  # your LLM callable, no vendor SDK
+
+    # Multi-engine web search with Reciprocal Rank Fusion + explainable scoring:
+    hits = await search("agentic document processing")   # query -> ranked results
+
+    # Ground extracted values back to source spans (verify, don't trust):
+    cites = find_citations(res, res.json)
+
+    # Detect what changed between two scrapes of one URL:
+    diff = await check_for_changes(url, store=SnapshotStore("~/.scrapefold/snapshots"))
 """
 
 from __future__ import annotations
@@ -16,7 +25,21 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, TypeVar
 
+from scrapefold.citations import (
+    Citation,
+    CitationReport,
+    Span,
+    cite_result,
+    find_citations,
+)
 from scrapefold.crawler.result import CrawlResult
+from scrapefold.diff import (
+    ContentDiff,
+    SnapshotStore,
+    check_for_changes,
+    diff_results,
+    diff_text,
+)
 from scrapefold.engines.base import (
     EngineCapabilities,
     EngineError,
@@ -39,6 +62,18 @@ from scrapefold.options import ScrapeOptions
 from scrapefold.pool import EnginePool
 from scrapefold.result import ScrapeResult
 from scrapefold.router import walk as _walk
+from scrapefold.search import (
+    SearchEngine,
+    SearchEngineError,
+    SearchHit,
+    SearchOptions,
+    SearchResult,
+    fuse,
+    get_search_engine,
+    list_search_engine_names,
+    reciprocal_rank_fusion,
+    search,
+)
 from scrapefold.social import (
     Author,
     Comment,
@@ -55,7 +90,10 @@ __all__ = [
     "AllEnginesFailed",
     "Author",
     "BudgetExceeded",
+    "Citation",
+    "CitationReport",
     "Comment",
+    "ContentDiff",
     "CrawlResult",
     "EngineCapabilities",
     "EngineError",
@@ -70,21 +108,38 @@ __all__ = [
     "ScrapeEngine",
     "ScrapeOptions",
     "ScrapeResult",
+    "SearchEngine",
+    "SearchEngineError",
+    "SearchHit",
+    "SearchOptions",
+    "SearchResult",
     "SequentialStep",
     "SiteClass",
+    "SnapshotStore",
     "SocialEntity",
+    "Span",
     "TextLLMCallable",
     "WalkBudget",
     "__version__",
+    "check_for_changes",
+    "cite_result",
     "classify_url",
     "crawl_site",
     "crawl_site_sync",
+    "diff_results",
+    "diff_text",
     "extract",
     "extract_into",
+    "find_citations",
+    "fuse",
     "get_ladder",
+    "get_search_engine",
+    "list_search_engine_names",
     "normalize_social",
+    "reciprocal_rank_fusion",
     "scrape",
     "scrape_sync",
+    "search",
 ]
 
 

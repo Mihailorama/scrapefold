@@ -6,6 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- **Multi-engine web search** (`scrapefold.search`) — a new `search(query)`
+  entrypoint parallel to `scrape` / `crawl_site`. Fans out to several SERP
+  engines concurrently (`serper`, `exa`, and a keyless `duckduckgo` default)
+  and merges their ranked lists with **Reciprocal Rank Fusion**, returning
+  deduped `SearchResult`s with an explainable per-engine `score_breakdown` and
+  `consensus` count. Engines that error are skipped; the search fails only if
+  every engine fails. Own lazy engine registry (`get_search_engine`,
+  `list_search_engine_names`); RRF is exposed standalone as
+  `reciprocal_rank_fusion` / `fuse`. Pure stdlib + httpx, no ML dependency.
+
+- **Source-span citation pinning** (`scrapefold.citations`) —
+  `find_citations(source, data)` pins every leaf of an extracted JSON value
+  back to a byte-range `Span` in the source text (exact then
+  whitespace/case-normalized match), flagging values absent from the source as
+  ungrounded. `cite_result()` grounds `result.json` against its own content;
+  `CitationReport` summarizes coverage. `extract_into(..., cite=True)` lands a
+  JSON-safe report under `meta["citations"]`. No new dependency.
+
+- **Change detection** (`scrapefold.diff`) — `diff_results` / `diff_text`
+  compare two scrapes of one URL on `text` or `markdown` via stdlib `difflib`,
+  returning a `ContentDiff` (changed flag, `[0,1]` similarity, added/removed
+  lines, unified diff) with whitespace-normalization and a similarity
+  threshold. `SnapshotStore` persists the latest result per URL;
+  `check_for_changes` scrapes now, diffs against the stored baseline, saves the
+  new snapshot, and returns the diff (`None` on first run). Pure stdlib.
+
 ## [0.7.0] - 2026-09-09
 
 ### Added
