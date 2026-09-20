@@ -16,6 +16,13 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, TypeVar
 
+from scrapefold.citations import (
+    Citation,
+    CitationReport,
+    Span,
+    cite_result,
+    find_citations,
+)
 from scrapefold.crawler.result import CrawlResult
 from scrapefold.engines.base import (
     EngineCapabilities,
@@ -55,6 +62,8 @@ __all__ = [
     "AllEnginesFailed",
     "Author",
     "BudgetExceeded",
+    "Citation",
+    "CitationReport",
     "Comment",
     "CrawlResult",
     "EngineCapabilities",
@@ -73,14 +82,17 @@ __all__ = [
     "SequentialStep",
     "SiteClass",
     "SocialEntity",
+    "Span",
     "TextLLMCallable",
     "WalkBudget",
     "__version__",
+    "cite_result",
     "classify_url",
     "crawl_site",
     "crawl_site_sync",
     "extract",
     "extract_into",
+    "find_citations",
     "get_ladder",
     "normalize_social",
     "scrape",

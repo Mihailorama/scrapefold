@@ -259,6 +259,7 @@ async def extract_into(
     instructions: str | None = None,
     max_retries: int = 1,
     max_content_chars: int | None = DEFAULT_MAX_CONTENT_CHARS,
+    cite: bool = False,
 ) -> ScrapeResult:
     """:func:`extract`, landing the data in a copy's ``ScrapeResult.json`` slot.
 
@@ -266,6 +267,12 @@ async def extract_into(
     extracted data and ``meta["llm_extracted"] = True`` for provenance; the
     input result is untouched. Mirrors how native structured engines
     (Firecrawl ``/extract``, AnySite, Apify) populate the same slot.
+
+    Set ``cite=True`` to also pin every extracted leaf back to a source span
+    via :func:`scrapefold.citations.find_citations`, landing the JSON-safe
+    report under ``meta["citations"]`` (paths, spans, and a ``coverage``
+    fraction). Values that do not appear in the source are flagged there — the
+    grounding signal a downstream agent uses to distrust an invented value.
     """
     data = await extract(
         result,
@@ -275,7 +282,12 @@ async def extract_into(
         max_retries=max_retries,
         max_content_chars=max_content_chars,
     )
-    return dataclasses.replace(result, json=data, meta={**result.meta, "llm_extracted": True})
+    meta: dict[str, Any] = {**result.meta, "llm_extracted": True}
+    if cite:
+        from scrapefold.citations import CitationReport, find_citations
+
+        meta["citations"] = CitationReport(find_citations(result, data)).as_dict()
+    return dataclasses.replace(result, json=data, meta=meta)
 
 
 __all__ = [

@@ -220,3 +220,38 @@ async def test_natural_language_schema_skips_structural_check() -> None:
     # A list reply is fine when the schema is free-form text.
     llm, _ = make_llm(json.dumps([{"a": 1}]))
     assert await extract(make_result(), schema="a list of things", llm=llm) == [{"a": 1}]
+
+
+# --- cite=True: extract_into pins values back to the source ----------------
+
+
+async def test_extract_into_cite_adds_grounded_citations() -> None:
+    # Source contains both extracted values, so coverage is full.
+    llm, _ = make_llm(json.dumps(BLOB))
+    extracted = await extract_into(make_result(), schema=SCHEMA, llm=llm, cite=True)
+
+    report = extracted.meta["citations"]
+    assert report["coverage"] == 1.0
+    paths = {c["path"]: c for c in report["citations"]}
+    assert paths["title"]["found"] is True
+    assert paths["price"]["found"] is True
+    # The stored report must be JSON-serializable (it rides in cached meta).
+    json.dumps(report)
+
+
+async def test_extract_into_cite_flags_ungrounded_value() -> None:
+    # The LLM invents a title absent from the page → flagged as not found.
+    invented = {"title": "Nonexistent Gizmo", "price": 9.99}
+    llm, _ = make_llm(json.dumps(invented))
+    extracted = await extract_into(make_result(), schema=SCHEMA, llm=llm, cite=True)
+
+    report = extracted.meta["citations"]
+    assert report["coverage"] == 0.5
+    ungrounded = {c["path"] for c in report["citations"] if not c["found"]}
+    assert ungrounded == {"title"}
+
+
+async def test_extract_into_without_cite_has_no_citations_key() -> None:
+    llm, _ = make_llm(json.dumps(BLOB))
+    extracted = await extract_into(make_result(), schema=SCHEMA, llm=llm)
+    assert "citations" not in extracted.meta
