@@ -106,6 +106,9 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | High-volume crawl behind your own proxy fleet | `ScrapeOptions(proxies=(...))` — health-scored rotation ("proxy over proxy"): retries a blocked page behind a fresh exit IP before escalating a tier |
 | Large crawl of a slow / rate-limiting origin | `ScrapeOptions(autothrottle=True)` — Scrapy-style adaptive per-host delay: eases toward observed latency, backs off hard on 429/503 |
 | Structured JSON from any page, via **your** LLM | `extract(result, schema=..., llm=my_llm)` — ScrapeGraphAI-style schema extraction over a user-provided callable; no vendor LLM SDK |
+| Web search by query (not a URL) | `await search("your query")` — multi-engine fan-out (serper / exa / keyless duckduckgo) merged with Reciprocal Rank Fusion; explainable `score_breakdown` + `consensus` per result |
+| Verify extracted values are grounded | `find_citations(result, result.json)` — pins each value back to a source-text span, flags anything absent from the page (`extract_into(..., cite=True)` stores coverage in `meta`) |
+| Monitor a page for changes | `check_for_changes(url, store=SnapshotStore(dir))` — diffs against the last snapshot, returns a `ContentDiff` (similarity + added/removed lines) |
 | Sync codebase (no `async`/`await`) | `scrape_sync(url)` / `crawl_site_sync(root)` — blocking wrappers that survive leaked event loops (e.g. Playwright Sync API in the same process) |
 | Site that emits clean markdown via API | **Jina Reader** or **Keenable** — direct markdown, no parsing |
 | Page is dead (404) or changed since you saw it | **wayback** — archive.org snapshot, honestly marked `source=archive.org` + timestamp |

@@ -2,12 +2,21 @@
 
 Public API:
 
-    from scrapefold import scrape, crawl_site, ScrapeOptions, ScrapeResult, ScrapeEngine
+    from scrapefold import scrape, crawl_site, search, ScrapeOptions, ScrapeResult
 
     res = await scrape("https://example.com")
     res = await scrape(url, opts=ScrapeOptions(language="ru", stealth=True))
     md_path = await crawl_site("https://docs.example.com", opts=ScrapeOptions(max_pages=50))
     data = await extract(res, schema={...}, llm=my_llm)  # your LLM callable, no vendor SDK
+
+    # Multi-engine web search with Reciprocal Rank Fusion + explainable scoring:
+    hits = await search("agentic document processing")   # query -> ranked results
+
+    # Ground extracted values back to source spans (verify, don't trust):
+    cites = find_citations(res, res.json)
+
+    # Detect what changed between two scrapes of one URL:
+    diff = await check_for_changes(url, store=SnapshotStore("~/.scrapefold/snapshots"))
 """
 
 from __future__ import annotations
@@ -53,6 +62,18 @@ from scrapefold.options import ScrapeOptions
 from scrapefold.pool import EnginePool
 from scrapefold.result import ScrapeResult
 from scrapefold.router import walk as _walk
+from scrapefold.search import (
+    SearchEngine,
+    SearchEngineError,
+    SearchHit,
+    SearchOptions,
+    SearchResult,
+    fuse,
+    get_search_engine,
+    list_search_engine_names,
+    reciprocal_rank_fusion,
+    search,
+)
 from scrapefold.social import (
     Author,
     Comment,
@@ -87,6 +108,11 @@ __all__ = [
     "ScrapeEngine",
     "ScrapeOptions",
     "ScrapeResult",
+    "SearchEngine",
+    "SearchEngineError",
+    "SearchHit",
+    "SearchOptions",
+    "SearchResult",
     "SequentialStep",
     "SiteClass",
     "SnapshotStore",
@@ -105,10 +131,15 @@ __all__ = [
     "extract",
     "extract_into",
     "find_citations",
+    "fuse",
     "get_ladder",
+    "get_search_engine",
+    "list_search_engine_names",
     "normalize_social",
+    "reciprocal_rank_fusion",
     "scrape",
     "scrape_sync",
+    "search",
 ]
 
 

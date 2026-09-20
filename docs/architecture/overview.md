@@ -13,7 +13,7 @@ related:
 
 ```
 src/scrapefold/
-├── __init__.py          public re-exports: scrape, crawl_site, ScrapeOptions, ScrapeResult, ScrapeEngine
+├── __init__.py          public re-exports: scrape, crawl_site, search, ScrapeOptions, ScrapeResult, ScrapeEngine
 ├── options.py           ScrapeOptions dataclass — single unified parameter schema
 ├── result.py            ScrapeResult dataclass
 ├── engines/
@@ -30,6 +30,13 @@ src/scrapefold/
 ├── cache.py             (S8) disk-backed TTL cache
 ├── vision.py            optional analyze_screenshot_with_llm(callable_llm)
 ├── extract.py           LLM-schema extraction over the user LLM callable → ScrapeResult.json
+├── citations.py         source-span pinning — ground extracted values back into the page
+├── diff.py              change detection — diff two scrapes + SnapshotStore baseline
+├── search/              multi-engine web search — query → RRF-fused ranked results
+│   ├── api.py           search(query, opts) — concurrent fan-out + fusion
+│   ├── fusion.py        reciprocal_rank_fusion — explainable per-engine scoring
+│   ├── options.py       SearchOptions; types.py: SearchHit / SearchResult
+│   └── engines/         SearchEngine ABC + lazy registry (serper, exa, duckduckgo)
 ├── cli.py               (S9) Typer entry — `scrapefold` console script
 └── mcp_server.py        (S10) MCP stdio server — `scrapefold-mcp` console script
 ```
@@ -239,6 +246,50 @@ A typical scrape of a friendly site costs one `requests` call (~200 ms, $0). The
 ### Parallel mode — only when explicitly requested
 
 `opts.parallel=True` runs every engine in `opts.engines` concurrently and uses an LLM judge to pick / merge. This is **opt-in** and intended for offline quality benchmarking, not for routine scraping. The default `parallel=False` walks the ladder sequentially and stops early.
+
+## Beyond scrape/crawl — search, citations, change detection
+
+Three capabilities sit alongside the scrape/crawl core. Each is pure Python (no
+new dependency) and follows the same "inject, don't import" and
+"deterministic + testable" principles as the rest of the library.
+
+### Multi-engine search (`scrapefold.search`)
+
+`await search(query, opts)` is a query→results primitive parallel to `scrape`.
+It fans out to several SERP engines concurrently and merges their ranked lists
+with **Reciprocal Rank Fusion** (`fusion.py`): a hit at 0-based position `i`
+contributes `1 / (k + i + 1)` to its URL's score (`k=60` default). URLs are
+deduped by a normalized key (lowercased scheme+host, trailing slash and
+`utm_*`/`fbclid`/`gclid` dropped), and each `SearchResult` carries a
+`score_breakdown` (per-engine contribution) and `consensus` count — the
+explainability the subsystem exists to provide. Search engines have their own
+`SearchEngine` ABC and lazy registry, mirroring the scrape side; `serper` and
+`exa` need keys, `duckduckgo` is the keyless default. Engines that error are
+skipped; `search()` fails only if every engine fails. RRF is deterministic and
+unit-tested in isolation; no ML, no vendor LLM SDK.
+
+### Source-span citation pinning (`scrapefold.citations`)
+
+`find_citations(source, data)` walks an extracted JSON value and locates each
+leaf back in the source text — exact substring first, then a whitespace/case
+normalized match whose offsets are mapped back onto the *original* text —
+returning a byte-range `Span` per value (or `None` when absent, a grounding red
+flag). `cite_result(result)` grounds `result.json` against its own content;
+`extract_into(..., cite=True)` stores a JSON-safe `CitationReport` (paths,
+spans, `coverage` fraction) under `meta["citations"]`, so grounding survives
+the disk cache. Purely lexical — it proves a value appears in the source, the
+signal a downstream agent uses to distrust an invented value.
+
+### Change detection (`scrapefold.diff`)
+
+`diff_results` / `diff_text` compare two scrapes of one URL on `text` or
+`markdown` via stdlib `difflib`, returning a `ContentDiff` (changed flag,
+`[0,1]` similarity, added/removed lines, unified diff) with
+whitespace-normalization and a tunable similarity `threshold`. `SnapshotStore`
+persists the latest `ScrapeResult` per URL (no TTL, reusing the cache's
+serialization); `check_for_changes(url, store=…)` scrapes now, diffs against
+the stored baseline, saves the new snapshot, and returns the diff (`None` on
+the first run) — the loop a scheduled monitor runs.
 
 ## Two console scripts
 
