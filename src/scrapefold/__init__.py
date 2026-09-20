@@ -24,6 +24,13 @@ from scrapefold.citations import (
     find_citations,
 )
 from scrapefold.crawler.result import CrawlResult
+from scrapefold.diff import (
+    ContentDiff,
+    SnapshotStore,
+    check_for_changes,
+    diff_results,
+    diff_text,
+)
 from scrapefold.engines.base import (
     EngineCapabilities,
     EngineError,
@@ -65,6 +72,7 @@ __all__ = [
     "Citation",
     "CitationReport",
     "Comment",
+    "ContentDiff",
     "CrawlResult",
     "EngineCapabilities",
     "EngineError",
@@ -81,15 +89,19 @@ __all__ = [
     "ScrapeResult",
     "SequentialStep",
     "SiteClass",
+    "SnapshotStore",
     "SocialEntity",
     "Span",
     "TextLLMCallable",
     "WalkBudget",
     "__version__",
+    "check_for_changes",
     "cite_result",
     "classify_url",
     "crawl_site",
     "crawl_site_sync",
+    "diff_results",
+    "diff_text",
     "extract",
     "extract_into",
     "find_citations",
