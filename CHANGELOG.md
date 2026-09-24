@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-24
+
 ### Added
 
 - **Multi-engine web search** (`scrapefold.search`) — a new `search(query)`
@@ -33,6 +35,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   threshold. `SnapshotStore` persists the latest result per URL;
   `check_for_changes` scrapes now, diffs against the stored baseline, saves the
   new snapshot, and returns the diff (`None` on first run). Pure stdlib.
+
+### Fixed
+
+- **AWS WAF JavaScript challenges** returning HTTP 202 with “Enable JavaScript
+  and then reload” are recognized as blocked pages, so the router tries the
+  next scraping engine instead of returning the challenge as a success.
 
 ## [0.7.0] - 2026-09-09
 
@@ -734,7 +742,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/mihailorama/scrapefold/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/mihailorama/scrapefold/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/mihailorama/scrapefold/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/mihailorama/scrapefold/compare/v0.4.0...v0.5.0

@@ -31,6 +31,7 @@ DEFAULT_ANTIBOT_PHRASES: tuple[str, ...] = (
     "Checking your browser",
     "Access denied",
     "Please enable JavaScript",
+    "Enable JavaScript and then reload",
     "cf-browser-verification",
 )
 

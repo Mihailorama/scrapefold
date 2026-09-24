@@ -552,8 +552,7 @@ async def test_router_treats_suspicious_response_as_failure(
     stub_ladder: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A scrape that returns short text containing antibot phrases is suspicious;
-    the router must advance to the next step rather than returning it."""
+    """An HTTP 202 JavaScript challenge must advance to the next engine."""
     from scrapefold import EngineCapabilities, SequentialStep
     from scrapefold.engines import _REGISTRY
     from scrapefold.engines.base import ScrapeEngine
@@ -561,14 +560,15 @@ async def test_router_treats_suspicious_response_as_failure(
     from scrapefold.router import walk
 
     async def _fetch_captcha(self, url, opts):
-        # Short text containing a known antibot phrase
+        challenge = "Enable JavaScript and then reload. " + "Prove you are human. " * 15
         return ScrapeResult(
             url=url,
-            text="Just a moment...",
-            markdown="Just a moment...",
-            html=None,
+            text=challenge,
+            markdown=challenge,
+            html=f"<html><body>{challenge}</body></html>",
             engine=self.NAME,
             elapsed_ms=1,
+            meta={"status_code": 202},
         )
 
     captcha_engine = type(

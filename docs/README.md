@@ -27,7 +27,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 
 ## Project status
 
-**v0.7.0 — shipped on 2026-09-09.** `pip install scrapefold`.
+**v0.8.0 — shipped on 2026-09-24.** `pip install scrapefold`.
 
 | PR / Pack | Engines / features | Version |
 |---|---|---|
@@ -48,6 +48,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | PR #6 ✅ | `socialcrawl` engine for SocialCrawl's social-data JSON gateway plus auto-router coverage for social / LinkedIn classes | 0.3.0 |
 | PR #7 ✅ | Normalized social entities plus `apify_actor`, Telegram, TGStat, Telemetr, LabelUp, and TikTok/Telegram/VK/Max site classes | 0.3.0 |
 | Release ✅ | Keenable indexed/live fetch and web-search engine, keyed or keyless | 0.7.0 |
+| Release ✅ | Multi-engine search, citation pinning, change detection, AWS WAF challenge detection | 0.8.0 |
 
 ## What's next
 
