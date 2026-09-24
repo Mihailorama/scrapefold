@@ -12,6 +12,7 @@ import json
 import pytest
 from pytest_httpx import HTTPXMock
 
+from scrapefold.detection import is_suspicious
 from scrapefold.engines.base import EngineError
 from scrapefold.options import ScrapeOptions
 
@@ -53,6 +54,20 @@ async def test_default_call_markdown_populated(httpx_mock: HTTPXMock) -> None:
     # text should also be populated (derived from markdown)
     assert result.text != ""
     assert "Hello" in result.text
+
+
+@pytest.mark.anyio
+async def test_jina_wrapped_target_403_is_suspicious(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url=_READER_URL,
+        status_code=200,
+        text="Warning: Target URL returned error 403\n\n" + "CloudFront blocked. " * 20,
+    )
+
+    result = await _engine().scrape(_TARGET_URL)
+
+    assert result.status_code == 200
+    assert is_suspicious(result) is True
 
 
 # ---------------------------------------------------------------------------
