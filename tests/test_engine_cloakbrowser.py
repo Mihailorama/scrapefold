@@ -27,9 +27,11 @@ ProxySettings(server=<url>) — TypedDict subclassing dict; pass server as key.
 from __future__ import annotations
 
 import base64
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pytest_httpx import HTTPXMock
 
 from scrapefold.engines.base import EngineError
 from scrapefold.engines.cloakbrowser import CloakBrowserEngine
@@ -99,6 +101,117 @@ async def test_basic_fetch_success() -> None:
     assert result.text  # must be non-empty
     assert result.markdown  # must be non-empty
     assert result.cost_usd == 0.0
+
+
+async def test_2captcha_solves_aws_waf_captcha_when_key_is_set(
+    httpx_mock: HTTPXMock,
+) -> None:
+    page = _make_page_mock("<html><body><h1>Real page</h1></body></html>")
+    page.evaluate = AsyncMock(
+        side_effect=[
+            {
+                "websiteKey": "site-key",
+                "iv": "iv-value",
+                "context": "context-value",
+                "challengeScript": "https://x.token.awswaf.com/challenge.js",
+                "captchaScript": "https://x.captcha.awswaf.com/captcha.js",
+                "jsapiScript": None,
+            },
+            None,
+        ]
+    )
+    page.reload = AsyncMock()
+    page.context = MagicMock(add_cookies=AsyncMock())
+    httpx_mock.add_response(
+        url="https://api.2captcha.com/createTask", json={"errorId": 0, "taskId": 123}
+    )
+    httpx_mock.add_response(
+        url="https://api.2captcha.com/getTaskResult",
+        json={
+            "errorId": 0,
+            "status": "ready",
+            "solution": {"captcha_voucher": "voucher", "existing_token": "waf-token"},
+            "cost": "0.00145",
+        },
+    )
+
+    with (
+        patch(
+            "scrapefold.engines.cloakbrowser.launch_context_async",
+            _make_launch_mock(_make_context_mock(page)),
+        ),
+        patch("scrapefold.engines.cloakbrowser.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        result = await CloakBrowserEngine().scrape(
+            _TEST_URL, ScrapeOptions(extra={"2captcha_api_key": "user-key"})
+        )
+
+    assert "Real page" in result.text
+    assert result.cost_usd == 0.00145
+    task_request = json.loads(httpx_mock.get_requests()[0].read())
+    assert task_request["clientKey"] == "user-key"
+    assert task_request["task"] == {
+        "type": "AmazonTaskProxyless",
+        "websiteURL": _TEST_URL,
+        "websiteKey": "site-key",
+        "iv": "iv-value",
+        "context": "context-value",
+        "challengeScript": "https://x.token.awswaf.com/challenge.js",
+        "captchaScript": "https://x.captcha.awswaf.com/captcha.js",
+    }
+    page.context.add_cookies.assert_awaited_once_with(
+        [{"name": "aws-waf-token", "value": "waf-token", "url": _TEST_URL}]
+    )
+    page.evaluate.assert_any_await(
+        "voucher => window.ChallengeScript.submitCaptcha(voucher)", "voucher"
+    )
+    page.reload.assert_awaited_once()
+
+
+async def test_2captcha_solves_aws_waf_202_challenge(
+    httpx_mock: HTTPXMock,
+) -> None:
+    page = _make_page_mock("<html><body>Enable JavaScript and then reload</body></html>")
+    page.evaluate = AsyncMock(
+        return_value={
+            "websiteKey": "site-key",
+            "iv": "iv-value",
+            "context": "context-value",
+            "challengeScript": "https://x.token.awswaf.com/challenge.js",
+            "captchaScript": None,
+            "jsapiScript": None,
+        }
+    )
+    page.reload = AsyncMock()
+    page.context = MagicMock(add_cookies=AsyncMock())
+    httpx_mock.add_response(
+        url="https://api.2captcha.com/createTask", json={"errorId": 0, "taskId": 456}
+    )
+    httpx_mock.add_response(
+        url="https://api.2captcha.com/getTaskResult",
+        json={
+            "errorId": 0,
+            "status": "ready",
+            "solution": {"captcha_voucher": "voucher", "existing_token": "waf-token"},
+            "cost": "0.00145",
+        },
+    )
+    with (
+        patch(
+            "scrapefold.engines.cloakbrowser.launch_context_async",
+            _make_launch_mock(_make_context_mock(page)),
+        ),
+        patch("scrapefold.engines.cloakbrowser.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        result = await CloakBrowserEngine().scrape(
+            _TEST_URL, ScrapeOptions(extra={"2captcha_api_key": "user-key"})
+        )
+
+    assert result.cost_usd == 0.00145
+    task = json.loads(httpx_mock.get_requests()[0].read())["task"]
+    assert task["challengeScript"] == "https://x.token.awswaf.com/challenge.js"
+    assert "captchaScript" not in task
+    page.reload.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

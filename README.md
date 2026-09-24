@@ -102,6 +102,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | JS-rendered SPA, no anti-bot | **scrapling_fast** (free) or **Jina Reader** (free tier) |
 | Cloudflare / Turnstile, free only | **scrapling_stealth** / **pydoll** / **Camoufox** (all free, local, raced) → **Firecrawl** / **ScrapingBee** (paid) |
 | Cloudflare / Datadome / PerimeterX | **scrapling_stealth** (free) → **Firecrawl** / **ScrapingBee** (paid) |
+| AWS WAF challenge or CAPTCHA with a 2Captcha key | **cloakbrowser** can submit the solved token and voucher; set `TWOCAPTCHA_API_KEY` or `ScrapeOptions(extra={"2captcha_api_key": key})`. Requires `scrapefold[cloakbrowser]`; a matching challenge creates a paid 2Captcha task. |
 | Article body only, no nav/ads/boilerplate | any HTML engine + `ScrapeOptions(main_content=True)` — Trafilatura-backed, `pip install scrapefold[trafilatura]` |
 | High-volume crawl behind your own proxy fleet | `ScrapeOptions(proxies=(...))` — health-scored rotation ("proxy over proxy"): retries a blocked page behind a fresh exit IP before escalating a tier |
 | Large crawl of a slow / rate-limiting origin | `ScrapeOptions(autothrottle=True)` — Scrapy-style adaptive per-host delay: eases toward observed latency, backs off hard on 429/503 |

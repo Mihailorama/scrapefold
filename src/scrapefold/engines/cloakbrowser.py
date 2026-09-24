@@ -1,7 +1,7 @@
 """CloakBrowser engine for scrapefold.
 
 Local stealth browser via the cloakbrowser SDK (Playwright + fingerprint
-hardening). Runs entirely locally — no API key required, no per-call cost.
+hardening). Runs locally by default; optional 2Captcha solving incurs a charge.
 
 SDK: cloakbrowser (``pip install 'cloakbrowser>=0.3'``).
 
@@ -28,7 +28,10 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import os
 from typing import Any
+
+import httpx
 
 from scrapefold.engines.base import EngineCapabilities, ScrapeEngine
 from scrapefold.html_to_text import html_to_both
@@ -44,6 +47,97 @@ _DEFAULT_OPTS = ScrapeOptions()
 #   patch("scrapefold.engines.cloakbrowser.launch_context_async", ...)
 launch_context_async: Any = None
 ProxySettings: Any = None
+
+
+async def _solve_aws_waf(page: Any, url: str, key: str, timeout_s: int) -> float:
+    """Use 2Captcha for a rendered AWS WAF challenge or CAPTCHA, then reload."""
+    params = await page.evaluate("""() => {
+        const scripts = Array.from(document.scripts, script => script.src);
+        const find = name => scripts.find(src => {
+            try {
+                const parsed = new URL(src);
+                return parsed.hostname.endsWith('.awswaf.com') &&
+                    parsed.pathname.endsWith('/' + name);
+            } catch { return false; }
+        });
+        return {
+            websiteKey: window.gokuProps?.key,
+            iv: window.gokuProps?.iv,
+            context: window.gokuProps?.context,
+            challengeScript: find('challenge.js'),
+            captchaScript: find('captcha.js'),
+            jsapiScript: find('jsapi.js'),
+        };
+    }""")
+    if (
+        not isinstance(params, dict)
+        or not isinstance(params.get("websiteKey"), str)
+        or not params["websiteKey"]
+    ):
+        return 0.0
+    task: dict[str, str] = {
+        "type": "AmazonTaskProxyless",
+        "websiteURL": url,
+        "websiteKey": params["websiteKey"],
+    }
+    if isinstance(params.get("jsapiScript"), str) and params["jsapiScript"]:
+        task["jsapiScript"] = params["jsapiScript"]
+    elif all(isinstance(params.get(name), str) and params[name] for name in ("iv", "context")):
+        task.update({name: params[name] for name in ("iv", "context")})
+        for name in ("challengeScript", "captchaScript"):
+            if isinstance(params.get(name), str) and params[name]:
+                task[name] = params[name]
+        if "challengeScript" not in task and "captchaScript" not in task:
+            return 0.0
+    else:
+        return 0.0
+
+    deadline = asyncio.get_running_loop().time() + timeout_s
+    async with httpx.AsyncClient(timeout=float(min(timeout_s, 15))) as client:
+        created = (
+            await client.post(
+                "https://api.2captcha.com/createTask", json={"clientKey": key, "task": task}
+            )
+        ).json()
+        if created.get("errorId") or not isinstance(created.get("taskId"), int):
+            logger.warning(
+                "2captcha createTask failed: %s", created.get("errorCode", "invalid response")
+            )
+            return 0.0
+        while asyncio.get_running_loop().time() + 5 < deadline:
+            await asyncio.sleep(5)
+            answer = (
+                await client.post(
+                    "https://api.2captcha.com/getTaskResult",
+                    json={"clientKey": key, "taskId": created["taskId"]},
+                )
+            ).json()
+            if answer.get("errorId"):
+                logger.warning("2captcha getTaskResult failed: %s", answer.get("errorCode"))
+                return 0.0
+            if answer.get("status") == "ready":
+                cost = float(answer.get("cost") or 0.0)
+                solution = answer.get("solution") or {}
+                voucher = solution.get("captcha_voucher") if isinstance(solution, dict) else None
+                if not isinstance(voucher, str) or not voucher:
+                    return cost
+                token = solution.get("existing_token")
+                try:
+                    if isinstance(token, str) and token:
+                        await page.context.add_cookies(
+                            [{"name": "aws-waf-token", "value": token, "url": url}]
+                        )
+                    await page.evaluate(
+                        "voucher => window.ChallengeScript.submitCaptcha(voucher)", voucher
+                    )
+                    await page.reload(wait_until="load", timeout=timeout_s * 1000)
+                except Exception:
+                    logger.warning("2captcha AWS WAF voucher could not be applied")
+                return cost
+            if answer.get("status") != "processing":
+                return 0.0
+    logger.warning("2captcha AWS WAF solve timed out")
+    return 0.0
 
 
 def _load_sdk() -> Any:
@@ -133,7 +227,7 @@ class CloakBrowserEngine(ScrapeEngine):
     """Stealth browser engine powered by the cloakbrowser SDK.
 
     Runs a local Chromium instance with fingerprint-hardening args. No API
-    key is required; cost per call is 0 (beyond local compute).
+    key is required; cost per call is 0 unless 2Captcha is enabled.
 
     Ideal for Cloudflare-protected pages and sites that detect headless
     browsers via standard CDP/navigator fingerprints.
@@ -205,6 +299,14 @@ class CloakBrowserEngine(ScrapeEngine):
             }
             await page.goto(url, **goto_kwargs)
 
+            captcha_key = opts.extra.get("2captcha_api_key") or os.getenv("TWOCAPTCHA_API_KEY")
+            captcha_cost = 0.0
+            if isinstance(captcha_key, str) and captcha_key.strip():
+                try:
+                    captcha_cost = await _solve_aws_waf(page, url, captcha_key, opts.timeout_s)
+                except Exception:
+                    logger.warning("2captcha AWS WAF solve failed; continuing engine ladder")
+
             if opts.wait_for_selector:
                 await page.wait_for_selector(
                     opts.wait_for_selector,
@@ -231,7 +333,7 @@ class CloakBrowserEngine(ScrapeEngine):
             html=html,
             engine=self.NAME,
             elapsed_ms=0,  # base class patches this
-            cost_usd=0.0,
+            cost_usd=captcha_cost,
             screenshot_b64=screenshot_b64,
         )
 
