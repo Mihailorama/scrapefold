@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 34 scraping engines — with automatic anti-bot escalation and LLM-ready output.
+  One async Python interface over 38 URL engines — with automatic anti-bot escalation and LLM-ready output. Search delegates to Enrichfold.
 </p>
 
 <p align="center">
@@ -16,13 +16,13 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml"><img src="https://github.com/mihailorama/scrapefold/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#"><img src="https://img.shields.io/badge/tests-1132%20passed-brightgreen.svg" alt="Tests"></a>
+  <a href="#"><img src="https://img.shields.io/badge/tests-1221%20passed-brightgreen.svg" alt="Tests"></a>
   <a href="https://pypi.org/project/scrapefold/"><img src="https://img.shields.io/pypi/dm/scrapefold.svg" alt="PyPI downloads"></a>
   <a href="https://github.com/mihailorama/scrapefold/stargazers"><img src="https://img.shields.io/github/stars/mihailorama/scrapefold?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <strong>34 engines</strong> · <strong>4 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai) · <strong>1132 tests</strong> · <strong>MIT</strong>
+  <strong>38 URL engines</strong> · <strong>5 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai · AWS WAF) · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -67,6 +67,9 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Jina Reader**](https://jina.ai/reader/) | ✅ | SaaS | Free tier | ★★★ | ★★★ | ★★☆ | Fast | Free / $ |
 | [**Keenable**](https://keenable.ai/) | ✅ | SaaS | Free tier | ★★★ | ★☆☆ | ★☆☆ | Fast | Free / $ |
 | [**Firecrawl**](https://www.firecrawl.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
+| [**Nimble**](https://www.nimbleway.com/) | ✅ | SaaS | Paid | — | — | — | — | Varies |
+| [**TinyFish**](https://www.tinyfish.ai/) | ✅ | SaaS | Free fetch tier | — | — | — | — | Varies |
+| [**Linkup**](https://www.linkup.so/) | ✅ | SaaS | Paid | — | — | — | — | Varies |
 | [**ScrapingBee**](https://www.scrapingbee.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Scrapingdog**](https://www.scrapingdog.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Cloudflare BR**](https://developers.cloudflare.com/browser-rendering/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
@@ -94,6 +97,23 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 
 > [Full ladder, site-class routing, and budget enforcement →](docs/architecture/overview.md#anti-bot-escalation-ladder)
 
+`search()` delegates to Enrichfold, which owns search adapters and result
+fusion. Scrapefold retains the existing API for callers that also fetch pages.
+Search adapters are enabled when their API key is present: `EXA_API_KEY`,
+`PARALLEL_API_KEY`, `YOU_API_KEY`, `TAVILY_API_KEY`, `LINKUP_API_KEY`,
+`SELTZ_API_KEY`, `TINYFISH_API_KEY`, `NIMBLE_API_KEY`, or
+`BROWSERBASE_API_KEY`. Use
+`SearchOptions(engines=("parallel", "tavily"))` to choose a fixed set.
+URL fetch uses `ScrapeOptions(engines=("nimble",))`, `("tinyfish",)`, or
+`("linkup",)` with the same vendor key. Browserbase Fetch works with
+`ScrapeOptions(engines=("browserbase",))`.
+
+From the pictured services, Exa, Parallel, You.com, Tavily, Seltz, TinyFish,
+Nimble, Linkup, and Browserbase belong to Enrichfold search. Scrapefold fetches
+URLs with Exa, Oxylabs, Firecrawl, TinyFish, Nimble, Linkup, and Browserbase.
+Kernel provides browser sessions and Browser Use runs browser tasks; these need
+a separate browser workflow to be useful.
+
 ## How to Choose
 
 | Your situation | Recommended engine(s) |
@@ -107,7 +127,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | High-volume crawl behind your own proxy fleet | `ScrapeOptions(proxies=(...))` — health-scored rotation ("proxy over proxy"): retries a blocked page behind a fresh exit IP before escalating a tier |
 | Large crawl of a slow / rate-limiting origin | `ScrapeOptions(autothrottle=True)` — Scrapy-style adaptive per-host delay: eases toward observed latency, backs off hard on 429/503 |
 | Structured JSON from any page, via **your** LLM | `extract(result, schema=..., llm=my_llm)` — ScrapeGraphAI-style schema extraction over a user-provided callable; no vendor LLM SDK |
-| Web search by query (not a URL) | `await search("your query")` — multi-engine fan-out (serper / exa / keyless duckduckgo) merged with Reciprocal Rank Fusion; explainable `score_breakdown` + `consensus` per result |
+| Web search by query (not a URL) | `await search("your query")` — delegates to Enrichfold's multi-engine search (Serper, Exa, Parallel, You.com, Tavily, Linkup, Seltz, TinyFish, Nimble, Browserbase, or keyless DuckDuckGo when configured); explainable `score_breakdown` + `consensus` per result |
 | Verify extracted values are grounded | `find_citations(result, result.json)` — pins each value back to a source-text span, flags anything absent from the page (`extract_into(..., cite=True)` stores coverage in `meta`) |
 | Monitor a page for changes | `check_for_changes(url, store=SnapshotStore(dir))` — diffs against the last snapshot, returns a `ContentDiff` (similarity + added/removed lines) |
 | Sync codebase (no `async`/`await`) | `scrape_sync(url)` / `crawl_site_sync(root)` — blocking wrappers that survive leaked event loops (e.g. Playwright Sync API in the same process) |
@@ -197,6 +217,9 @@ asyncio.run(main())
 | [**Jina Reader**](https://jina.ai/reader/) | SaaS | Free tier | Direct markdown, no parsing | `pip install scrapefold[jina]` |
 | [**Keenable**](https://keenable.ai/) | SaaS | Free tier | Web search + indexed/live URL-to-markdown fetch | (built-in — pure httpx) |
 | [**Firecrawl**](https://www.firecrawl.dev/) | SaaS | Paid | LLM-ready markdown + stealth | `pip install scrapefold[firecrawl]` |
+| [**Nimble**](https://www.nimbleway.com/) | SaaS | Paid | v2 search and rendered page extraction | `NIMBLE_API_KEY` |
+| [**TinyFish**](https://www.tinyfish.ai/) | SaaS | Free fetch tier | Search and URL fetch | `TINYFISH_API_KEY` |
+| [**Linkup**](https://www.linkup.so/) | SaaS | Paid | Search and URL fetch | `LINKUP_API_KEY` |
 | [**ScrapingBee**](https://www.scrapingbee.com/) | SaaS | Paid | Premium proxy + JS rendering | `pip install scrapefold[scrapingbee]` |
 | [**Scrapingdog**](https://www.scrapingdog.com/) | SaaS | Paid | Cheaper proxy alternative | `pip install scrapefold[scrapingdog]` |
 | [**Cloudflare BR**](https://developers.cloudflare.com/browser-rendering/) | SaaS | Paid | Cloudflare-native browser API | `pip install scrapefold[cloudflare]` |
@@ -565,7 +588,9 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 
 ### SERP APIs
 
-scrapefold does not yet ship dedicated SERP engines — search-results scraping is a planned pack (`oxylabs_serp`, `scrapingdog_serp`, …). Until then, the table below compares the major SERP vendors so the routing/cost model can be extended consistently. Several integrated vendors already expose a SERP endpoint behind their main API (e.g. Oxylabs `source="google_search"`, Bright Data SERP), so wiring them as engines is mostly an adapter + parser.
+Scrapefold's public `search()` delegates to Enrichfold's 11 search engines.
+The table below compares specialist SERP APIs that are not part of that
+registry; several URL vendors also expose separate SERP endpoints.
 
 Prices are **approximate per-1000-search published rates** and move between plan tiers — treat them as ballpark, not quotes.
 

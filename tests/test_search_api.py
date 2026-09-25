@@ -7,8 +7,8 @@ happens and the test exercises only the orchestration + fusion wiring.
 from __future__ import annotations
 
 import pytest
+from enrichfold.search import engines as engines_mod
 
-from scrapefold.search import engines as engines_mod
 from scrapefold.search.api import search
 from scrapefold.search.engines.base import SearchEngine, SearchEngineError
 from scrapefold.search.options import SearchOptions

@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-25
+
+### Added
+
+- Search adapters for Parallel, You.com, Tavily, Linkup, Seltz, TinyFish, and
+  Nimble, and Browserbase in Enrichfold; Scrapefold's search API delegates to
+  Enrichfold 0.6.0 while preserving the previous public Python imports.
+- URL fetch engines for Linkup, TinyFish, Nimble, and Browserbase.
+
 ## [0.9.2] - 2026-09-25
 
 ### Fixed
@@ -780,7 +789,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/mihailorama/scrapefold/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/mihailorama/scrapefold/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/mihailorama/scrapefold/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/mihailorama/scrapefold/compare/v0.8.1...v0.9.0

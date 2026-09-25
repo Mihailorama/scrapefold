@@ -10,7 +10,7 @@ related:
 
 # scrapefold docs
 
-Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, visual screenshot capture, and LLM-ready output. Wraps 34 engines across vendor APIs, local stealth browsers, visual capture tools, search indexes, and a baseline `requests` engine behind one async interface.
+Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, visual screenshot capture, and LLM-ready output. Wraps 38 URL engines across vendor APIs, local stealth browsers, visual capture tools, search indexes, and a baseline `requests` engine behind one async interface. Query search delegates to Enrichfold.
 
 ## Where to look
 
@@ -27,7 +27,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 
 ## Project status
 
-**v0.9.2 — shipped on 2026-09-25.** `pip install scrapefold`.
+**v0.10.0 — 2026-09-25.** `pip install scrapefold`.
 
 | PR / Pack | Engines / features | Version |
 |---|---|---|
@@ -53,6 +53,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | Release ✅ | Optional 2Captcha solving for AWS WAF challenges and CAPTCHA in CloakBrowser | 0.9.0 |
 | Patch ✅ | DDG and Mojeek CAPTCHA detection; free SERP browser fallback | 0.9.1 |
 | Patch ✅ | Long HTTP error responses escalate; JavaScript phrases no longer cause false blocks | 0.9.2 |
+| Release ✅ | Enrichfold-backed search; Linkup, TinyFish, Nimble, Browserbase URL fetch | 0.10.0 |
 
 ## What's next
 

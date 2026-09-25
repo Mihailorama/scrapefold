@@ -17,6 +17,11 @@ if TYPE_CHECKING:
 # Each lambda imports the engine module on first call so missing extras
 # only error out when that engine is actually requested.
 _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
+    "browserbase": lambda: (
+        __import__(
+            "scrapefold.engines.browserbase", fromlist=["BrowserbaseEngine"]
+        ).BrowserbaseEngine
+    ),
     "requests": lambda: (
         __import__("scrapefold.engines.requests", fromlist=["RequestsEngine"]).RequestsEngine
     ),
@@ -37,6 +42,15 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
         __import__("scrapefold.engines.scraperapi", fromlist=["ScraperApiEngine"]).ScraperApiEngine
     ),
     "exa": lambda: __import__("scrapefold.engines.exa", fromlist=["ExaEngine"]).ExaEngine,
+    "tinyfish": lambda: (
+        __import__("scrapefold.engines.tinyfish", fromlist=["TinyFishEngine"]).TinyFishEngine
+    ),
+    "linkup": lambda: (
+        __import__("scrapefold.engines.linkup", fromlist=["LinkupEngine"]).LinkupEngine
+    ),
+    "nimble": lambda: (
+        __import__("scrapefold.engines.nimble", fromlist=["NimbleEngine"]).NimbleEngine
+    ),
     "keenable": lambda: (
         __import__("scrapefold.engines.keenable", fromlist=["KeenableEngine"]).KeenableEngine
     ),

@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scrapefold — turn any URL into clean markdown</title>
-<meta name="description" content="One async Python interface over 34 web-scraping engines, with automatic anti-bot escalation (Cloudflare, Datadome, PerimeterX, Akamai) and LLM-ready markdown output. Open source, MIT.">
+<meta name="description" content="One async Python interface over 38 URL engines, with automatic anti-bot escalation and LLM-ready markdown output. Search delegates to Enrichfold. Open source, MIT.">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="canonical" href="https://scrapefold.com/">
 
 <!-- Open Graph / Twitter -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Scrapefold — turn any URL into clean markdown">
-<meta property="og:description" content="One async Python interface over 34 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
+<meta property="og:description" content="38 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
 <meta property="og:url" content="https://scrapefold.com/">
 <meta property="og:image" content="https://scrapefold.com/assets/social-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Scrapefold — turn any URL into clean markdown">
-<meta name="twitter:description" content="One async Python interface over 34 scraping engines, with automatic anti-bot escalation and LLM-ready output.">
+<meta name="twitter:description" content="38 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
 <meta name="twitter:image" content="https://scrapefold.com/assets/social-card.png">
 
 <style>
@@ -202,6 +202,7 @@
     <div class="links">
       <a href="#agents">For AI agents</a>
       <a class="hide-sm" href="#why">Why</a>
+      <a class="hide-sm" href="#search">Search</a>
       <a href="#engines">Engines</a>
       <a href="#quickstart">Quickstart</a>
       <a class="gh" href="https://github.com/mihailorama/scrapefold">GitHub ↗</a>
@@ -212,7 +213,7 @@
 <header class="hero" id="top">
   <img class="logo" src="assets/logo-dark.svg" alt="Scrapefold">
   <h1>Turn any URL into clean markdown.</h1>
-  <p class="tag">One async Python interface over <strong>34 scraping engines</strong> — with automatic anti-bot escalation and LLM-ready output. Open source, MIT.</p>
+  <p class="tag">One async Python interface over <strong>38 URL engines</strong> — with automatic anti-bot escalation and LLM-ready output. Search powered by Enrichfold. Open source, MIT.</p>
 
   <div class="agent-cta">
     <button class="btn btn-primary btn-lg" id="agentPrompt" title="Click to copy"
@@ -228,7 +229,7 @@
     </button>
   </div>
 
-  <p class="stats"><strong>v0.9.2</strong> · <strong>34 engines</strong> · <strong>5 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai · AWS WAF) · <strong>MIT</strong></p>
+  <p class="stats"><strong>v0.10.0</strong> · <strong>38 URL engines</strong> · <strong>11 search engines via Enrichfold</strong> · <strong>MIT</strong></p>
   <p class="hero-links"><a href="https://github.com/mihailorama/scrapefold">⭐ Star on GitHub</a> · <a href="https://pypi.org/project/scrapefold/">PyPI</a></p>
 
   <div class="hero-demo">
@@ -287,9 +288,20 @@
   </div>
 </section>
 
+<section id="search">
+  <div class="wrap">
+    <h2>Search with Enrichfold. Fetch with Scrapefold.</h2>
+    <p class="lead"><code>scrapefold.search(query)</code> calls <a href="https://mihailorama.github.io/enrichfold/">Enrichfold</a>, which merges ranked results from Exa, Parallel, You.com, Tavily, Linkup, Seltz, TinyFish, Nimble, Browserbase, Serper, and DuckDuckGo. Then <code>scrapefold.scrape(url)</code> retrieves a page through the URL engine you choose.</p>
+    <pre><span class="k">from</span> scrapefold <span class="k">import</span> SearchOptions, ScrapeOptions, search, scrape
+
+hits = <span class="k">await</span> search("example.com company", SearchOptions(engines=("parallel", "tavily")))
+page = <span class="k">await</span> scrape(hits[0].url, ScrapeOptions(engines=("firecrawl",)))</pre>
+  </div>
+</section>
+
 <section id="engines">
   <div class="wrap">
-    <h2>34 engines, one interface</h2>
+    <h2>38 URL engines, one interface</h2>
     <p class="lead">Local engines are free and fast; SaaS engines add premium proxies and stealth. The router picks the cheapest tier that works. Ratings: ★★★ excellent · ★★☆ good · ★☆☆ basic.</p>
     <div class="engines">
       <div class="engine"><span class="name">requests</span> <span class="type">local</span><div class="caps">Static HTML · ultra-fast · <span class="stars">★★★</span></div></div>
@@ -306,6 +318,10 @@
       <div class="engine"><span class="name">Scrapingdog</span> <span class="type">saas</span><div class="caps">Affordable proxy + browser · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">ScraperAPI</span> <span class="type">saas</span><div class="caps">Proxy + JS render · native markdown · AI Parser → JSON · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Exa</span> <span class="type">saas · search</span><div class="caps">Search · Contents · Answer · Agent · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Linkup</span> <span class="type">saas · fetch</span><div class="caps">Rendered page → markdown</div></div>
+      <div class="engine"><span class="name">TinyFish</span> <span class="type">saas · fetch</span><div class="caps">URL fetch → text or JSON</div></div>
+      <div class="engine"><span class="name">Nimble</span> <span class="type">saas · fetch</span><div class="caps">Rendered HTML and markdown</div></div>
+      <div class="engine"><span class="name">Browserbase</span> <span class="type">saas · fetch</span><div class="caps">Fetch API → page content</div></div>
       <div class="engine"><span class="name">Serper</span> <span class="type">saas</span><div class="caps">Fast, cheap scrape · native markdown + JSON-LD · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Twingly</span> <span class="type">saas · search</span><div class="caps">Blog Search API · blogosphere index → posts JSON + markdown · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Maxun</span> <span class="type">local · self-hosted</span><div class="caps">No-code robot runs → structured JSON · <span class="stars">★★★</span></div></div>
