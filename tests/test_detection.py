@@ -103,6 +103,7 @@ class TestIsSuspiciousAntibotPhrases:
                 + "x" * 500,
                 {},
             ),
+            ("Unfortunately, bots use DuckDuckGo too" + "x" * 300, {"status_code": 200}),
         ],
     )
     def test_wrapped_block_pages_are_suspicious(self, text: str, meta: dict) -> None:
@@ -125,6 +126,14 @@ class TestIsSuspiciousAntibotPhrases:
         result = _result(
             text="A" * 300,
             html="<html>cf-browser-verification</html>",
+        )
+        assert is_suspicious(result) is True
+
+    def test_captcha_title_with_200_is_suspicious(self) -> None:
+        result = _result(
+            text="JavaScript is required to complete this challenge" + "A" * 300,
+            html="<html><head><title>Captcha</title></head><body>Challenge</body></html>",
+            meta={"status_code": 200},
         )
         assert is_suspicious(result) is True
 
@@ -183,6 +192,10 @@ class TestIsSuspiciousScriptDominated:
 
 
 class TestIsSuspiciousStatusCode:
+    def test_202_with_rich_text_is_suspicious(self) -> None:
+        result = _result(text="A" * 300, meta={"status_code": 202})
+        assert is_suspicious(result) is True
+
     def test_403_with_empty_text_is_suspicious(self) -> None:
         result = _result(text="", meta={"status_code": 403})
         assert is_suspicious(result) is True

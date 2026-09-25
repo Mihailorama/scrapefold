@@ -207,6 +207,23 @@ async def test_router_skips_unavailable_engine(
     assert result.engine == "stub_good"
 
 
+async def test_bing_uses_free_browser_when_serp_vendors_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.router import walk
+
+    for name in ("scrapingdog", "scrapingbee"):
+        cls = _stub_engine(name, requires_api_key=True)
+        monkeypatch.setitem(_REGISTRY, name, lambda cls=cls: cls)
+    cls = _stub_engine("scrapling_stealth")
+    monkeypatch.setitem(_REGISTRY, "scrapling_stealth", lambda: cls)
+
+    result = await walk("https://www.bing.com/search?q=foo")
+
+    assert result.engine == "scrapling_stealth"
+    assert result.failures == ["scrapingdog:unavailable", "scrapingbee:unavailable"]
+
+
 # ---------------------------------------------------------------------------
 # 5. All steps fail → AllEnginesFailed
 # ---------------------------------------------------------------------------

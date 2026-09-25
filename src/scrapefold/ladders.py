@@ -521,10 +521,12 @@ LADDERS: dict[SiteClass, Ladder] = {
         _seq("scrapingdog", cost=_LOW),
         _seq("scrapingbee", cost=_MED),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
+        _race("scrapling_stealth", "cloakbrowser"),
     ),
     "serp_bing": (
         _seq("scrapingdog", cost=_LOW),
         _seq("scrapingbee", cost=_MED),
+        _race("scrapling_stealth", "cloakbrowser"),
     ),
     "serp_yandex": (
         _race("scrapingdog", "scrapling_stealth", budget_accounting="sum_all"),
