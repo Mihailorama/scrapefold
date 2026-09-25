@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-09-25
+
+### Fixed
+
+- HTTP errors (status 400 or higher) now trigger engine escalation even when
+  their response body is long, so Jina's Mojeek 422 error cannot pass as a
+  successful scrape.
+- Anti-bot phrases inside JavaScript no longer mark otherwise valid pages as
+  blocked, including Google pages containing Closure's `Access denied` string.
+
 ## [0.9.1] - 2026-09-25
 
 ### Fixed
@@ -770,7 +780,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/mihailorama/scrapefold/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/mihailorama/scrapefold/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/mihailorama/scrapefold/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/mihailorama/scrapefold/compare/v0.8.0...v0.8.1

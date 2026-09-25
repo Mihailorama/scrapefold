@@ -129,6 +129,19 @@ class TestIsSuspiciousAntibotPhrases:
         )
         assert is_suspicious(result) is True
 
+    def test_phrase_only_inside_script_is_not_suspicious(self) -> None:
+        result = _result(
+            text="Normal Google content " * 150,
+            html=(
+                "<html><body>"
+                + "Normal Google content " * 150
+                + '<script>ErrorCode.ACCESS_DENIED:return"Access denied to content document"</script>'
+                + "</body></html>"
+            ),
+            meta={"status_code": 200},
+        )
+        assert is_suspicious(result) is False
+
     def test_captcha_title_with_200_is_suspicious(self) -> None:
         result = _result(
             text="JavaScript is required to complete this challenge" + "A" * 300,
@@ -217,11 +230,10 @@ class TestIsSuspiciousStatusCode:
         result = _result(text="Too Many Requests" + "A" * 300, meta={"status_code": 429})
         assert is_suspicious(result) is True
 
-    def test_404_with_rich_text_is_not_suspicious(self) -> None:
-        # 404 is a legitimate protocol response — escalation will not help, so
-        # the router must NOT flag it suspicious.
-        result = _result(text="Page not found" + "A" * 300, meta={"status_code": 404})
-        assert is_suspicious(result) is False
+    @pytest.mark.parametrize("status_code", [400, 401, 404, 410, 422, 500])
+    def test_any_http_error_with_rich_text_is_suspicious(self, status_code: int) -> None:
+        result = _result(text="Error response " + "A" * 300, meta={"status_code": status_code})
+        assert is_suspicious(result) is True
 
     def test_200_with_empty_text_still_suspicious_via_length(self) -> None:
         result = _result(text="", meta={"status_code": 200})

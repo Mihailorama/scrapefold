@@ -60,43 +60,33 @@ def is_suspicious(
 
     Heuristics applied (any one is sufficient):
 
-    1. **Short text + failure signal** — ``len(result.text) < min_text_chars`` AND
-       either: (a) ``result.text`` is empty / whitespace-only, OR (b)
-       ``meta["status_code"]`` indicates an HTTP error (4xx or 5xx).
-       Short but non-empty text with a 2xx status is NOT suspicious under this
-       rule alone — other rules (antibot phrases, noscript/script domination) can
-       still flag it.
+    1. **Short empty text** — ``len(result.text) < min_text_chars`` and the
+       text is empty or whitespace-only.
     2. **Anti-bot phrase** — any phrase in *antibot_phrases* appears (case-
-       insensitive) in ``result.text`` or ``result.html``.
+       insensitive) in ``result.text`` or HTML outside ``<script>`` blocks.
     3. **Noscript domination** — the ``<noscript>`` content exceeds 50 % of the
        raw HTML length after stripping noscript tags.
     4. **Script domination** — the ratio of non-script visible text to total HTML
        is below 0.1 (script tags make up more than 90 % of the document).
-    5. **Block-status code** — ``meta["status_code"]`` is 202, 403, 429, or 503,
-       regardless of body length. These codes always indicate a bot block or
-       rate limit; the body is a synthetic error page, not real content, so the
-       router should escalate to a different engine. (404 / 401 / 410 are NOT
-       suspicious — they are legitimate protocol responses where escalation
-       would not change the outcome.)
+    5. **Failure status** — ``meta["status_code"]`` is 202 or at least 400,
+       regardless of body length. The router escalates rather than returning
+       an error response as a successful scrape.
     """
     text: str = result.text or ""
     html: str | None = result.html
+    status_code = result.status_code
 
-    if len(text) < min_text_chars:
-        status_code = result.status_code
-        is_error_status = status_code is not None and status_code >= 400
-        is_empty = not text.strip()
-        if is_empty or is_error_status:
-            logger.debug(
-                "is_suspicious: short text (%d < %d chars) with %s",
-                len(text),
-                min_text_chars,
-                "empty text" if is_empty else f"status_code={status_code}",
-            )
-            return True
+    if status_code == 202 or (status_code is not None and status_code >= 400):
+        logger.debug("is_suspicious: failure status_code=%d", status_code)
+        return True
+
+    if len(text) < min_text_chars and not text.strip():
+        logger.debug("is_suspicious: short empty text (%d < %d chars)", len(text), min_text_chars)
+        return True
 
     text_lower = text.lower()
-    html_lower = (html or "").lower()
+    html_without_scripts = _RE_SCRIPT.sub("", html) if html else ""
+    html_lower = html_without_scripts.lower()
     phrases_lower = tuple(p.lower() for p in antibot_phrases)
     for phrase, phrase_lower in zip(antibot_phrases, phrases_lower, strict=True):
         if phrase_lower in text_lower or phrase_lower in html_lower:
@@ -117,7 +107,7 @@ def is_suspicious(
             return True
 
         if html_len > 0:
-            script_total = sum(m.end() - m.start() for m in _RE_SCRIPT.finditer(html))
+            script_total = html_len - len(html_without_scripts)
             ratio = (html_len - script_total) / html_len
             if ratio < 0.1:
                 logger.debug(
@@ -127,11 +117,6 @@ def is_suspicious(
                     html_len,
                 )
                 return True
-
-    status_code = result.status_code
-    if status_code in (202, 403, 429, 503):
-        logger.debug("is_suspicious: block-status status_code=%d", status_code)
-        return True
 
     return False
 

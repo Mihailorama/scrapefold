@@ -27,7 +27,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 
 ## Project status
 
-**v0.9.1 — shipped on 2026-09-25.** `pip install scrapefold`.
+**v0.9.2 — shipped on 2026-09-25.** `pip install scrapefold`.
 
 | PR / Pack | Engines / features | Version |
 |---|---|---|
@@ -52,6 +52,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | Release ✅ | Jina-wrapped target errors and CloudFront block-page detection | 0.8.1 |
 | Release ✅ | Optional 2Captcha solving for AWS WAF challenges and CAPTCHA in CloakBrowser | 0.9.0 |
 | Patch ✅ | DDG and Mojeek CAPTCHA detection; free SERP browser fallback | 0.9.1 |
+| Patch ✅ | Long HTTP error responses escalate; JavaScript phrases no longer cause false blocks | 0.9.2 |
 
 ## What's next
 
