@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scrapefold — turn any URL into clean markdown</title>
-<meta name="description" content="One async Python interface over 38 URL engines, with automatic anti-bot escalation and LLM-ready markdown output. Search delegates to Enrichfold. Open source, MIT.">
+<meta name="description" content="One async Python interface over 39 URL engines, with automatic anti-bot escalation and LLM-ready markdown output. Search delegates to Enrichfold. Open source, MIT.">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="canonical" href="https://scrapefold.com/">
 
 <!-- Open Graph / Twitter -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Scrapefold — turn any URL into clean markdown">
-<meta property="og:description" content="38 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
+<meta property="og:description" content="39 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
 <meta property="og:url" content="https://scrapefold.com/">
 <meta property="og:image" content="https://scrapefold.com/assets/social-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Scrapefold — turn any URL into clean markdown">
-<meta name="twitter:description" content="38 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
+<meta name="twitter:description" content="39 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
 <meta name="twitter:image" content="https://scrapefold.com/assets/social-card.png">
 
 <style>
@@ -213,7 +213,7 @@
 <header class="hero" id="top">
   <img class="logo" src="assets/logo-dark.svg" alt="Scrapefold">
   <h1>Turn any URL into clean markdown.</h1>
-  <p class="tag">One async Python interface over <strong>38 URL engines</strong> — with automatic anti-bot escalation and LLM-ready output. Search powered by Enrichfold. Open source, MIT.</p>
+  <p class="tag">One async Python interface over <strong>39 URL engines</strong> — with automatic anti-bot escalation and LLM-ready output. Search powered by Enrichfold. Open source, MIT.</p>
 
   <div class="agent-cta">
     <button class="btn btn-primary btn-lg" id="agentPrompt" title="Click to copy"
@@ -229,7 +229,7 @@
     </button>
   </div>
 
-  <p class="stats"><strong>v0.10.0</strong> · <strong>38 URL engines</strong> · <strong>11 search engines via Enrichfold</strong> · <strong>MIT</strong></p>
+  <p class="stats"><strong>v0.11.0</strong> · <strong>39 URL engines</strong> · <strong>12 search engines via Enrichfold</strong> · <strong>MIT</strong></p>
   <p class="hero-links"><a href="https://github.com/mihailorama/scrapefold">⭐ Star on GitHub</a> · <a href="https://pypi.org/project/scrapefold/">PyPI</a></p>
 
   <div class="hero-demo">
@@ -296,12 +296,13 @@
 
 hits = <span class="k">await</span> search("example.com company", SearchOptions(engines=("parallel", "tavily")))
 page = <span class="k">await</span> scrape(hits[0].url, ScrapeOptions(engines=("firecrawl",)))</pre>
+    <p class="lead"><a href="https://treg.to/">Treg</a> is available with <code>TREG_TOKEN</code>: select <code>engines=("treg",)</code> for web search or URL extraction. Page calls default to a $0.01 ceiling and retain the serving provider, call ID, and actual cost. People search and other catalog sources use <a href="https://mihailorama.github.io/enrichfold/#treg">Enrichfold's Treg adapter</a>.</p>
   </div>
 </section>
 
 <section id="engines">
   <div class="wrap">
-    <h2>38 URL engines, one interface</h2>
+    <h2>39 URL engines, one interface</h2>
     <p class="lead">Local engines are free and fast; SaaS engines add premium proxies and stealth. The router picks the cheapest tier that works. Ratings: ★★★ excellent · ★★☆ good · ★☆☆ basic.</p>
     <div class="engines">
       <div class="engine"><span class="name">requests</span> <span class="type">local</span><div class="caps">Static HTML · ultra-fast · <span class="stars">★★★</span></div></div>
@@ -313,6 +314,7 @@ page = <span class="k">await</span> scrape(hits[0].url, ScrapeOptions(engines=("
       <div class="engine"><span class="name">selenium</span> <span class="type">local</span><div class="caps">Classic JS rendering · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Jina Reader</span> <span class="type">saas · free tier</span><div class="caps">Direct URL → markdown · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Keenable</span> <span class="type">saas · free tier</span><div class="caps">Web search + URL → markdown · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Treg</span> <span class="type">saas · catalog</span><div class="caps">Routed URL extraction · actual cost and source metadata</div></div>
       <div class="engine"><span class="name">Firecrawl</span> <span class="type">saas</span><div class="caps">LLM-ready markdown + stealth · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">ScrapingBee</span> <span class="type">saas</span><div class="caps">Premium proxy + JS · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Scrapingdog</span> <span class="type">saas</span><div class="caps">Affordable proxy + browser · <span class="stars">★★★</span></div></div>

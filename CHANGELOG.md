@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-26
+
+### Added
+
+- Treg URL extraction via `treg.web.extract`, authenticated with `TREG_TOKEN`.
+  Results preserve the upstream provider, Treg call ID, and actual billed cost.
+- Treg search through Enrichfold 0.7.0. People search and other catalog sources
+  are available through Enrichfold's `TregProvider`.
+- A server-enforced spending ceiling for Treg page calls (default $0.01).
+
 ## [0.10.0] - 2026-09-25
 
 ### Added
@@ -789,7 +799,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/mihailorama/scrapefold/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/mihailorama/scrapefold/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/mihailorama/scrapefold/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/mihailorama/scrapefold/compare/v0.9.0...v0.9.1

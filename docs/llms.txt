@@ -1,6 +1,6 @@
 # scrapefold
 
-> Unified Python interface over 38 URL engines — single URL or whole
+> Unified Python interface over 39 URL engines — single URL or whole
 > site → clean, LLM-ready markdown, with automatic anti-bot escalation
 > (Cloudflare, Datadome, PerimeterX, Akamai). Open source, MIT. Ships a CLI
 > (`scrapefold`) and an MCP server (`scrapefold-mcp`).
@@ -12,6 +12,11 @@
   (`scrapefold install claude|codex|cursor|vscode|generic`).
 
 ## Docs
+
+- Treg: `TREG_TOKEN` enables `SearchOptions(engines=("treg",))` via Enrichfold
+  and `ScrapeOptions(engines=("treg",))` for URL extraction. People search and
+  other JSON endpoints use `enrichfold.TregClient` / `enrichfold.TregProvider`.
+  Page calls default to a $0.01 ceiling (`extra['treg_max_cost_usd']` overrides).
 
 - [README](https://github.com/mihailorama/scrapefold/blob/main/README.md)
 - [Agent mode (CLI + MCP)](https://github.com/mihailorama/scrapefold/blob/main/docs/tools/agent-mode.md)

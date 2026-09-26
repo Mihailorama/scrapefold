@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 # Each lambda imports the engine module on first call so missing extras
 # only error out when that engine is actually requested.
 _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
+    "treg": lambda: __import__("scrapefold.engines.treg", fromlist=["TregEngine"]).TregEngine,
     "browserbase": lambda: (
         __import__(
             "scrapefold.engines.browserbase", fromlist=["BrowserbaseEngine"]

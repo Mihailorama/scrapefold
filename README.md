@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 38 URL engines — with automatic anti-bot escalation and LLM-ready output. Search delegates to Enrichfold.
+  One async Python interface over 39 URL engines — with automatic anti-bot escalation and LLM-ready output. Search delegates to Enrichfold.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <strong>38 URL engines</strong> · <strong>5 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai · AWS WAF) · <strong>MIT</strong>
+  <strong>39 URL engines</strong> · <strong>5 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai · AWS WAF) · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -107,6 +107,20 @@ Search adapters are enabled when their API key is present: `EXA_API_KEY`,
 URL fetch uses `ScrapeOptions(engines=("nimble",))`, `("tinyfish",)`, or
 `("linkup",)` with the same vendor key. Browserbase Fetch works with
 `ScrapeOptions(engines=("browserbase",))`.
+
+### Treg catalog
+
+Set `TREG_TOKEN` to use `SearchOptions(engines=("treg",))` for routed web
+search through Enrichfold, or `ScrapeOptions(engines=("treg",))` for routed
+URL extraction. Page results retain `cost_usd`, `meta["treg_call_id"]`, and
+`meta["treg_served_by"]`. Page calls have a server-enforced $0.01 ceiling;
+override it with `extra={"treg_max_cost_usd": 0.05}`. Identity tokens also
+need `TREG_ORG`; org-scoped tokens do not.
+
+People search, company enrichment, email lookup, and other JSON catalog
+sources use Enrichfold's [TregClient and TregProvider](https://github.com/Mihailorama/enrichfold#treg-people-companies-and-other-catalog-sources).
+The [Treg catalog](https://treg.to/catalog) documents each endpoint's native
+inputs. Search remains in Enrichfold; URL extraction remains in Scrapefold.
 
 From the pictured services, Exa, Parallel, You.com, Tavily, Seltz, TinyFish,
 Nimble, Linkup, and Browserbase belong to Enrichfold search. Scrapefold fetches
@@ -216,6 +230,7 @@ asyncio.run(main())
 | [**selenium**](https://github.com/SeleniumHQ/selenium) | Local | Apache | Classic JS rendering (deprecated) | `pip install scrapefold[selenium]` |
 | [**Jina Reader**](https://jina.ai/reader/) | SaaS | Free tier | Direct markdown, no parsing | `pip install scrapefold[jina]` |
 | [**Keenable**](https://keenable.ai/) | SaaS | Free tier | Web search + indexed/live URL-to-markdown fetch | (built-in — pure httpx) |
+| [**Treg**](https://treg.to/) | SaaS | Per call | Routed web search and URL extraction; People search and other sources via Enrichfold | `TREG_TOKEN` |
 | [**Firecrawl**](https://www.firecrawl.dev/) | SaaS | Paid | LLM-ready markdown + stealth | `pip install scrapefold[firecrawl]` |
 | [**Nimble**](https://www.nimbleway.com/) | SaaS | Paid | v2 search and rendered page extraction | `NIMBLE_API_KEY` |
 | [**TinyFish**](https://www.tinyfish.ai/) | SaaS | Free fetch tier | Search and URL fetch | `TINYFISH_API_KEY` |
@@ -588,7 +603,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 
 ### SERP APIs
 
-Scrapefold's public `search()` delegates to Enrichfold's 11 search engines.
+Scrapefold's public `search()` delegates to Enrichfold's 12 search engines.
 The table below compares specialist SERP APIs that are not part of that
 registry; several URL vendors also expose separate SERP endpoints.
 
