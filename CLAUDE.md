@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # scrapefold
 
 Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, and LLM-ready output.
