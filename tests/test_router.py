@@ -2379,3 +2379,109 @@ async def test_router_race_billing_control_with_headroom(
 
     result = await walk("https://example.com/", opts)
     assert result.engine == "bill_next_tier"
+
+
+# ---------------------------------------------------------------------------
+# SCRAPEFOLD-2 — response-signature reclassification switches the ladder
+# ---------------------------------------------------------------------------
+
+
+def _datadome_engine(name: str) -> type[ScrapeEngine]:
+    async def _fetch(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        body = "<html><script src='https://ct.captcha-delivery.com/c.js'></script></html>"
+        return ScrapeResult(
+            url=url,
+            text="",
+            markdown="",
+            html=body,
+            engine=name,
+            elapsed_ms=1,
+            meta={"status_code": 403, "cookies": {"datadome": "x"}, "headers": {}},
+        )
+
+    return type(
+        f"_Stub_{name}",
+        (ScrapeEngine,),
+        {
+            "NAME": name,
+            "CAPABILITIES": EngineCapabilities(requires_api_key=False),
+            "_fetch": _fetch,
+        },
+    )
+
+
+async def test_walk_reclassifies_datadome_block_to_vendor_ladder(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.router import walk
+
+    monkeypatch.setitem(_REGISTRY, "stub_dd", lambda: _datadome_engine("stub_dd"))
+    # General ladder: a DataDome block, then an engine that must NOT run.
+    stub_ladder((SequentialStep(engine="stub_dd"), SequentialStep(engine="stub_raise")))
+    monkeypatch.setitem(LADDERS, "datadome_protected", (SequentialStep(engine="stub_good"),))
+
+    result = await walk("https://example.com/", ScrapeOptions())
+
+    assert result.engine == "stub_good"
+    assert "reclassified:static_general->datadome_protected" in result.failures
+    assert not any(f.startswith("stub_raise") for f in result.failures)
+
+
+async def test_walk_does_not_reclassify_back_to_visited_class(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.router import walk
+
+    monkeypatch.setitem(_REGISTRY, "stub_dd", lambda: _datadome_engine("stub_dd"))
+    monkeypatch.setitem(_REGISTRY, "stub_dd2", lambda: _datadome_engine("stub_dd2"))
+    stub_ladder((SequentialStep(engine="stub_dd"),))
+    # The vendor ladder blocks again with the same signature: no ping-pong.
+    monkeypatch.setitem(LADDERS, "datadome_protected", (SequentialStep(engine="stub_dd2"),))
+
+    with pytest.raises(AllEnginesFailed) as exc:
+        await walk("https://example.com/", ScrapeOptions())
+    hops = [f for f in exc.value.failures if f.startswith("reclassified:")]
+    assert hops == ["reclassified:static_general->datadome_protected"]
+
+
+# ---------------------------------------------------------------------------
+# SCRAPEFOLD-18 — engines receive the remaining walk budget, not full timeout_s
+# ---------------------------------------------------------------------------
+
+
+async def test_later_engine_gets_remaining_timeout(
+    stub_registry: dict[str, type[ScrapeEngine]],
+    stub_ladder: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrapefold.router import walk
+
+    seen: list[int] = []
+
+    async def _slow_empty(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        # Reports 40 s spent without actually sleeping.
+        return ScrapeResult(
+            url=url, text="", markdown="", html=None, engine="slow", elapsed_ms=40_000
+        )
+
+    async def _record(self: ScrapeEngine, url: str, opts: ScrapeOptions) -> ScrapeResult:
+        seen.append(opts.timeout_s)
+        return _make_result("rec", url=url)
+
+    caps = EngineCapabilities(requires_api_key=False)
+    slow = type(
+        "_Slow", (ScrapeEngine,), {"NAME": "slow", "CAPABILITIES": caps, "_fetch": _slow_empty}
+    )
+    rec = type("_Rec", (ScrapeEngine,), {"NAME": "rec", "CAPABILITIES": caps, "_fetch": _record})
+    monkeypatch.setitem(_REGISTRY, "slow", lambda: slow)
+    monkeypatch.setitem(_REGISTRY, "rec", lambda: rec)
+    stub_ladder((SequentialStep(engine="slow"), SequentialStep(engine="rec")))
+
+    result = await walk("https://example.com/", ScrapeOptions(timeout_s=60))
+
+    assert result.engine == "rec"
+    assert seen == [20]

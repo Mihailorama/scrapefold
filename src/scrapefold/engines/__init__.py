@@ -121,6 +121,17 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
             "scrapefold.engines.cloakbrowser", fromlist=["CloakBrowserEngine"]
         ).CloakBrowserEngine
     ),
+    "brightdata_unlocker_sync": lambda: (
+        __import__(
+            "scrapefold.engines.brightdata", fromlist=["BrightDataUnlockerEngine"]
+        ).BrightDataUnlockerEngine
+    ),
+    "lightpanda": lambda: (
+        __import__("scrapefold.engines.lightpanda", fromlist=["LightpandaEngine"]).LightpandaEngine
+    ),
+    "obscura": lambda: (
+        __import__("scrapefold.engines.obscura", fromlist=["ObscuraEngine"]).ObscuraEngine
+    ),
     "selenium": lambda: (
         __import__("scrapefold.engines.selenium", fromlist=["SeleniumEngine"]).SeleniumEngine
     ),
@@ -190,6 +201,7 @@ def list_engine_names() -> list[str]:
 register_alias("scrapling", "scrapling_stealth")
 # "apify" resolves to the universal actor engine (apify_linkedin stays explicit).
 register_alias("apify", "apify_actor")
+register_alias("brightdata", "brightdata_unlocker_sync")
 
 
 __all__ = [

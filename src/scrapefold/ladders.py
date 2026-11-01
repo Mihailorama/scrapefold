@@ -307,13 +307,15 @@ SIGNATURES: tuple[Signature, ...] = (
     Signature(
         target="datadome_protected",
         cookie_names=("datadome",),
-        body_phrases_any=("/captcha-delivery/", "geo.captcha-delivery.com"),
+        header_names=("x-datadome",),
+        body_phrases_any=("/captcha-delivery/", "captcha-delivery.com"),
         min_matches=2,
     ),
     Signature(
         target="perimeterx_protected",
         cookie_names=("_px", "_px2", "_px3", "_pxhd"),
-        header_names=("x-px",),
+        header_names=("x-px", "x-px-blocked"),
+        body_phrases_any=("px-captcha", "perimeterx"),
         min_matches=2,
     ),
     Signature(
@@ -356,8 +358,11 @@ def _race(*engines: str, **kwargs: object) -> RaceStep:
 
 _GENERAL_LADDER: Ladder = (
     _seq("requests", cost=_FREE),  # T0
-    _race("scrapling_stealth", "crawl4ai"),  # T1 free JS
-    _race("cloakbrowser", "obscura", "pydoll", "camoufox"),  # T2 free stealth
+    # T1 free JS: lightpanda (~1 s, no stealth) then obscura (Chrome UA/
+    # fingerprint; got Amazon + LinkedIn public pages in the 2026-11-01 check).
+    _seq("lightpanda"),
+    _seq("obscura"),
+    _race("scrapling_stealth", "cloakbrowser"),  # T2 free heavy stealth
     _race(
         "firecrawl",
         "scrapingbee",
@@ -416,6 +421,10 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Amazon
     "amazon_product": (
+        # Free first: both returned the real product page in the 2026-11-01
+        # live check (obscura every run, lightpanda intermittently).
+        _seq("lightpanda"),
+        _seq("obscura"),
         _seq("scrapingdog", cost=_LOW),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
         _seq("firecrawl", cost=_MED),
@@ -482,7 +491,7 @@ LADDERS: dict[SiteClass, Ladder] = {
             "requests",
             budget_accounting="sum_all",
         ),
-        _race("scrapling_stealth", "crawl4ai"),
+        _race("lightpanda", "scrapling_stealth"),
         _seq("firecrawl", cost=_MED),
     ),
     # Telegram — public channels render as server-side HTML at t.me/s/<channel>;
@@ -494,7 +503,7 @@ LADDERS: dict[SiteClass, Ladder] = {
         _seq("telegram"),
         _race("tgstat", "telemetr", "apify_actor", budget_accounting="sum_all"),
         _seq("requests"),
-        _race("scrapling_stealth", "crawl4ai"),
+        _race("lightpanda", "scrapling_stealth"),
     ),
     # VK (vk.com / vk.ru) — structured path is the Apify VK actor; stealth
     # browsers and a paid unlocker behind it for the public web pages.
@@ -545,8 +554,9 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     "ecommerce_other": (
         _seq("requests"),
-        _race("scrapling_stealth", "crawl4ai"),
-        _race("cloakbrowser", "obscura", "pydoll", "camoufox"),
+        _seq("lightpanda"),
+        _seq("obscura"),
+        _race("scrapling_stealth", "cloakbrowser"),
         _race("firecrawl", "scrapingbee", budget_accounting="sum_all"),
     ),
     # Paywall — needs a real browser to get past front-page gate
@@ -583,8 +593,9 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Difficulty class
     "js_spa": (
-        _race("scrapling_stealth", "crawl4ai"),
-        _race("cloakbrowser", "obscura", "pydoll", "camoufox"),
+        _seq("lightpanda"),
+        _seq("obscura"),
+        _race("scrapling_stealth", "cloakbrowser"),
         _seq("firecrawl", cost=_MED),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),

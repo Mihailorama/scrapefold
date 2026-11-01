@@ -64,6 +64,8 @@ outscraper   = ["outscraper>=6.0"]
 apify        = ["apify-client>=3.0"]
 # --- new engines (5) ---
 cloakbrowser = ["cloakbrowser>=0.3"]
+# obscura binary itself is installed separately; the client only needs CDP
+obscura      = ["playwright>=1.40"]
 anysite      = []
 scrapecreators = []
 socialcrawl = []
@@ -78,7 +80,7 @@ trafilatura  = ["trafilatura>=2.0"]
 mcp          = ["mcp>=1.27"]
 # --- meta ---
 all = [
-    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,exa,pixelrag,selenium,scrapling,crawl4ai,pydoll,camoufox,trafilatura,outscraper,apify,cloakbrowser,socialcrawl,mcp]",
+    "scrapefold[firecrawl,scrapingbee,scrapingdog,scraperapi,exa,pixelrag,selenium,scrapling,crawl4ai,pydoll,camoufox,trafilatura,outscraper,apify,cloakbrowser,obscura,socialcrawl,mcp]",
 ]
 test = [
     "pytest>=9.0",

@@ -30,7 +30,7 @@ from dataclasses import dataclass, replace
 
 import tldextract
 
-from scrapefold.detection import is_suspicious
+from scrapefold.detection import is_suspicious, reclassify_from_response
 from scrapefold.engines import get_engine
 from scrapefold.engines.base import EngineError, RedirectScopeViolation, ScrapeEngine
 from scrapefold.ladders import (
@@ -53,7 +53,10 @@ from scrapefold.result import ScrapeResult
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MAX_ENGINES = 4
+# 8 = the free tiers of the general ladder (requests, lightpanda, obscura, two
+# stealth browsers) still leave room for the paid fan-out. At 4 the walk halted
+# before any paid engine once the free extras were installed.
+_DEFAULT_MAX_ENGINES = 8
 _DEFAULT_MAX_COST_USD = 0.05
 _DEFAULT_AVG_RESPONSE_MB = 2.0
 _DEFAULT_PROXY_ROTATIONS = 2
@@ -148,6 +151,8 @@ class _AttemptResult:
     keep_walking: bool
     cost_delta: float = 0.0
     elapsed_delta: float = 0.0
+    blocked: ScrapeResult | None = None
+    """Last empty/suspicious result, kept for response-signature reclassification."""
 
 
 # ---------------------------------------------------------------------------
@@ -410,7 +415,11 @@ async def _attempt_engine(
                 continue
             failures.append(f"{canonical}:{reason}")
             return _AttemptResult(
-                result=None, keep_walking=True, cost_delta=total_cost, elapsed_delta=total_elapsed
+                result=None,
+                keep_walking=True,
+                cost_delta=total_cost,
+                elapsed_delta=total_elapsed,
+                blocked=result,
             )
 
         # 9. Winner
@@ -519,7 +528,7 @@ async def _walk_inner(
             attempt = await _attempt_engine(
                 engine_name=name,
                 url=url,
-                opts=opts,
+                opts=_with_remaining_timeout(opts, elapsed_accum_ms),
                 policy=policy_override,
                 budget_cost_usd=cost_accum,
                 budget_engines_tried=budget_tried,
@@ -554,7 +563,11 @@ async def _walk_inner(
     max_engines = int(opts.extra.get("max_engines", _DEFAULT_MAX_ENGINES))
     max_cost_usd = float(opts.extra.get("max_cost_usd", _DEFAULT_MAX_COST_USD))
 
-    for step in ladder:
+    ladder_steps = list(ladder)
+    step_index = 0
+    while step_index < len(ladder_steps):
+        step = ladder_steps[step_index]
+        step_index += 1
         if isinstance(step, SequentialStep):
             engines_to_try = [step.engine]
         elif isinstance(step, RaceStep):
@@ -582,7 +595,7 @@ async def _walk_inner(
             attempt = await _attempt_engine(
                 engine_name=engine_name,
                 url=url,
-                opts=opts,
+                opts=_with_remaining_timeout(opts, budget.elapsed_ms),
                 policy=policy,
                 budget_cost_usd=budget.cost_usd,
                 budget_engines_tried=budget.engines_tried,
@@ -601,7 +614,55 @@ async def _walk_inner(
             if not attempt.keep_walking:
                 raise AllEnginesFailed(url=url, failures=failures)
 
+            # SCRAPEFOLD-2: a block page that matches an anti-bot vendor
+            # signature moves the walk onto that vendor's ladder. Engines
+            # already tried stay deduped; the loop guard caps the hops.
+            new_class = _reclassify(attempt.blocked, budget)
+            if new_class is not None:
+                failures.append(f"reclassified:{site_class}->{new_class}")
+                logger.info("router: reclassify %s -> %s for %s", site_class, new_class, url)
+                site_class = new_class
+                policy = _resolve_policy(opts, site_class)
+                ladder_steps = list(get_ladder(site_class))
+                step_index = 0
+                break
+
     raise AllEnginesFailed(url=url, failures=failures)
+
+
+def _with_remaining_timeout(opts: ScrapeOptions, elapsed_ms: float) -> ScrapeOptions:
+    """Hand the engine only what is left of the walk's ``timeout_s`` (SCRAPEFOLD-18).
+
+    Without this every engine got the full ``timeout_s`` and a late step could
+    push one ``scrape()`` far past it. Floor of 1 s: the walk-level check has
+    already stopped the walk when nothing is left.
+    """
+    remaining = int(opts.timeout_s - elapsed_ms / 1000)
+    if remaining >= opts.timeout_s:
+        return opts
+    return opts.with_updates(timeout_s=max(1, remaining))
+
+
+def _reclassify(blocked: ScrapeResult | None, budget: WalkBudget) -> SiteClass | None:
+    """Return the vendor SiteClass a blocked response points to, or ``None``.
+
+    Skips classes already visited (A→B→A ping-pong) and stops once
+    ``WalkBudget.MAX_RECLASSIFICATIONS`` hops have been made.
+    """
+    if blocked is None or budget.reclassifications >= WalkBudget.MAX_RECLASSIFICATIONS:
+        return None
+    meta = blocked.meta or {}
+    target = reclassify_from_response(
+        body=blocked.html or blocked.text,
+        headers=meta.get("headers"),
+        cookies=meta.get("cookies"),
+        status_code=blocked.status_code,
+    )
+    if target is None or target in budget.visited_site_classes:
+        return None
+    budget.reclassifications += 1
+    budget.visited_site_classes.add(target)
+    return target
 
 
 __all__ = ["walk"]

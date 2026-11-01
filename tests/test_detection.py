@@ -363,3 +363,50 @@ class TestReclassifyFromResponse:
             reclassify_from_response(body="blocked", status_code=403, signatures=custom)
             == "static_general"
         )
+
+
+class TestChallengeScriptMarkers:
+    """Regression: a DataDome interstitial fetched by obscura (no HTTP status,
+    visible text 'g2.com', marker only inside <script>) was accepted as a page."""
+
+    _DD_HTML = (
+        "<html><head><title>g2.com</title></head><body>"
+        "<script>var dd={'rt':'c','host':'geo.captcha-delivery.com'}</script>"
+        '<script src="https://ct.captcha-delivery.com/c.js"></script></body></html>'
+    )
+
+    def test_datadome_interstitial_with_short_text_is_suspicious(self) -> None:
+        assert is_suspicious(_result(text="g2.com", html=self._DD_HTML)) is True
+
+    def test_real_page_loading_vendor_script_is_not_suspicious(self) -> None:
+        html = '<html><body><p>content</p><script src="https://ct.captcha-delivery.com/c.js"></script></body></html>'
+        assert is_suspicious(_result(text="Real article body. " * 20, html=html)) is False
+
+
+def test_amazon_robot_check_is_suspicious() -> None:
+    """Regression: the Amazon 'continue shopping' interstitial (~350 chars) passed."""
+    text = "Click the button below to continue shopping " + "Conditions of Use Privacy Policy " * 10
+    assert is_suspicious(_result(text=text, html=f"<html><body>{text}</body></html>")) is True
+
+
+class TestShortNonEmptyPages:
+    """SCRAPEFOLD-3: short but non-empty JS shells and block notices passed."""
+
+    def test_js_shell_is_suspicious(self) -> None:
+        data = "<script>var data = " + "[{'text': 'quote', 'author': 'x'}]," * 120 + ";</script>"
+        html = f"<html><body><h1>Quotes to Scrape</h1><a>Login</a>{data}</body></html>"
+        text = "Quotes to Scrape Login " * 10  # ~230 chars, non-empty
+        assert is_suspicious(_result(text=text, html=html)) is True
+
+    def test_small_static_page_is_not_suspicious(self) -> None:
+        text = "Example Domain. This domain is for use in documentation examples. " * 2
+        html = f"<html><body><p>{text}</p><script src='/s.js'></script></body></html>"
+        assert is_suspicious(_result(text=text, html=html)) is False
+
+    def test_jina_captcha_notice_is_suspicious(self) -> None:
+        text = (
+            "Title: g2.com\n\nURL Source: https://www.g2.com/\n\nWarning: This page maybe "
+            "requiring CAPTCHA, please make sure you are authorized to access this page."
+            "\n\nMarkdown Content:"
+        )
+        assert is_suspicious(_result(text=text)) is True

@@ -27,7 +27,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 
 ## Project status
 
-**v0.11.0 — 2026-09-26.** `pip install scrapefold`.
+**v0.12.0 — 2026-11-01.** `pip install scrapefold`.
 
 | PR / Pack | Engines / features | Version |
 |---|---|---|
@@ -55,6 +55,7 @@ Unified Python library for web scraping — single URL or whole-site → markdow
 | Patch ✅ | Long HTTP error responses escalate; JavaScript phrases no longer cause false blocks | 0.9.2 |
 | Release ✅ | Enrichfold-backed search; Linkup, TinyFish, Nimble, Browserbase URL fetch | 0.10.0 |
 | Release ✅ | Treg URL extraction and shared web search; catalog research sources in Enrichfold | 0.11.0 |
+| Release ✅ | Lightpanda, Obscura and Bright Data engines; anti-bot reclassification; JS-shell detection; paid tier reachable again | 0.12.0 |
 
 ## What's next
 
@@ -64,7 +65,7 @@ Tracked in [TECH_DEBT.md](TECH_DEBT.md) and [post-1.0/backlog.md](post-1.0/backl
 - **P2 #11**: residential-proxy engine (`brightdata_unlocker`) for IP-geofenced targets.
 - **P2 #12**: `scrape_sync` / `crawl_site_sync` wrappers robust to leaked event loops (Playwright Sync).
 - **MCP S10**: replace the `scrapefold-mcp` scaffold with working stdio tools/resources.
-- **Engines**: `obscura`, `brightdata` family (see [post-1.0/backlog.md](post-1.0/backlog.md)).
+- **Engines**: `brightdata` family (see [post-1.0/backlog.md](post-1.0/backlog.md)).
 
 ## Cross-links
 

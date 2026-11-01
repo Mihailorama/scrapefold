@@ -6,6 +6,61 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-01
+
+### Added
+
+- `lightpanda` engine: drives the Lightpanda binary (Zig/V8, AGPL, spawned as
+  a separate process, telemetry off). JS-renders friendly pages in about 1 s
+  with no stealth.
+- `obscura` engine: starts `obscura serve` (Rust/V8, Apache-2.0, Chrome UA)
+  and drives it over CDP with Playwright (`pip install scrapefold[obscura]`).
+  It reports the HTTP status, headers and cookies, which the CLI never
+  exposes. The page timeout is capped at 25 s; on timeout the partial DOM is
+  returned. `extra["obscura_stealth"]` turns on TLS impersonation; it is off
+  by default because it got blocked more often in live checks.
+- `brightdata_unlocker_sync` engine (alias `brightdata`): Bright Data Web
+  Unlocker REST API. Needs `BRIGHTDATA_API_KEY`; the zone comes from
+  `BRIGHTDATA_UNLOCKER_ZONE` (default `web_unlocker1`). It keeps the target's
+  status code and headers.
+- `lightpanda` and `obscura` enforce the crawler's
+  `same_host_redirect_scope`.
+
+### Changed
+
+- `static_general`, `ecommerce_other`, `js_spa`: `requests → lightpanda →
+  obscura → (scrapling_stealth | cloakbrowser) → paid`. `amazon_product` now
+  tries `lightpanda` and `obscura` before the paid engines.
+- The default `max_engines` is now 8 (was 4).
+- `reddit` / `telegram` ladders: the free JS step is now
+  `lightpanda | scrapling_stealth`. `crawl4ai` was there before, but it is an
+  optional extra that is often not installed.
+
+### Fixed
+
+- The router never reached the paid tier in `static_general` once the free
+  browser extras were installed: four free engines used up the `max_engines=4`
+  budget first.
+- `obscura` (`ecommerce_other` / `js_spa` and the anti-bot ladders) was listed
+  in ladders but never registered, so the router skipped it every time.
+- `is_suspicious` accepted the DataDome interstitial, whose marker sits only
+  inside `<script>`, and the Amazon "continue shopping" robot check.
+- The router now reclassifies a blocked response by vendor signature
+  (`reclassify_from_response`) and moves the walk onto `datadome_protected`,
+  `perimeterx_protected`, etc. Before, the signatures were never consulted.
+  The `requests` and `lightpanda` engines now expose response headers and
+  cookies for this check, and the DataDome / PerimeterX signatures also match
+  `x-datadome`, `x-px-blocked` and `px-captcha` (SCRAPEFOLD-2).
+- `is_suspicious` accepted short JS-app shells (under 500 chars of text, at
+  least half of the HTML inline script, e.g. quotes.toscrape.com/js) and
+  Jina's "This page maybe requiring CAPTCHA" notice (SCRAPEFOLD-3).
+- `brightdata_unlocker_sync`, the last step of most ladders, was not
+  registered, so the router always skipped it. The ladder test now checks the
+  live engine registry instead of a hand-kept list (SCRAPEFOLD-7).
+- Each engine now gets only the remaining walk budget as its `timeout_s`.
+  Before, every engine got the full `timeout_s`, so a late step could push
+  one `scrape()` far past it (SCRAPEFOLD-18).
+
 ## [0.11.0] - 2026-09-26
 
 ### Added
@@ -799,7 +854,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/mihailorama/scrapefold/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/mihailorama/scrapefold/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/mihailorama/scrapefold/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/mihailorama/scrapefold/compare/v0.9.1...v0.9.2

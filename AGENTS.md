@@ -6,7 +6,7 @@ This file mirrors [CLAUDE.md](CLAUDE.md) — pointers, not content. Read the doc
 
 ## What this project is
 
-`scrapefold` — unified Python library for web scraping with one async API across 34 engines and a built-in anti-bot escalation ladder.
+`scrapefold` — unified Python library for web scraping with one async API across 42 engines and a built-in anti-bot escalation ladder.
 
 ## Start here
 
@@ -28,6 +28,10 @@ pytest -m "not paid and not network"            # default suite
 - Async-everywhere. `httpx` for HTTP, `asyncio` for concurrency. No `requests` package.
 - No vendor LLM SDK imports anywhere in `src/`. LLM is an injected callable.
 - Engines are lazy-imported via `src/scrapefold/engines/__init__.py` registry.
+
+## Task tracking
+
+Plane project **SCRAPEFOLD** (`39ce4ed6-d9a8-4493-a7a2-8066268f3ac1`, tasks.aiagentlbs.com, workspace `sg`) is the source of truth for bugs, tech debt and follow-ups. `docs/TECH_DEBT.md` and `docs/post-1.0/backlog.md` mirror their Plane issue by `SCRAPEFOLD-<n>`.
 
 ## Output
 
