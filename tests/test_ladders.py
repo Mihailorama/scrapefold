@@ -28,47 +28,6 @@ from scrapefold.ladders import (
     step_engines,
 )
 
-# Engine names referenced by ladders. Multi-mode engines are registered as
-# distinct canonical names; user-facing aliases live in ENGINE_ALIASES.
-_VALID_ENGINES = frozenset(
-    {
-        # ported (10)
-        "requests",
-        "firecrawl",
-        "scrapingbee",
-        "scrapingdog",
-        "selenium",
-        "jina",
-        "cloudflare",
-        "crawl4ai",
-        "outscraper",
-        "apify_linkedin",
-        "apify_actor",
-        "telegram",
-        "tgstat",
-        "telemetr",
-        "labelup",
-        # multi-mode distinct names
-        "scrapling_stealth",
-        "scrapling_fast",
-        "brightdata_unlocker_sync",
-        "brightdata_unlocker_async",
-        "brightdata_browser",
-        # new stealth browsers (open-source)
-        "obscura",
-        "cloakbrowser",
-        "pydoll",
-        "camoufox",
-        # new paid SaaS
-        "anysite",
-        "scrapecreators",
-        "socialcrawl",
-        "exa",
-        "enrichlayer",
-    }
-)
-
-
 # ---------------------------------------------------------------------------
 # Structural — every ladder is well-formed
 # ---------------------------------------------------------------------------
@@ -82,9 +41,15 @@ def test_every_site_class_has_a_ladder() -> None:
 
 
 def test_every_engine_in_every_ladder_is_a_known_engine() -> None:
+    """Checks the live registry, not a hand-kept list: `obscura` and
+    `brightdata_unlocker_sync` sat in ladders for months while unregistered,
+    and the router skipped them silently (SCRAPEFOLD-7)."""
+    from scrapefold.engines import list_engine_names
+
+    registered = set(list_engine_names())
     for site_class, ladder in LADDERS.items():
         for step in ladder:
-            unknown = set(step_engines(step)) - _VALID_ENGINES
+            unknown = set(step_engines(step)) - registered
             assert not unknown, f"ladder for {site_class!r} mentions unknown engine(s) {unknown}"
 
 
@@ -484,8 +449,8 @@ def test_derive_budget_accounting_flags_billed_engine() -> None:
 
     assert derive_budget_accounting(("scrapingbee", "scrapling_stealth")) == "sum_all"
     assert derive_budget_accounting(("scrapling_stealth", "cloakbrowser")) == "winner_only"
-    # Declared-but-unshipped engines are skipped, not fatal.
-    assert derive_budget_accounting(("brightdata_unlocker_sync",)) == "winner_only"
+    # brightdata_unlocker_sync shipped 2026-11-01 (SCRAPEFOLD-7) and is billed.
+    assert derive_budget_accounting(("brightdata_unlocker_sync",)) == "sum_all"
     assert derive_budget_accounting(("brightdata_unlocker_sync", "scrapingbee")) == "sum_all"
 
 
@@ -571,3 +536,18 @@ def test_billed_paid_engines_declare_bills_failed_attempts() -> None:
             f"{name}: bills_failed_attempts={caps.bills_failed_attempts} but "
             f"requires_api_key={caps.requires_api_key}, cost={caps.estimated_cost_usd}"
         )
+
+
+@pytest.mark.parametrize("cls", ["static_general", "ecommerce_other", "js_spa"])
+def test_paid_tier_reachable_within_default_engine_budget(cls: str) -> None:
+    """Regression: with max_engines=4 the walk halted on free engines and never
+    reached the paid fan-out. Free engines before the first paid step must leave
+    at least one slot under the router default."""
+    from scrapefold.router import _DEFAULT_MAX_ENGINES
+
+    free_before_paid = 0
+    for step in get_ladder(cls):
+        if "firecrawl" in step_engines(step):
+            break
+        free_before_paid += len(step_engines(step))
+    assert free_before_paid < _DEFAULT_MAX_ENGINES

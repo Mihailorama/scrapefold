@@ -169,6 +169,7 @@ consumer-safe default.
 
 ### 8. Per-instance httpx client in HTTP-tier engines
 
+- **Plane:** SCRAPEFOLD-8 (source of truth; this entry is a mirror).
 - **Where:** `engines/requests.py`, `engines/jina.py`, `engines/scrapingdog.py`, `engines/anysite.py`.
 - **Status:** Each `_fetch` opens a fresh `httpx.AsyncClient`. For a 50-URL crawl that's 50 TLS handshakes + connection-pool teardowns. Flagged by Wave 2 Pack 2A efficiency review; anysite added in Pack 2B.
 - **Fix sketch:** instantiate `self._client: httpx.AsyncClient` once in `__init__`, and add an `async def aclose(self)` method the router (S7) calls at walk shutdown.
@@ -177,6 +178,7 @@ consumer-safe default.
 
 ### 9. SDK client reuse across calls (Firecrawl, Apify, Outscraper)
 
+- **Plane:** SCRAPEFOLD-9 (source of truth; this entry is a mirror).
 - **Where:** `engines/firecrawl.py:_fetch_scrape`, `engines/apify_linkedin.py:_fetch`, `engines/outscraper.py:_fetch`.
 - **Status:** Each `_fetch` rebuilds the vendor SDK client. Firecrawl's `AsyncFirecrawlApp` opens an httpx pool per instance; Apify's `ApifyClientAsync` opens an aiohttp `ClientSession`; Outscraper's `ApiClient` constructs a `requests.Session`. Per-call teardown wastes the pool.
 - **Fix sketch:** cache the SDK instance on `self` after first `_fetch`. Outscraper's `requests.Session` is also a candidate for `aclose()`-style cleanup at walk shutdown.
@@ -190,6 +192,11 @@ consumer-safe default.
 
 ### 11. Dedicated geofenced fallback tier
 
+- **Plane:** SCRAPEFOLD-7 (source of truth; this entry is a mirror).
+- **Progress 2026-11-01:** `brightdata_unlocker_sync` (Web Unlocker, `country`
+  routing) is shipped and wired as the last step of most ladders. Still open: a
+  dedicated geofenced site class / ladder that leads with residential geo
+  routing (`oxylabs` / Bright Data `country`).
 - **Where:** `src/scrapefold/engines/`.
 - **Status:** Some geofenced targets are unreachable from US/EU IPs at the network layer (TCP timeout, not bot detection). No amount of stealth / JS rendering / fingerprint randomisation helps — the connection never completes. `oxylabs` ships residential geo routing (`ScrapeOptions.country` → `geo_location`), but the dedicated Bright Data-family fallback tier is still missing after v0.3.0.
 - **Originally scoped, never shipped:** `brightdata_unlocker` and `brightdata_browser` were listed in the early README's 16-engine table; the placeholder pyproject extras were removed in `0.1.0a2` (CHANGELOG).
@@ -221,6 +228,7 @@ consumer-safe default.
 
 ### 13. Maxun capability ratings in README / site are unverified
 
+- **Plane:** SCRAPEFOLD-10 (source of truth; this entry is a mirror).
 - **Where:** `README.md` (Engine Comparison + Supported Engines tables), `docs/index.html` (engine card).
 - **Status:** The `maxun` engine (v0.4.0) was merged without any README/site
   documentation. When the 0.4.0 release was cut (with the `serper` engine),
@@ -343,6 +351,7 @@ Recorded so the next reviewer doesn't re-litigate:
 
 ### 17. Twingly engine has not been exercised against the live API
 
+- **Plane:** SCRAPEFOLD-11 (source of truth; this entry is a mirror).
 - **Where:** `src/scrapefold/engines/twingly.py` (v0.6.0, PR #16).
 - **Status:** The engine's contract (endpoint, `apiKey`/`q` params, XML
   envelope, error shape) is pinned from Twingly's official-but-archived
@@ -360,6 +369,7 @@ Recorded so the next reviewer doesn't re-litigate:
 
 ### 18. SpyTrend engine — only the free Meta path is live-validated
 
+- **Plane:** SCRAPEFOLD-12 (source of truth; this entry is a mirror).
 - **Where:** `src/scrapefold/engines/spytrend.py` (PR #18, fix PR #19).
 - **Status:** Live-validated end-to-end against the real MCP endpoint with agent
   credentials — token (`audience` + `scope=mcp:read`) then a stateless

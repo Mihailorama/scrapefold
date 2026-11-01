@@ -212,6 +212,9 @@ class RequestsEngine(ScrapeEngine):
                 "status_code": response.status_code,
                 "content_type": content_type,
                 "final_url": response.url,
+                # Consumed by router reclassification (detection SIGNATURES).
+                "headers": dict(response.headers),
+                "cookies": dict(response.cookies),
             },
         )
 

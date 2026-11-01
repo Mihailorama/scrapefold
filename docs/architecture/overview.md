@@ -161,10 +161,13 @@ Race semantics are encoded as data on the step, not as router convention.
 | Step | Engines | Cost | Notes |
 |---|---|---|---|
 | 1 | `requests` (SequentialStep) | $0 | Cheapest first |
-| 2 | `scrapling_stealth`, `crawl4ai` (RaceStep, winner_only) | $0 | Free JS rendering |
-| 3 | `cloakbrowser`, `obscura` (RaceStep) | $0 | Free stealth browsers |
-| 4 | `firecrawl`, `scrapingbee`, `scrapingdog`, `cloudflare`, `jina` (RaceStep, **sum_all**) | $0.50-1.50 / 1k | Paid fan-out; every attempt billed |
-| 5 | `brightdata_unlocker_sync` | $1.50 / 1k | Last-resort unlock |
+| 2 | `lightpanda` (SequentialStep) | $0 | ~1 s JS render, no stealth |
+| 3 | `obscura` (SequentialStep) | $0 | JS render with a Chrome UA and fingerprint |
+| 4 | `scrapling_stealth`, `cloakbrowser` (RaceStep) | $0 | Heavy stealth browsers |
+| 5 | `firecrawl`, `scrapingbee`, `scrapingdog`, `cloudflare`, `jina` (RaceStep, **sum_all**) | $0.50-1.50 / 1k | Paid fan-out; every attempt billed |
+| 6 | `brightdata_unlocker_sync` | $1.50 / 1k | Last-resort unlock |
+
+The five free engines before the paid step fit under the default `max_engines=8`, so the paid fan-out stays reachable. `crawl4ai`, `pydoll`, and `camoufox` remain in the social and anti-bot-vendor ladders.
 
 ### LinkedIn (specialized — never starts with `requests`)
 
@@ -214,7 +217,7 @@ _estimate_step_cost(step, avg_response_mb=2.0) -> float
 
 ### "Suspicious content" detection
 
-`scrapefold/detection.py` (S2) owns the heuristics (text length < `min_text_chars`, anti-bot phrases, `<noscript>`-dominant body, mostly-`<script>` body). The router calls `detection.is_suspicious(result)` and, on `True`, advances to the next step or reclassifies via `SIGNATURES`.
+`scrapefold/detection.py` (S2) owns the heuristics (text length < `min_text_chars`, anti-bot phrases, `<noscript>`-dominant body, mostly-`<script>` body). The router calls `detection.is_suspicious(result)`. On `True` it runs `detection.reclassify_from_response()` over the blocked result's body, `meta["headers"]`, `meta["cookies"]` and status. On a vendor match it switches to that class's ladder; engines already tried stay deduped, and a class already visited is never re-entered. Otherwise it advances to the next step.
 
 ### Proxy rotation — "proxy over proxy"
 
@@ -237,7 +240,7 @@ The walk stops when any of:
 | Step returns a non-suspicious response | — | `opts.extra["accept_first_success"]=False` to keep trying |
 | `walk.elapsed_ms / 1000 >= opts.timeout_s` | 60 s | `opts.timeout_s=N` |
 | `walk.cost_usd + step_cost > max_cost_usd` | 0.05 USD | `opts.extra["max_cost_usd"]=N` |
-| `len(walk.engines_tried) + step_fanout > max_engines` | 4 | `opts.extra["max_engines"]=N` |
+| `len(walk.engines_tried) + step_fanout > max_engines` | 8 | `opts.extra["max_engines"]=N` |
 | `walk.reclassifications >= MAX_RECLASSIFICATIONS` | 3 | (class invariant) |
 | Explicit `opts.engines=[…]` was passed | — | router uses only that list |
 

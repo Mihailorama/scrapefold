@@ -59,6 +59,8 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**scrapling_fast**](https://github.com/D4Vinci/Scrapling) | ✅ | Local | BSD | ★★★ | ☆☆☆ | ★☆☆ | Ultra | Free |
 | [**scrapling_stealth**](https://github.com/D4Vinci/Scrapling) | ✅ | Local | BSD | ★★★ | ★★★ | ★★★ | Medium | Free |
 | [**crawl4ai**](https://github.com/unclecode/crawl4ai) | ✅ | Local | Apache | ★★★ | ★★★ | ★★☆ | Slow | Free |
+| [**Lightpanda**](https://github.com/lightpanda-io/browser) | ✅ | Local | AGPL | ★★★ | ★★☆ | ☆☆☆ | Ultra | Free |
+| [**Obscura**](https://github.com/h4ckf0r0day/obscura) | ✅ | Local | Apache | ★★★ | ★★☆ | ★★☆ | Fast | Free |
 | [**pydoll**](https://github.com/autoscrape-labs/pydoll) | ✅ | Local | MIT | ★★★ | ★★★ | ★★★ | Medium | Free |
 | [**Camoufox**](https://github.com/daijro/camoufox) | ✅ | Local | MIT | ★★★ | ★★★ | ★★★ | Slow | Free |
 | [**PixelRAG**](https://github.com/StarTrail-org/PixelRAG) | ✅ | Local | Apache | ★★☆ | ★★★ | ☆☆☆ | Medium | Free |
@@ -71,6 +73,7 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**TinyFish**](https://www.tinyfish.ai/) | ✅ | SaaS | Free fetch tier | — | — | — | — | Varies |
 | [**Linkup**](https://www.linkup.so/) | ✅ | SaaS | Paid | — | — | — | — | Varies |
 | [**ScrapingBee**](https://www.scrapingbee.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
+| [**Bright Data Web Unlocker**](https://brightdata.com/products/web-unlocker) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Slow | $$$ |
 | [**Scrapingdog**](https://www.scrapingdog.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Cloudflare BR**](https://developers.cloudflare.com/browser-rendering/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Fast | $$ |
 | [**Outscraper**](https://outscraper.com/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
@@ -223,6 +226,8 @@ asyncio.run(main())
 | [**requests**](https://www.python-httpx.org/) | Local | Apache | Static HTML; ultra-fast | (built-in) |
 | [**scrapling**](https://github.com/D4Vinci/Scrapling) | Local | BSD | Static + stealth modes | `pip install scrapefold[scrapling]` |
 | [**crawl4ai**](https://github.com/unclecode/crawl4ai) | Local | Apache | JS rendering, markdown cleanup | `pip install scrapefold[crawl4ai]` |
+| [**Lightpanda**](https://github.com/lightpanda-io/browser) | Local | AGPL-3.0 | Zig/V8 headless browser, ~1 s JS render, ~100 MB RAM; no stealth (announces itself as `Lightpanda/X.Y`) | release binary on PATH or `$LIGHTPANDA_BIN` (spawned as a separate process, not bundled) |
+| [**Obscura**](https://github.com/h4ckf0r0day/obscura) | Local | Apache | Rust/V8 headless browser with a Chrome UA and fingerprint, driven over CDP (status, headers and cookies included); `extra["obscura_stealth"]` turns on TLS impersonation | release binary on PATH or `$OBSCURA_BIN`, plus `pip install scrapefold[obscura]` |
 | [**pydoll**](https://github.com/autoscrape-labs/pydoll) | Local | MIT | Stealth Chromium over CDP — no WebDriver; clears Cloudflare / Turnstile | `pip install scrapefold[pydoll]` |
 | [**Camoufox**](https://github.com/daijro/camoufox) | Local | MIT | Anti-detect Firefox; source-level fingerprint (fingerprint diversity vs. Chromium engines) | `pip install scrapefold[camoufox]` then `python -m camoufox fetch` |
 | [**PixelRAG**](https://github.com/StarTrail-org/PixelRAG) | Local | Apache | Visual screenshot-tile capture via `pixelshot`, with injected VLM/OCR reader output in markdown / JSON | `pip install "scrapefold[pixelrag]"` on Python 3.12+, or set `PIXELRAG_BIN` |
@@ -236,6 +241,7 @@ asyncio.run(main())
 | [**TinyFish**](https://www.tinyfish.ai/) | SaaS | Free fetch tier | Search and URL fetch | `TINYFISH_API_KEY` |
 | [**Linkup**](https://www.linkup.so/) | SaaS | Paid | Search and URL fetch | `LINKUP_API_KEY` |
 | [**ScrapingBee**](https://www.scrapingbee.com/) | SaaS | Paid | Premium proxy + JS rendering | `pip install scrapefold[scrapingbee]` |
+| [**Bright Data Web Unlocker**](https://brightdata.com/products/web-unlocker) | SaaS | Paid | Last-resort unblocking (residential network); `brightdata` alias | `BRIGHTDATA_API_KEY` + `BRIGHTDATA_UNLOCKER_ZONE` |
 | [**Scrapingdog**](https://www.scrapingdog.com/) | SaaS | Paid | Cheaper proxy alternative | `pip install scrapefold[scrapingdog]` |
 | [**Cloudflare BR**](https://developers.cloudflare.com/browser-rendering/) | SaaS | Paid | Cloudflare-native browser API | `pip install scrapefold[cloudflare]` |
 | [**Outscraper**](https://outscraper.com/) | SaaS | Paid | Niche aggregator scrapes | `pip install scrapefold[outscraper]` |
@@ -575,6 +581,8 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `scrapling_fast` | local | — | — | — | — | datacenter | no | ✓ | $0 |
 | `scrapling_stealth` | local | ✓ | ✓ | — | — | datacenter | no | ✓ | $0 |
 | `crawl4ai` | local | ✓ | — | ✓ | ✓ | datacenter | no | ✓ | $0 |
+| `lightpanda` | local | ✓ | — | — | — | datacenter | no | ✓ | $0 |
+| `obscura` | local | ✓ | ✓ | — | — | datacenter | no | ✓ | $0 |
 | `cloakbrowser` | local | ✓ | ✓ | ✓ | — | residential | no | ✓ | $0 |
 | `selenium` | local | ✓ | — | ✓ | — | datacenter | no | ✓ | $0 |
 | `jina` | SaaS | ✓ | — | ✓ | ✓ | none | optional | ✓ | ~$0 |
@@ -582,6 +590,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `scrapingdog` | SaaS | ✓ | — | — | — | datacenter | ✓ | ✓ | $0.50 |
 | `firecrawl` | SaaS | ✓ | ✓ | ✓ | ✓ | datacenter | ✓ | ✓ | $1.00 |
 | `scrapingbee` | SaaS | ✓ | ✓ | ✓ | — | residential | ✓ | ✓ | $1.00 |
+| `brightdata_unlocker_sync` | SaaS | ✓ | ✓ | — | — | residential | ✓ | — | $1.50 |
 | `apify_linkedin` | SaaS · site | ✓ | ✓ | — | — | residential | ✓ | ✓ | $1.50 |
 | `apify_actor` | SaaS · site | ✓ | ✓ | — | — | residential | ✓ | ✓ | $1.50 |
 | `cloudflare` | SaaS | ✓ | — | — | ✓ | none | ✓ | — | $1.80 |

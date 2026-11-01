@@ -84,7 +84,7 @@ from scrapefold.social import (
     normalize_social,
 )
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"
 
 __all__ = [
     "AllEnginesFailed",

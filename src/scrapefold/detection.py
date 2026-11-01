@@ -38,11 +38,34 @@ DEFAULT_ANTIBOT_PHRASES: tuple[str, ...] = (
     "bots use DuckDuckGo too",
     "<title>Captcha</title>",
     "cf-browser-verification",
+    # Amazon robot check (interstitial is ~350 chars, above min_text_chars)
+    "Click the button below to continue shopping",
+    "make sure you're not a robot",
+    # Jina Reader's own notice when the upstream page was a challenge
+    "This page maybe requiring CAPTCHA",
+)
+
+# A JS-app shell: little visible text while scripts dominate the document.
+# Measured 2026-11-01: quotes.toscrape.com/js shell = 262 chars text, scripts
+# 78% of HTML; example.com (172 chars, 5% scripts), HN, python.org, react.dev
+# and vercel.com all stay clean.
+_JS_SHELL_MAX_TEXT = 500
+_JS_SHELL_MIN_SCRIPT_SHARE = 0.5
+
+# Challenge-vendor markers that live INSIDE <script> blocks (so the phrase check,
+# which strips scripts, misses them). Only trusted together with short visible
+# text: real pages also load these vendors' scripts.
+_CHALLENGE_SCRIPT_MARKERS: tuple[str, ...] = (
+    "captcha-delivery.com",  # DataDome interstitial
+    "challenges.cloudflare.com",  # Cloudflare Turnstile / managed challenge
+    "/cdn-cgi/challenge-platform/",  # Cloudflare challenge bootstrap
+    "px-captcha",  # PerimeterX / HUMAN
 )
 
 # Pre-compiled patterns used by the HTML heuristics.
 _RE_NOSCRIPT = re.compile(r"<noscript[^>]*>.*?</noscript>", re.IGNORECASE | re.DOTALL)
 _RE_SCRIPT = re.compile(r"<script[^>]*>.*?</script>", re.IGNORECASE | re.DOTALL)
+_RE_SCRIPT_BODY = re.compile(r"<script[^>]*>(.*?)</script>", re.IGNORECASE | re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +94,13 @@ def is_suspicious(
     5. **Failure status** — ``meta["status_code"]`` is 202 or at least 400,
        regardless of body length. The router escalates rather than returning
        an error response as a successful scrape.
+    6. **Challenge interstitial** — visible text shorter than *min_text_chars*
+       and the raw HTML (scripts included) references a challenge vendor
+       (DataDome ``captcha-delivery.com``, Cloudflare Turnstile, PerimeterX).
+       Catches engines that report no HTTP status (e.g. ``obscura``).
+    7. **JS shell** — visible text under 500 chars while ``<script>`` blocks are
+       at least half of the HTML: the content needs JS rendering, so the walk
+       escalates to a JS engine instead of returning the empty shell.
     """
     text: str = result.text or ""
     html: str | None = result.html
@@ -83,6 +113,13 @@ def is_suspicious(
     if len(text) < min_text_chars and not text.strip():
         logger.debug("is_suspicious: short empty text (%d < %d chars)", len(text), min_text_chars)
         return True
+
+    if html and len(text.strip()) < min_text_chars:
+        raw_lower = html.lower()
+        for marker in _CHALLENGE_SCRIPT_MARKERS:
+            if marker in raw_lower:
+                logger.debug("is_suspicious: challenge marker %r with short text", marker)
+                return True
 
     text_lower = text.lower()
     html_without_scripts = _RE_SCRIPT.sub("", html) if html else ""
@@ -109,6 +146,17 @@ def is_suspicious(
         if html_len > 0:
             script_total = html_len - len(html_without_scripts)
             ratio = (html_len - script_total) / html_len
+            if len(text.strip()) < _JS_SHELL_MAX_TEXT:
+                # Inline script bodies only: an external <script src> tag is no
+                # evidence that the content itself is JS-rendered.
+                inline = sum(len(m.group(1)) for m in _RE_SCRIPT_BODY.finditer(html))
+                if inline >= html_len * _JS_SHELL_MIN_SCRIPT_SHARE:
+                    logger.debug(
+                        "is_suspicious: JS shell (text=%d chars, inline script share=%.2f)",
+                        len(text.strip()),
+                        inline / html_len,
+                    )
+                    return True
             if ratio < 0.1:
                 logger.debug(
                     "is_suspicious: script domination (ratio=%.3f, script=%d, total=%d)",

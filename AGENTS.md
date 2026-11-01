@@ -6,7 +6,7 @@ This file mirrors [CLAUDE.md](CLAUDE.md) — pointers, not content. Read the doc
 
 ## What this project is
 
-`scrapefold` — unified Python library for web scraping with one async API across 34 engines and a built-in anti-bot escalation ladder.
+`scrapefold` — unified Python library for web scraping with one async API across 42 engines and a built-in anti-bot escalation ladder.
 
 ## Start here
 
@@ -28,6 +28,25 @@ pytest -m "not paid and not network"            # default suite
 - Async-everywhere. `httpx` for HTTP, `asyncio` for concurrency. No `requests` package.
 - No vendor LLM SDK imports anywhere in `src/`. LLM is an injected callable.
 - Engines are lazy-imported via `src/scrapefold/engines/__init__.py` registry.
+
+## Task tracking
+
+Plane project **SCRAPEFOLD** (`39ce4ed6-d9a8-4493-a7a2-8066268f3ac1`, tasks.aiagentlbs.com, workspace `sg`) is the source of truth for bugs, tech debt and follow-ups. `docs/TECH_DEBT.md` and `docs/post-1.0/backlog.md` mirror their Plane issue by `SCRAPEFOLD-<n>`.
+
+States (owner decision 2026-11-01):
+
+- **Todo**: accepted and not started. **In Progress**: code is being written.
+- **In Review**: the code is finished and the PR is open or awaiting merge. Nothing is released yet.
+- **Done**: shipped in a published release. Merged-but-unreleased work stays In Review.
+
+Releases are Plane **Modules** named after the version (`v0.12.0`). Plane Releases returns 404 on this instance. When releasing (see CONTRIBUTING.md › Release):
+
+1. Every CHANGELOG entry names its `SCRAPEFOLD-<n>`.
+2. After the `vX.Y.Z` tag is pushed, verify that PyPI serves `X.Y.Z` and that the GitHub Release exists.
+3. Create the `vX.Y.Z` module and add the shipped issues to it.
+4. On each issue, comment with the version and the GitHub Release and PyPI links, then set it to **Done**.
+
+An agent may perform step 4 only after the step-2 check passes. This is the repo exception to the shared rule that only a human sets Done.
 
 ## Output
 
