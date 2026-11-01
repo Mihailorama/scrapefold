@@ -47,7 +47,7 @@ shape.
 
 ### Residential-proxy escalation tier
 
-- **Plane:** SCRAPEFOLD-7
+- **Plane:** SCRAPEFOLD-19
 
 - **Why deferred:** `oxylabs` ships the first residential-geo path, but the
   Bright Data-family fallback tier is still missing after v0.3.0

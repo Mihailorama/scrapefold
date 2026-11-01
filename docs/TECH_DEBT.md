@@ -192,7 +192,7 @@ consumer-safe default.
 
 ### 11. Dedicated geofenced fallback tier
 
-- **Plane:** SCRAPEFOLD-7 (source of truth; this entry is a mirror).
+- **Plane:** SCRAPEFOLD-19 (source of truth; this entry is a mirror). The Bright Data engine itself shipped in 0.12.0 (SCRAPEFOLD-7).
 - **Progress 2026-11-01:** `brightdata_unlocker_sync` (Web Unlocker, `country`
   routing) is shipped and wired as the last step of most ladders. Still open: a
   dedicated geofenced site class / ladder that leads with residential geo
