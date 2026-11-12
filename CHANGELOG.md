@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-12
+
+### Changed
+
+- `crawl_site()` now returns each page's main content: markdown/text blocks
+  repeated on at least half of the crawled pages (nav bar, header, footer,
+  repeated CTAs) are dropped from every page. On by default through the new
+  `ScrapeOptions.strip_boilerplate` (set `False` for full pages). No extra
+  dependency, works with any engine; a page made only of repeated blocks is
+  kept whole. On a 5-page crawl of datatera.ai, line similarity to Firecrawl's
+  `onlyMainContent` crawl rose from 0.65 to 0.83. (SCRAPEFOLD-28)
+
 ## [0.12.0] - 2026-11-01
 
 ### Added
@@ -854,7 +866,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/mihailorama/scrapefold/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/mihailorama/scrapefold/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/mihailorama/scrapefold/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/mihailorama/scrapefold/compare/v0.9.2...v0.10.0

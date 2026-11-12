@@ -841,3 +841,53 @@ async def test_crawl_site_discovers_via_engine_ladder(
     fetched_urls = [p.url for p in result.pages]
     assert "https://example.com/page-a" in fetched_urls
     assert "https://example.com/page-b" in fetched_urls
+
+
+_NAV = "- [Home](https://example.com/)\n- [Blog](https://example.com/blog)"
+_FOOTER = "© 2026 Example Inc."
+
+
+@pytest.fixture
+def stub_scrape_with_chrome(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every page = shared nav + its own body + shared footer."""
+
+    async def _fake_scrape(
+        url: str, opts: ScrapeOptions | None = None, **kw: object
+    ) -> ScrapeResult:
+        body = f"# Page {url}\n\nUnique body of {url}."
+        md = f"{_NAV}\n\n{body}\n\n{_FOOTER}"
+        return ScrapeResult(url=url, text=md, markdown=md, html=None, engine="stub", elapsed_ms=1)
+
+    monkeypatch.setattr("scrapefold.scrape", _fake_scrape)
+
+
+@pytest.mark.parametrize("strip", [True, False])
+async def test_crawl_site_strips_chrome_repeated_across_pages(
+    tmp_path: Path, stub_discover: None, stub_scrape_with_chrome: None, strip: bool
+) -> None:
+    result = await scrapefold.crawl_site(
+        "https://example.com/",
+        opts=ScrapeOptions(max_pages=3, strip_boilerplate=strip),
+        output=tmp_path / "crawl.md",
+    )
+    assert len(result.pages) == 3
+    for page in result.pages:
+        assert f"Unique body of {page.url}." in page.markdown
+        assert f"Unique body of {page.url}." in page.text
+        assert (_FOOTER in page.markdown) is not strip
+        assert (_FOOTER in page.text) is not strip
+    assert ("Blog" in (tmp_path / "crawl.md").read_text()) is not strip
+
+
+def test_strip_repeated_blocks_threshold_and_never_blanks() -> None:
+    from scrapefold.crawler.boilerplate import strip_repeated_blocks
+
+    nav = "Home\nBlog"
+    docs = [f"{nav}\n\nA", "  Home \nBlog\n\n\nB", f"{nav}\n\nC\n\nshared-2", "shared-2\n\nD"]
+    # nav is on 3 of 4 pages (>= half): dropped everywhere, whitespace-insensitive.
+    # "shared-2" is on exactly half (2 of 4): dropped too.
+    assert strip_repeated_blocks(docs) == ["A", "B", "C", "D"]
+    # A page made only of repeated blocks is kept whole, never blanked.
+    assert strip_repeated_blocks([nav, f"{nav}\n\nX"]) == [nav, "X"]
+    # A single page is never touched.
+    assert strip_repeated_blocks([nav]) == [nav]

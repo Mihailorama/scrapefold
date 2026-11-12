@@ -386,6 +386,10 @@ class CrawlResult:
     failures: tuple[str, ...]        # "<url>:<ExceptionType>:<detail>"
 ```
 
+Each page's nav, header and footer are dropped: blocks repeated on at least half
+of the crawled pages are removed (`ScrapeOptions(strip_boilerplate=False)` keeps
+full pages).
+
 ## Anti-bot Detection
 
 Scrapefold ships a content-quality detection module (`scrapefold.detection`) that decides when the router should escalate to a more expensive engine:

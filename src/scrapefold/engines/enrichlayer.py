@@ -140,9 +140,8 @@ def _route_for(url: str) -> tuple[str, dict[str, str]]:
         if "/status/" not in path and _first_segment(path):
             return "/api/v2/profile", {"twitter_profile_url": url}
 
-    elif host == "facebook.com" or host.endswith(".facebook.com"):
-        if _first_segment(path):
-            return "/api/v2/profile", {"facebook_profile_url": url}
+    elif (host == "facebook.com" or host.endswith(".facebook.com")) and _first_segment(path):
+        return "/api/v2/profile", {"facebook_profile_url": url}
 
     raise ValueError(
         f"enrichlayer has no endpoint for URL {url!r}; "

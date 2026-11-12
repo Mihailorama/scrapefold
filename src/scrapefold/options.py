@@ -105,6 +105,16 @@ class ScrapeOptions:
     max_depth: int = 3
     follow_subdomains: bool = False
 
+    strip_boilerplate: bool = True
+    """Crawl only: drop blocks repeated on at least half of the crawled pages.
+
+    Removes the nav bar, header, footer and other site chrome that every page
+    repeats, so each page keeps its main content (see
+    :func:`scrapefold.crawler.boilerplate.strip_repeated_blocks`). Applied to
+    ``markdown`` and ``text`` after all pages are fetched; no extra dependency.
+    Set ``False`` to keep full pages.
+    """
+
     autothrottle: bool = False
     """Adapt the per-host crawl delay to observed latency (Scrapy-style).
 

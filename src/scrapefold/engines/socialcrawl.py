@@ -188,9 +188,8 @@ def _route_for(url: str) -> tuple[str, dict[str, str]]:
         if re.search(r"/(posts|pulse|feed/update)/", path):
             return "/linkedin/post", {"url": url}
 
-    elif "reddit.com" in host:
-        if "/comments/" in path:
-            return "/reddit/post/comments", {"url": url}
+    elif "reddit.com" in host and "/comments/" in path:
+        return "/reddit/post/comments", {"url": url}
 
     raise ValueError(
         f"socialcrawl has no endpoint for URL {url!r}; "
