@@ -6,8 +6,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
-## [0.13.0] - 2026-11-12
-
 ### Changed
 
 - `crawl_site()` now returns each page's main content: markdown/text blocks
@@ -866,8 +864,7 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.13.0...HEAD
-[0.13.0]: https://github.com/mihailorama/scrapefold/compare/v0.12.0...v0.13.0
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.12.0...HEAD
 [0.12.0]: https://github.com/mihailorama/scrapefold/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/mihailorama/scrapefold/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/mihailorama/scrapefold/compare/v0.9.2...v0.10.0
