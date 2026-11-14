@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- `scrapingdog_dedicated` engine: Scrapingdog's LinkedIn profile/company
+  (`/linkedin`), LinkedIn jobs (`/linkedinjobs`), Amazon product
+  (`/amazon/product`) and Twitter (`/twitter`) endpoints, with the request
+  parameters ai-utils sends. The JSON payload stays in `ScrapeResult.json`;
+  `text`/`markdown` are its rendering. It is the first step of the
+  `linkedin_profile`, `linkedin_company`, `linkedin_job`, `amazon_product` and
+  `twitter` ladders; the previous steps follow as fallbacks (SCRAPEFOLD-20,
+  AIDE-164).
+- `scripts/parity_ai_utils.py`: runs the scrapefold engines against a saved
+  ai-utils output and prints a field-by-field comparison (needs vendor keys).
+
+### Changed
+
+- ai-utils option parity (SCRAPEFOLD-26): `jina` also reads `JINAAI_API_KEY`;
+  `scrapling_stealth` sends `network_idle=True`; `crawl4ai` always forwards
+  `wait_ms` as `delay_before_return_html` (5 s by default instead of
+  crawl4ai's 0.1 s) and fails on `success=False`; `firecrawl` sends
+  `only_main_content` from `main_content` (default `False`, where Firecrawl's
+  API default is `true`). Remaining differences are listed in each engine's
+  docstring.
+
 ## [0.12.0] - 2026-11-01
 
 ### Added

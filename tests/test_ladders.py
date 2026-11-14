@@ -84,12 +84,16 @@ def test_linkedin_never_starts_with_requests() -> None:
         )
 
 
+def _first_race(cls: str) -> RaceStep:
+    """First race of a ladder: ai-utils-parity ladders put a single
+    ``scrapingdog_dedicated`` step before it (SCRAPEFOLD-20)."""
+    step = next(s for s in get_ladder(cls) if isinstance(s, RaceStep))
+    return step
+
+
 def test_linkedin_profile_and_company_ladders_include_exa() -> None:
     for cls in ("linkedin_profile", "linkedin_company"):
-        first = get_ladder(cls)
-        step = first[0]
-        assert isinstance(step, RaceStep), f"{cls} first step is not a race"
-        assert "exa" in step_engines(step)
+        assert "exa" in step_engines(_first_race(cls))
 
 
 def test_socialcrawl_ladders_include_paid_social_gateway() -> None:
@@ -104,8 +108,7 @@ def test_socialcrawl_ladders_include_paid_social_gateway() -> None:
         "youtube",
         "reddit",
     ):
-        first = get_ladder(cls)[0]
-        assert isinstance(first, RaceStep), f"{cls} first step is not a race"
+        first = _first_race(cls)
         assert "socialcrawl" in step_engines(first)
         assert first.budget_accounting == "sum_all"
 
@@ -113,7 +116,7 @@ def test_socialcrawl_ladders_include_paid_social_gateway() -> None:
 def test_social_ladders_include_apify_actor() -> None:
     """The universal Apify actor engine races in every public-social ladder."""
     for cls in ("twitter", "instagram", "tiktok", "facebook", "youtube", "reddit"):
-        first = get_ladder(cls)[0]
+        first = _first_race(cls)
         assert "apify_actor" in step_engines(first), (
             f"{cls} first step omits apify_actor: {step_engines(first)}"
         )
@@ -317,8 +320,7 @@ def test_race_step_default_budget_accounting_is_winner_only() -> None:
 def test_paid_linkedin_race_steps_use_sum_all_billing() -> None:
     """LinkedIn race steps fan out 2-3 paid vendors — each call is billed."""
     for cls in ("linkedin_profile", "linkedin_company", "linkedin_job"):
-        first = get_ladder(cls)[0]
-        assert isinstance(first, RaceStep), f"{cls} first step is not a race"
+        first = _first_race(cls)
         assert first.budget_accounting == "sum_all", (
             f"{cls} race must bill all engines, not winner_only"
         )
