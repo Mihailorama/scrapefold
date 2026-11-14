@@ -88,7 +88,7 @@ from scrapefold.social import (
 # Keyed engines pass API keys as query params; keep them out of httpx's request logs.
 _install_log_redaction()
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 __all__ = [
     "AllEnginesFailed",
