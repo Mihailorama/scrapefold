@@ -129,9 +129,8 @@ def _route_for(url: str) -> tuple[str, dict[str, str]]:
         if handle:
             return "/v1/twitter/profile", {"handle": handle}
 
-    elif "reddit.com" in host:
-        if "/comments/" in path:
-            return "/v1/reddit/post", {"url": url}
+    elif "reddit.com" in host and "/comments/" in path:
+        return "/v1/reddit/post", {"url": url}
 
     raise ValueError(
         f"scrapecreators has no endpoint for URL {url!r}; "

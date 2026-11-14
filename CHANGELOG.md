@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Changed
+
+- `crawl_site()` now returns each page's main content: blocks repeated on at
+  least half of the crawled pages (nav bar, header, footer, repeated CTAs) are
+  dropped from the start and end of every page. On by default through the new
+  `ScrapeOptions.strip_boilerplate` (set `False` for full pages). Headings or
+  paragraphs that repeat inside the content stay, code fences are never split,
+  crawls of fewer than 3 pages are left alone, and a page made only of repeated
+  blocks is kept whole. No extra dependency, works with any engine.
+  (SCRAPEFOLD-28)
+
 ## [0.12.0] - 2026-11-01
 
 ### Added
