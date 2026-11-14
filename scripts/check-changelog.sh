@@ -22,6 +22,18 @@ if ! echo "$CHANGED" | grep -q '^src/scrapefold/'; then
     exit 0
 fi
 
+# A release PR moves [Unreleased] under a new "## [X.Y.Z]" heading and bumps
+# __version__ to X.Y.Z: that is its changelog entry.
+version_of() { grep -oE '^__version__ = "[^"]+"' | cut -d'"' -f2; }
+NEW_VERSION=$(version_of < src/scrapefold/__init__.py || true)
+OLD_VERSION=$(git show "${BASE_REF}:src/scrapefold/__init__.py" 2>/dev/null | version_of || true)
+if [ -n "$NEW_VERSION" ] && [ "$NEW_VERSION" != "$OLD_VERSION" ] \
+    && grep -qF "## [${NEW_VERSION}]" CHANGELOG.md \
+    && ! git show "${BASE_REF}:CHANGELOG.md" 2>/dev/null | grep -qF "## [${NEW_VERSION}]"; then
+    echo "check-changelog: OK — release ${NEW_VERSION} adds its CHANGELOG section"
+    exit 0
+fi
+
 # Helper: extract the lines belonging to the ## [Unreleased] section.
 # Starts on the line after "## [Unreleased]", stops before the next "## [" heading.
 extract_unreleased() {
