@@ -885,9 +885,40 @@ def test_strip_repeated_blocks_threshold_and_never_blanks() -> None:
     nav = "Home\nBlog"
     docs = [f"{nav}\n\nA", "  Home \nBlog\n\n\nB", f"{nav}\n\nC\n\nshared-2", "shared-2\n\nD"]
     # nav is on 3 of 4 pages (>= half): dropped everywhere, whitespace-insensitive.
-    # "shared-2" is on exactly half (2 of 4): dropped too.
+    # "shared-2" is on exactly half (2 of 4) at a page edge: dropped too.
     assert strip_repeated_blocks(docs) == ["A", "B", "C", "D"]
     # A page made only of repeated blocks is kept whole, never blanked.
-    assert strip_repeated_blocks([nav, f"{nav}\n\nX"]) == [nav, "X"]
+    assert strip_repeated_blocks([nav, f"{nav}\n\nX", f"{nav}\n\nY"]) == [nav, "X", "Y"]
     # A single page is never touched.
     assert strip_repeated_blocks([nav]) == [nav]
+
+
+def test_strip_repeated_blocks_keeps_repeated_headings_inside_content() -> None:
+    from scrapefold.crawler.boilerplate import strip_repeated_blocks
+
+    docs = [
+        f"Nav\n\n# Fn{i}\n\n## Parameters\n\n- p{i}\n\n## Returns\n\nr{i}\n\nFooter"
+        for i in range(4)
+    ]
+    assert strip_repeated_blocks(docs)[0] == "# Fn0\n\n## Parameters\n\n- p0\n\n## Returns\n\nr0"
+
+
+def test_strip_repeated_blocks_never_splits_code_fences() -> None:
+    from scrapefold.crawler.boilerplate import strip_repeated_blocks
+
+    docs = [f"Nav\n\n# P{i}\n\n```\nx{i}\n\n```\n\nFooter" for i in range(3)]
+    assert strip_repeated_blocks(docs)[0] == "# P0\n\n```\nx0\n\n```"
+
+
+def test_strip_repeated_blocks_leaves_small_crawls_alone() -> None:
+    from scrapefold.crawler.boilerplate import strip_repeated_blocks
+
+    docs = ["A\n\nOur office is open Monday to Friday", "B\n\nOur office is open Monday to Friday"]
+    assert strip_repeated_blocks(docs) == docs
+
+
+def test_strip_repeated_blocks_handles_crlf() -> None:
+    from scrapefold.crawler.boilerplate import strip_repeated_blocks
+
+    docs = [f"Home | Blog\r\n\r\nBody {i}" for i in range(3)]
+    assert strip_repeated_blocks(docs) == ["Body 0", "Body 1", "Body 2"]

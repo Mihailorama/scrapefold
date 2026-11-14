@@ -8,13 +8,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ### Changed
 
-- `crawl_site()` now returns each page's main content: markdown/text blocks
-  repeated on at least half of the crawled pages (nav bar, header, footer,
-  repeated CTAs) are dropped from every page. On by default through the new
-  `ScrapeOptions.strip_boilerplate` (set `False` for full pages). No extra
-  dependency, works with any engine; a page made only of repeated blocks is
-  kept whole. On a 5-page crawl of datatera.ai, line similarity to Firecrawl's
-  `onlyMainContent` crawl rose from 0.65 to 0.83. (SCRAPEFOLD-28)
+- `crawl_site()` now returns each page's main content: blocks repeated on at
+  least half of the crawled pages (nav bar, header, footer, repeated CTAs) are
+  dropped from the start and end of every page. On by default through the new
+  `ScrapeOptions.strip_boilerplate` (set `False` for full pages). Headings or
+  paragraphs that repeat inside the content stay, code fences are never split,
+  crawls of fewer than 3 pages are left alone, and a page made only of repeated
+  blocks is kept whole. No extra dependency, works with any engine.
+  (SCRAPEFOLD-28)
 
 ## [0.12.0] - 2026-11-01
 
