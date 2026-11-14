@@ -18,6 +18,7 @@ import scrapefold.crawler.sitemap as sitemap
 from scrapefold._host_utils import _is_invalid_location_error
 from scrapefold._host_utils import same_host as _same_host
 from scrapefold.cache import Cache, make_key
+from scrapefold.crawler.boilerplate import strip_repeated_blocks
 from scrapefold.crawler.result import CrawlResult
 from scrapefold.crawler.stitcher import write_stitched
 from scrapefold.crawler.throttle import AutoThrottle, host_of
@@ -175,6 +176,17 @@ def _build_throttle(opts: ScrapeOptions) -> AutoThrottle | None:
     )
 
 
+def _strip_boilerplate(results: list[ScrapeResult]) -> list[ScrapeResult]:
+    """Drop site chrome repeated across pages from each page's markdown and text."""
+    from dataclasses import replace as _replace
+
+    markdown = strip_repeated_blocks([r.markdown for r in results])
+    text = strip_repeated_blocks([r.text for r in results])
+    return [
+        _replace(r, markdown=md, text=tx) for r, md, tx in zip(results, markdown, text, strict=True)
+    ]
+
+
 async def crawl(
     root: str,
     opts: ScrapeOptions | None = None,
@@ -313,6 +325,9 @@ async def crawl(
                     await cache.set(cache_key, result, opts=opts)
     finally:
         await pool.aclose()
+
+    if opts.strip_boilerplate and len(results) > 1:
+        results = _strip_boilerplate(results)
 
     if output is None:
         output = _default_output_path()

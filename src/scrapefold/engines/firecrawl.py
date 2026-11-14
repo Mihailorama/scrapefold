@@ -14,7 +14,7 @@ entireWebsite=True)``). ai-utils starts one Firecrawl crawl job; scrapefold's
 ``crawl_site`` discovers URLs itself and calls ``/scrape`` per page. To match
 ai-utils' crawl, pass ``ScrapeOptions(engines=("firecrawl",),
 max_pages=<entireWebsiteLimit>, max_depth=5, main_content=True,
-wait_ms=4000)``:
+wait_ms=4000, strip_boilerplate=False)``:
 
   limit                         -> max_pages (ai-utils: urlsLimitForWholeWebsite)
   maxDepth=5                    -> max_depth=5 (scrapefold default 3)
@@ -25,6 +25,8 @@ wait_ms=4000)``:
                                 -> no equivalent (v0 crawl options)
   output                        -> ai-utils concatenates each page's markdown;
                                    crawl_site writes one stitched file
+  (no cross-page dedup)         -> strip_boilerplate=False (crawl_site drops
+                                   blocks repeated across pages by default)
 
 Single-page ``/scrape`` (not part of the whole-site parity): ai-utils always
 sends ``proxy="stealth"``, ``maxAge=172800000``, ``waitFor=5000``,

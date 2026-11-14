@@ -73,6 +73,7 @@ def engine_and_opts(record: dict[str, Any]) -> tuple[str, ScrapeOptions]:
             max_depth=5,
             main_content=True,
             wait_ms=4000,
+            strip_boilerplate=False,  # ai-utils does no cross-page dedup
         )
     if engine in ("cloudflare", "crawl4ai", "firecrawl"):
         return engine, ScrapeOptions()
