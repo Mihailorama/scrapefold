@@ -340,4 +340,9 @@ async def test_main_content_pins_only_main_content(main_content: bool) -> None:
             _TEST_URL, ScrapeOptions(main_content=main_content)
         )
 
-    assert _scrape_kwargs(app_class)["only_main_content"] is main_content
+    kwargs = _scrape_kwargs(app_class)
+    if main_content:
+        assert kwargs["only_main_content"] is True
+    else:
+        # Leave Firecrawl's own default for existing callers.
+        assert "only_main_content" not in kwargs

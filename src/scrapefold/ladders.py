@@ -213,7 +213,9 @@ URL_PATTERNS: tuple[tuple[re.Pattern[str], SiteClass], ...] = (
     (re.compile(r"linkedin\.com/company/"), "linkedin_company"),
     (re.compile(r"linkedin\.com/(posts|pulse)/"), "linkedin_post"),
     (re.compile(r"linkedin\.com/jobs/"), "linkedin_job"),
-    (re.compile(r"amazon\.[a-z.]+/(dp|gp/product)/"), "amazon_product"),
+    # Product pages may carry a title slug before /dp/ (amazon.com/<title>/dp/<asin>).
+    # Short links (amzn.to) are not resolved and fall through to static_general.
+    (re.compile(r"amazon\.[a-z.]+/(?:.*/)?(dp|gp/product)/"), "amazon_product"),
     (re.compile(r"amazon\.[a-z.]+/s\?"), "amazon_search"),
     (re.compile(r"(twitter|x)\.com/"), "twitter"),
     (re.compile(r"instagram\.com/"), "instagram"),
@@ -255,6 +257,7 @@ GOLDEN_CORPUS: tuple[tuple[str, SiteClass], ...] = (
     ("https://www.linkedin.com/pulse/foo-bar", "linkedin_post"),
     ("https://www.linkedin.com/jobs/view/1234", "linkedin_job"),
     ("https://www.amazon.com/dp/B07XYZ", "amazon_product"),
+    ("https://www.amazon.com/Some-Title/dp/B07XYZ1234", "amazon_product"),
     ("https://www.amazon.co.uk/gp/product/B07XYZ", "amazon_product"),
     ("https://www.amazon.de/s?k=foo", "amazon_search"),
     ("https://twitter.com/elonmusk", "twitter"),

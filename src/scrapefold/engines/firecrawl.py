@@ -29,8 +29,11 @@ wait_ms=4000, strip_boilerplate=False)``:
                                    blocks repeated across pages by default)
 
 Single-page ``/scrape`` (not part of the whole-site parity): ai-utils always
-sends ``proxy="stealth"``, ``maxAge=172800000``, ``waitFor=5000``,
-``timeout=30000`` and ``formats=[markdown, html, rawHtml]``. Here the proxy
+sends ``onlyMainContent=False``, ``proxy="stealth"``, ``maxAge=172800000``,
+``waitFor=5000``, ``timeout=30000`` and ``formats=[markdown, html, rawHtml]``.
+Here ``onlyMainContent`` is left to Firecrawl's default (true) unless
+``main_content=True`` (pass ``firecrawl_only_main_content=False`` for a full
+page), the proxy
 follows ``opts.stealth``, ``wait_for`` is sent only when ``wait_ms`` differs
 from the default, the timeout is ``opts.timeout_s``; pass ``firecrawl_max_age``
 etc. via ``opts.extra`` to reproduce the rest.
@@ -111,10 +114,10 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if headers:
         kwargs["headers"] = headers
 
-    # Pin onlyMainContent to the unified main_content flag instead of leaving
-    # Firecrawl's API default (true): ai-utils sends False on single-page
-    # /scrape and True in its whole-site crawl (SCRAPEFOLD-26).
-    kwargs["only_main_content"] = opts.main_content
+    # main_content=True pins onlyMainContent (ai-utils' whole-site crawl sends
+    # it, SCRAPEFOLD-26). Otherwise Firecrawl's own default applies.
+    if opts.main_content:
+        kwargs["only_main_content"] = True
 
     formats: set[str] = set(kwargs.get("formats", []))
     if not formats:

@@ -74,11 +74,9 @@ def _adapt(opts: ScrapeOptions, url: str) -> dict[str, Any]:
     ai-utils parity (SCRAPEFOLD-26), ``get_content_scrapling(stealth=True)``:
       matched  — StealthyFetcher, headless (default), network_idle=True
       differs  — timeout is ``opts.timeout_s`` (ai-utils: 30 s); the page HTML is
-                 read from ``response.html_content`` (ai-utils reads
-                 ``page.text``, which is empty for a normal HTML page on
-                 scrapling >= 0.4, so its Scrapling path reports "failed");
-                 HTTP >= 400 is returned with ``status_code`` for the router
-                 to judge instead of a hard failure.
+                 read from ``response.html_content``; HTTP >= 400 is returned
+                 with ``status_code`` for the router to judge instead of a
+                 hard failure.
     """
     kwargs: dict[str, Any] = {}
 

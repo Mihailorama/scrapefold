@@ -24,10 +24,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 - ai-utils option parity (SCRAPEFOLD-26): `jina` also reads `JINAAI_API_KEY`;
   `scrapling_stealth` sends `network_idle=True`; `crawl4ai` always forwards
   `wait_ms` as `delay_before_return_html` (5 s by default instead of
-  crawl4ai's 0.1 s) and fails on `success=False`; `firecrawl` sends
-  `only_main_content` from `main_content` (default `False`, where Firecrawl's
-  API default is `true`). Remaining differences are listed in each engine's
-  docstring.
+  crawl4ai's 0.1 s, so each crawl4ai call now takes about 5 s longer; set
+  `wait_ms` lower to shorten it) and fails on `success=False`; `firecrawl`
+  sends `only_main_content=True` when `main_content=True` (otherwise
+  Firecrawl's default applies). Remaining differences are listed in each
+  engine's docstring.
+- `scrapingdog_dedicated` fails on a 200 that is empty or error-shaped, so the
+  ladder falls back, and skips (no call, no cost, no engine slot) URLs it has
+  no endpoint for. LinkedIn ids are percent-decoded.
+- Amazon product URLs with a title slug (`amazon.com/<title>/dp/<asin>`)
+  classify as `amazon_product`. Short links (`amzn.to`) are not resolved.
+
+### Security
+
+- `api_key=`, `key=`, `token=` and similar query values are masked in httpx's
+  request log lines, so keyed engines (`scrapingdog`, `scrapingdog_dedicated`,
+  …) no longer write their API key to INFO logs.
 
 ## [0.13.0] - 2026-11-14
 

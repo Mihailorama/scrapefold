@@ -206,3 +206,62 @@ def test_first_step_of_ai_utils_classes(site_class: str) -> None:
     assert step_engines(ladder[0]) == ("scrapingdog_dedicated",)
     # The previous ladder stays behind it as the fallback.
     assert len(ladder) > 1
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{}, [], {"success": False, "message": "Invalid linkId"}, {"error": "Not found"}],
+)
+async def test_empty_or_error_payload_raises(httpx_mock: HTTPXMock, payload: object) -> None:
+    """A 200 with no data or an error body must fail so the ladder falls back."""
+    httpx_mock.add_response(json=payload)
+
+    with pytest.raises(EngineError):
+        await _engine().scrape("https://www.linkedin.com/in/john-doe/")
+
+
+def test_percent_encoded_linkedin_id_is_decoded() -> None:
+    # httpx encodes query params itself; an encoded id would be sent as %25C3...
+    _, params, _ = _route_for("https://www.linkedin.com/in/j%C3%B6rg-m%C3%BCller/")
+    assert params["linkId"] == "jörg-müller"
+    _, params, _ = _route_for("https://www.linkedin.com/company/caf%C3%A9-acme")
+    assert params["linkId"] == "café-acme"
+
+
+async def test_probe_rejects_unroutable_url() -> None:
+    assert ScrapingdogDedicatedEngine.PROBE_SCOPE == "per_url"
+    assert await _engine().probe("https://www.linkedin.com/in/john-doe/") is True
+    assert await _engine().probe("https://www.linkedin.com/jobs/search/?keywords=x") is False
+
+
+async def test_router_does_not_bill_unroutable_url(
+    httpx_mock: HTTPXMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A route miss is 'not applicable': no request, no cost, no engine slot."""
+    from scrapefold.ladders import AllEnginesFailed
+    from scrapefold.router import _PROBE_CACHE, walk
+
+    _PROBE_CACHE.clear()
+    monkeypatch.setenv("SCRAPINGDOG_API_KEY", _KEY)
+    url = "https://www.linkedin.com/jobs/search/?keywords=x"
+
+    with pytest.raises(AllEnginesFailed) as info:
+        await walk(url, ScrapeOptions(engines=("scrapingdog_dedicated",)))
+
+    assert "scrapingdog_dedicated:probe_failed" in info.value.failures
+    assert httpx_mock.get_requests() == []
+
+
+async def test_api_key_masked_in_httpx_log(
+    httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    httpx_mock.add_response(json=_PROFILE)
+    with caplog.at_level(logging.INFO, logger="httpx"):
+        await _engine().scrape("https://www.linkedin.com/in/john-doe/")
+
+    request_logs = [r.getMessage() for r in caplog.records if r.name == "httpx"]
+    assert request_logs, "httpx request line was not logged"
+    assert all(_KEY not in line for line in request_logs)
+    assert any("api_key=***" in line for line in request_logs)

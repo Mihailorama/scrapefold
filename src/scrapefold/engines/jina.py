@@ -10,7 +10,7 @@ the name ai-utils uses) for higher rate limits.
 ai-utils parity (SCRAPEFOLD-26): ai-utils sends ``GET r.jina.ai/<url>`` with
 only an ``Authorization: Bearer`` header and returns the body as-is; this
 engine's default request is the same. Differences: no ``Authorization`` header
-is sent without a key (ai-utils sends ``Bearer None``), redirects are followed,
+is sent without a key, redirects are followed,
 the timeout is ``opts.timeout_s`` (ai-utils: 30 s), and a non-200 body is
 returned with its ``status_code`` for the router to judge (ai-utils returns
 "Jina failed").
