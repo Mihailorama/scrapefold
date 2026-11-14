@@ -62,13 +62,21 @@ def _load_stealth_fetcher() -> Any:
 def _adapt(opts: ScrapeOptions, url: str) -> dict[str, Any]:
     """Map unified ScrapeOptions to StealthyFetcher.fetch kwargs.
 
-    Supported StealthSession kwargs used:
-      useragent    — from opts.user_agent
-      extra_headers — from opts.custom_headers + Accept-Language
-      cookies       — Playwright cookie list scoped to ``url``
-      timeout       — from opts.timeout_s (converted to ms)
-      wait          — from opts.wait_ms
-      wait_selector — from opts.wait_for_selector
+        Supported StealthSession kwargs used:
+          useragent    — from opts.user_agent
+          extra_headers — from opts.custom_headers + Accept-Language
+          cookies       — Playwright cookie list scoped to ``url``
+          timeout       — from opts.timeout_s (converted to ms)
+          wait          — from opts.wait_ms
+          wait_selector — from opts.wait_for_selector
+          network_idle  — always True (ai-utils parity)
+
+    ai-utils parity (SCRAPEFOLD-26), ``get_content_scrapling(stealth=True)``:
+      matched  — StealthyFetcher, headless (default), network_idle=True
+      differs  — timeout is ``opts.timeout_s`` (ai-utils: 30 s); the page HTML is
+                 read from ``response.html_content``; HTTP >= 400 is returned
+                 with ``status_code`` for the router to judge instead of a
+                 hard failure.
     """
     kwargs: dict[str, Any] = {}
 
@@ -89,6 +97,11 @@ def _adapt(opts: ScrapeOptions, url: str) -> dict[str, Any]:
 
     if opts.wait_for_selector:
         kwargs["wait_selector"] = opts.wait_for_selector
+
+    # ai-utils parity (SCRAPEFOLD-26): ai-utils calls StealthyFetcher.fetch with
+    # headless=True (scrapling's default) and network_idle=True. Override with
+    # extra={"scrapling_network_idle": False}.
+    kwargs["network_idle"] = True
 
     # Always forward the scrapefold timeout so scrapling's internal 30s
     # default cannot win silently — even when timeout_s matches our default.

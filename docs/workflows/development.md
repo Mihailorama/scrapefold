@@ -92,9 +92,9 @@ See [../../CONTRIBUTING.md](../../CONTRIBUTING.md) § "Add an engine". Five-step
 |---|---|
 | `FIRECRAWL_API_KEY` | firecrawl |
 | `SCRAPINGBEE_API_KEY` | scrapingbee |
-| `SCRAPINGDOG_API_KEY` | scrapingdog |
+| `SCRAPINGDOG_API_KEY` | scrapingdog, scrapingdog_dedicated |
 | `SCRAPERAPI_API_KEY` | scraperapi |
-| `JINA_API_KEY` | jina |
+| `JINA_API_KEY` (alias `JINAAI_API_KEY`) | jina |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | cloudflare |
 | `OUTSCRAPER_API_KEY` | outscraper |
 | `APIFY_API_TOKEN` | apify |

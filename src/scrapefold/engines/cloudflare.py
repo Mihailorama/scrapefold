@@ -6,6 +6,16 @@ Two endpoints: /markdown (preferred — clean markdown extraction) and
 Auth via Authorization: Bearer <CLOUDFLARE_API_TOKEN>. Account scope via
 CLOUDFLARE_ACCOUNT_ID. JS rendering via render=True (default; set
 render_js=False for fast static fetch).
+
+ai-utils parity (SCRAPEFOLD-26), ``get_content_cloudflare``:
+  matched  — same endpoints and order (/markdown, then /content), same body
+             ``{url, render, gotoOptions: {waitUntil: "domcontentloaded"}}``,
+             same result parsing (string or ``{"markdown": ...}``).
+  differs  — a 5xx on /markdown raises instead of trying /content (a
+             transient error should not buy a second paid call; the router
+             escalates); both calls share one ``opts.timeout_s`` deadline
+             (ai-utils: 60 s each); /content HTML is converted by
+             ``html_to_both`` (ai-utils: its own ``html_text_extractor_v2``).
 """
 
 from __future__ import annotations

@@ -243,6 +243,7 @@ asyncio.run(main())
 | [**ScrapingBee**](https://www.scrapingbee.com/) | SaaS | Paid | Premium proxy + JS rendering | `pip install scrapefold[scrapingbee]` |
 | [**Bright Data Web Unlocker**](https://brightdata.com/products/web-unlocker) | SaaS | Paid | Last-resort unblocking (residential network); `brightdata` alias | `BRIGHTDATA_API_KEY` + `BRIGHTDATA_UNLOCKER_ZONE` |
 | [**Scrapingdog**](https://www.scrapingdog.com/) | SaaS | Paid | Cheaper proxy alternative | `pip install scrapefold[scrapingdog]` |
+| [**Scrapingdog dedicated**](https://www.scrapingdog.com/) | SaaS | Paid | LinkedIn profile/company/job, Amazon product and Twitter JSON endpoints; first step of those ladders | `SCRAPINGDOG_API_KEY` |
 | [**Cloudflare BR**](https://developers.cloudflare.com/browser-rendering/) | SaaS | Paid | Cloudflare-native browser API | `pip install scrapefold[cloudflare]` |
 | [**Outscraper**](https://outscraper.com/) | SaaS | Paid | Niche aggregator scrapes | `pip install scrapefold[outscraper]` |
 | [**Apify (LinkedIn)**](https://apify.com/) | SaaS | Paid | LinkedIn actor runs | `pip install scrapefold[apify]` |
@@ -610,6 +611,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `outscraper` | SaaS · site | ✓ | ✓ | — | — | datacenter | ✓ | ✓ | $3.00 |
 | `scraperapi` | SaaS | ✓ | — | — | ✓ | datacenter | ✓ | ✓ | $0.49–4.90 |
 | `twingly` | SaaS · search | — | ✓ | — | — | none | ✓ | trial | $5.00 |
+| `scrapingdog_dedicated` | SaaS · site | — | ✓ | — | — | datacenter | ✓ | — | $5.00 |
 | `enrichlayer` | SaaS · site | — | ✓ | — | — | residential | ✓ | trial | $20.00 |
 
 `SaaS · site` = ships site-specialized endpoints (LinkedIn, Google Maps, …). `SaaS · search` = query-driven search index rather than a page fetcher (the target is a search query or a blog URL). `jina`, `keenable`, and `cloakbrowser` set `requires_api_key=False`; keys are optional and raise free-tier rate limits.

@@ -213,7 +213,9 @@ URL_PATTERNS: tuple[tuple[re.Pattern[str], SiteClass], ...] = (
     (re.compile(r"linkedin\.com/company/"), "linkedin_company"),
     (re.compile(r"linkedin\.com/(posts|pulse)/"), "linkedin_post"),
     (re.compile(r"linkedin\.com/jobs/"), "linkedin_job"),
-    (re.compile(r"amazon\.[a-z.]+/(dp|gp/product)/"), "amazon_product"),
+    # Product pages may carry a title slug before /dp/ (amazon.com/<title>/dp/<asin>).
+    # Short links (amzn.to) are not resolved and fall through to static_general.
+    (re.compile(r"amazon\.[a-z.]+/(?:.*/)?(dp|gp/product)/"), "amazon_product"),
     (re.compile(r"amazon\.[a-z.]+/s\?"), "amazon_search"),
     (re.compile(r"(twitter|x)\.com/"), "twitter"),
     (re.compile(r"instagram\.com/"), "instagram"),
@@ -255,6 +257,7 @@ GOLDEN_CORPUS: tuple[tuple[str, SiteClass], ...] = (
     ("https://www.linkedin.com/pulse/foo-bar", "linkedin_post"),
     ("https://www.linkedin.com/jobs/view/1234", "linkedin_job"),
     ("https://www.amazon.com/dp/B07XYZ", "amazon_product"),
+    ("https://www.amazon.com/Some-Title/dp/B07XYZ1234", "amazon_product"),
     ("https://www.amazon.co.uk/gp/product/B07XYZ", "amazon_product"),
     ("https://www.amazon.de/s?k=foo", "amazon_search"),
     ("https://twitter.com/elonmusk", "twitter"),
@@ -346,6 +349,7 @@ _FREE = 0.0
 _LOW = 0.0005  # $0.50 per 1k
 _MED = 0.001  # $1.00 per 1k
 _HIGH = 0.0015  # $1.50 per 1k
+_SD_DEDICATED = 0.005  # Scrapingdog dedicated endpoints (placeholder, see engine)
 
 
 def _seq(engine: str, *, cost: float = 0.0, **kwargs: object) -> SequentialStep:
@@ -378,6 +382,8 @@ _GENERAL_LADDER: Ladder = (
 LADDERS: dict[SiteClass, Ladder] = {
     # LinkedIn — vendor-specialized endpoints first, never plain HTTP.
     "linkedin_profile": (
+        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
+        _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
         _race(
             "enrichlayer",
             "apify_linkedin",
@@ -390,6 +396,8 @@ LADDERS: dict[SiteClass, Ladder] = {
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "linkedin_company": (
+        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
+        _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
         _race(
             "enrichlayer",
             "apify_linkedin",
@@ -406,6 +414,8 @@ LADDERS: dict[SiteClass, Ladder] = {
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "linkedin_job": (
+        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
+        _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
         _race(
             "enrichlayer",
             "apify_linkedin",
@@ -421,7 +431,9 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Amazon
     "amazon_product": (
-        # Free first: both returned the real product page in the 2026-11-01
+        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
+        _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
+        # Free next: both returned the real product page in the 2026-11-01
         # live check (obscura every run, lightpanda intermittently).
         _seq("lightpanda"),
         _seq("obscura"),
@@ -435,6 +447,8 @@ LADDERS: dict[SiteClass, Ladder] = {
     ),
     # Twitter / X
     "twitter": (
+        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
+        _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
         _race(
             "scrapecreators",
             "socialcrawl",

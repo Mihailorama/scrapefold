@@ -301,3 +301,16 @@ async def test_unsupported_options_do_not_break_the_call(httpx_mock: HTTPXMock) 
     # Log behavior is covered by tests/test_engine_base.py.
     result = await _engine().scrape("https://example.com/", ScrapeOptions(stealth=True))
     assert result.engine == "scrapingdog"
+
+
+async def test_api_key_masked_in_httpx_log(
+    httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    httpx_mock.add_response(text=_HTML)
+    with caplog.at_level(logging.INFO, logger="httpx"):
+        await _engine().scrape("https://example.com/")
+
+    lines = [r.getMessage() for r in caplog.records if r.name == "httpx"]
+    assert lines and all(_API_KEY not in line for line in lines)

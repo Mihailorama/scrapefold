@@ -298,8 +298,8 @@ def test_engine_registered() -> None:
 
 
 def test_linkedin_ladders_include_enrichlayer() -> None:
-    from scrapefold.ladders import get_ladder, step_engines
+    from scrapefold.ladders import RaceStep, get_ladder, step_engines
 
     for cls in ("linkedin_profile", "linkedin_company", "linkedin_job"):
-        first = get_ladder(cls)[0]
+        first = next(s for s in get_ladder(cls) if isinstance(s, RaceStep))
         assert "enrichlayer" in step_engines(first), f"{cls} race missing enrichlayer"

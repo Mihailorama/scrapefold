@@ -8,6 +8,35 @@ SDK: firecrawl-py (install with ``pip install scrapefold[firecrawl]``).
 
 The SDK is lazy-imported inside ``_fetch`` so that importing scrapefold does
 NOT require firecrawl-py to be installed.
+
+ai-utils parity (SCRAPEFOLD-26), whole-site (``get_content_firecrawl(
+entireWebsite=True)``). ai-utils starts one Firecrawl crawl job; scrapefold's
+``crawl_site`` discovers URLs itself and calls ``/scrape`` per page. To match
+ai-utils' crawl, pass ``ScrapeOptions(engines=("firecrawl",),
+max_pages=<entireWebsiteLimit>, max_depth=5, main_content=True,
+wait_ms=4000, strip_boilerplate=False)``:
+
+  limit                         -> max_pages (ai-utils: urlsLimitForWholeWebsite)
+  maxDepth=5                    -> max_depth=5 (scrapefold default 3)
+  onlyMainContent=True          -> main_content=True -> only_main_content
+  waitFor=4000                  -> wait_ms=4000
+  allowExternalContentLinks     -> not followed; crawl_site stays on the host
+  replaceAllPathsWithAbsolutePaths, generateImgAltText, returnOnlyUrls
+                                -> no equivalent (v0 crawl options)
+  output                        -> ai-utils concatenates each page's markdown;
+                                   crawl_site writes one stitched file
+  (no cross-page dedup)         -> strip_boilerplate=False (crawl_site drops
+                                   blocks repeated across pages by default)
+
+Single-page ``/scrape`` (not part of the whole-site parity): ai-utils always
+sends ``onlyMainContent=False``, ``proxy="stealth"``, ``maxAge=172800000``,
+``waitFor=5000``, ``timeout=30000`` and ``formats=[markdown, html, rawHtml]``.
+Here ``onlyMainContent`` is left to Firecrawl's default (true) unless
+``main_content=True`` (pass ``firecrawl_only_main_content=False`` for a full
+page), the proxy
+follows ``opts.stealth``, ``wait_for`` is sent only when ``wait_ms`` differs
+from the default, the timeout is ``opts.timeout_s``; pass ``firecrawl_max_age``
+etc. via ``opts.extra`` to reproduce the rest.
 """
 
 from __future__ import annotations
@@ -85,6 +114,11 @@ def _adapt(opts: ScrapeOptions) -> dict[str, Any]:
     if headers:
         kwargs["headers"] = headers
 
+    # main_content=True pins onlyMainContent (ai-utils' whole-site crawl sends
+    # it, SCRAPEFOLD-26). Otherwise Firecrawl's own default applies.
+    if opts.main_content:
+        kwargs["only_main_content"] = True
+
     formats: set[str] = set(kwargs.get("formats", []))
     if not formats:
         if opts.output_format in ("markdown", "auto"):
@@ -151,6 +185,7 @@ class FirecrawlEngine(ScrapeEngine):
             "cookies",
             "output_format",
             "take_screenshot",
+            "main_content",
             "timeout_s",
             "extra",
         }

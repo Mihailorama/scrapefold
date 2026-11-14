@@ -171,10 +171,11 @@ The five free engines before the paid step fit under the default `max_engines=8`
 
 ### LinkedIn (specialized — never starts with `requests`)
 
-LinkedIn ladders skip plain HTTP and lead with a paid race over vendor-specialized endpoints. Example for `linkedin_profile`:
+LinkedIn ladders skip plain HTTP. They start with Scrapingdog's dedicated JSON endpoint (the one ai-utils routes these URLs to, AIDE-164), then a paid race over vendor-specialized endpoints. Example for `linkedin_profile`:
 
 ```python
 (
+    SequentialStep(engine="scrapingdog_dedicated", cost=0.005),
     RaceStep(engines=("enrichlayer", "apify_linkedin", "anysite", "scrapingdog", "exa"),
              budget_accounting="sum_all"),
     SequentialStep(engine="brightdata_unlocker_sync", cost=0.0015),

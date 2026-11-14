@@ -25,6 +25,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, TypeVar
 
+from scrapefold._log_redact import install as _install_log_redaction
 from scrapefold.citations import (
     Citation,
     CitationReport,
@@ -83,6 +84,9 @@ from scrapefold.social import (
     SocialEntity,
     normalize_social,
 )
+
+# Keyed engines pass API keys as query params; keep them out of httpx's request logs.
+_install_log_redaction()
 
 __version__ = "0.13.0"
 
