@@ -4,7 +4,16 @@ Uses the free (or keyed) Jina Reader endpoint at https://r.jina.ai/<url>.
 Returns markdown natively, making it ideal for clean content extraction.
 Server-side JS rendering is included. No proxy, no stealth.
 
-Free tier is rate-limited; supply JINA_API_KEY for higher rate limits.
+Free tier is rate-limited; supply JINA_API_KEY (or its alias JINAAI_API_KEY,
+the name ai-utils uses) for higher rate limits.
+
+ai-utils parity (SCRAPEFOLD-26): ai-utils sends ``GET r.jina.ai/<url>`` with
+only an ``Authorization: Bearer`` header and returns the body as-is; this
+engine's default request is the same. Differences: no ``Authorization`` header
+is sent without a key (ai-utils sends ``Bearer None``), redirects are followed,
+the timeout is ``opts.timeout_s`` (ai-utils: 30 s), and a non-200 body is
+returned with its ``status_code`` for the router to judge (ai-utils returns
+"Jina failed").
 """
 
 from __future__ import annotations
@@ -111,7 +120,7 @@ class JinaEngine(ScrapeEngine):
     )
 
     def __init__(self, api_key: str | None = None) -> None:
-        super().__init__(api_key or os.getenv("JINA_API_KEY"))
+        super().__init__(api_key or os.getenv("JINA_API_KEY") or os.getenv("JINAAI_API_KEY"))
 
     def is_available(self) -> bool:
         # Override: Jina works WITHOUT api_key (free tier)

@@ -454,3 +454,31 @@ async def test_extra_crawl4ai_passthrough() -> None:
 
     assert len(run_cfg_cls._instances) == 1
     assert run_cfg_cls._instances[0].word_count_threshold == 50
+
+
+async def test_default_delay_matches_ai_utils() -> None:
+    """SCRAPEFOLD-26: ai-utils waits 5 s (delay_before_return_html=5.0) for SPAs;
+    the default wait_ms=5000 must reach crawl4ai instead of its 0.1 s default."""
+    run_cfg_cls = _make_run_config_mock()
+    with (
+        patch("scrapefold.engines.crawl4ai.AsyncWebCrawler", _make_crawler_mock()),
+        patch("scrapefold.engines.crawl4ai.CrawlerRunConfig", run_cfg_cls),
+        patch("scrapefold.engines.crawl4ai.BrowserConfig", _make_browser_config_mock()),
+    ):
+        await Crawl4AIEngine().scrape(_TEST_URL, ScrapeOptions())
+
+    cfg = run_cfg_cls._instances[0]
+    assert cfg.delay_before_return_html == pytest.approx(5.0)
+    assert cfg.page_timeout == 60_000
+
+
+async def test_unsuccessful_crawl_raises() -> None:
+    """SCRAPEFOLD-26: ai-utils treats result.success=False as a failure."""
+    crawler = _make_crawler_mock(_make_crawl_result(success=False))
+    with (
+        patch("scrapefold.engines.crawl4ai.AsyncWebCrawler", crawler),
+        patch("scrapefold.engines.crawl4ai.CrawlerRunConfig", _make_run_config_mock()),
+        patch("scrapefold.engines.crawl4ai.BrowserConfig", _make_browser_config_mock()),
+        pytest.raises(EngineError),
+    ):
+        await Crawl4AIEngine().scrape(_TEST_URL)

@@ -283,3 +283,18 @@ def test_unified_proxy_maps_to_scrapling_proxy_kwarg() -> None:
 
 def test_scrapling_proxy_in_supported_options() -> None:
     assert "proxy" in ScraplingStealthEngine.SUPPORTED_OPTIONS
+
+
+@pytest.mark.anyio
+async def test_network_idle_on_by_default_like_ai_utils() -> None:
+    """SCRAPEFOLD-26: ai-utils calls StealthyFetcher.fetch(..., network_idle=True)."""
+    mock_cls = MagicMock()
+    mock_cls.fetch = MagicMock(return_value=_make_response())
+
+    with patch("scrapefold.engines.scrapling_stealth.StealthyFetcher", mock_cls):
+        await _engine().scrape("https://example.com/", ScrapeOptions())
+        assert mock_cls.fetch.call_args[1]["network_idle"] is True
+
+        opts = ScrapeOptions(extra={"scrapling_network_idle": False})
+        await _engine().scrape("https://example.com/", opts)
+        assert mock_cls.fetch.call_args[1]["network_idle"] is False

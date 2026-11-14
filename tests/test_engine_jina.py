@@ -372,3 +372,15 @@ async def test_network_error_raises_engine_error(httpx_mock: HTTPXMock) -> None:
         await _engine().scrape(_TARGET_URL)
 
     assert exc_info.value.engine == "jina"
+
+
+def test_jinaai_api_key_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SCRAPEFOLD-26: ai-utils names the key JINAAI_API_KEY; accept it as an alias."""
+    from scrapefold.engines.jina import JinaEngine
+
+    monkeypatch.delenv("JINA_API_KEY", raising=False)
+    monkeypatch.setenv("JINAAI_API_KEY", "alias-key")
+    assert JinaEngine().api_key == "alias-key"
+
+    monkeypatch.setenv("JINA_API_KEY", "primary-key")
+    assert JinaEngine().api_key == "primary-key"

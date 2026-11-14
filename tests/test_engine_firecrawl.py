@@ -327,3 +327,17 @@ async def test_firecrawl_prefixed_extra_keys_are_passed_through() -> None:
         )
 
     assert _scrape_kwargs(app_class).get("only_main_content") is True
+
+
+@pytest.mark.parametrize("main_content", [False, True])
+async def test_main_content_pins_only_main_content(main_content: bool) -> None:
+    """SCRAPEFOLD-26: ai-utils sends onlyMainContent=False on single pages and
+    True in its whole-site crawl; the unified main_content flag is forwarded
+    instead of leaving Firecrawl's API default (true)."""
+    app_class = _make_app_mock()
+    with patch("scrapefold.engines.firecrawl.AsyncFirecrawlApp", app_class):
+        await FirecrawlEngine(api_key="fc-test").scrape(
+            _TEST_URL, ScrapeOptions(main_content=main_content)
+        )
+
+    assert _scrape_kwargs(app_class)["only_main_content"] is main_content

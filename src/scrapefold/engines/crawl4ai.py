@@ -13,6 +13,14 @@ Architecture note (crawl4ai 0.8.x):
   which is passed to AsyncWebCrawler(config=browser_config).
 - Run-level config (wait, screenshot, timeout) goes into CrawlerRunConfig,
   which is passed to crawler.arun(url, config=run_config).
+
+ai-utils parity (SCRAPEFOLD-26), ``get_content_crawl4ai``:
+  matched  — BrowserConfig(headless=True) (SDK default), page_timeout=60000
+             (opts.timeout_s=60), delay_before_return_html=5.0 (opts.wait_ms),
+             cache_mode=BYPASS (SDK default in 0.9.x), ``success=False`` is a
+             failure.
+  differs  — markdown: ai-utils returns crawl4ai's native markdown; this engine
+             keeps the longer of native and HTML-converted markdown.
 """
 
 from __future__ import annotations
@@ -106,9 +114,10 @@ def _adapt_run_config(opts: ScrapeOptions, run_config_cls: Any) -> Any:
     """
     kwargs: dict[str, Any] = {}
 
-    # wait_ms → delay_before_return_html (seconds, float)
-    if opts.wait_ms != _DEFAULT_OPTS.wait_ms:
-        kwargs["delay_before_return_html"] = opts.wait_ms / 1000.0
+    # wait_ms → delay_before_return_html (seconds, float). Always forwarded:
+    # the default wait_ms=5000 gives the 5 s ai-utils uses for SPAs, where
+    # crawl4ai's own default is 0.1 s.
+    kwargs["delay_before_return_html"] = opts.wait_ms / 1000.0
 
     # wait_for_selector → wait_for (CrawlerRunConfig accepts a CSS selector string)
     if opts.wait_for_selector:
@@ -203,6 +212,12 @@ class Crawl4AIEngine(ScrapeEngine):
         except (TypeError, IndexError):
             # Fallback: the container itself may be the result (mock or older API).
             result = container
+
+        if getattr(result, "success", True) is False:
+            raise ValueError(
+                f"crawl4ai failed (status={getattr(result, 'status_code', None)}): "
+                f"{getattr(result, 'error_message', None)}"
+            )
 
         # --- Text + Markdown ---
         html: str | None = getattr(result, "html", None) or None
