@@ -30,8 +30,7 @@ Differences from ai-utils, on purpose:
   yields an empty or wrong ``linkId``/``asin`` (ai-utils takes the last path
   segment). The job id is the trailing digit run of the path, or the
   ``currentJobId`` query parameter.
-- every endpoint is called over ``https``; ai-utils calls ``/linkedinjobs`` and
-  ``/twitter`` over plain ``http``, which sends the API key unencrypted.
+- every endpoint is called over ``https``.
 - ``x.com`` URLs are routed to ``/twitter`` too (ai-utils matches only
   ``twitter.com/``).
 
