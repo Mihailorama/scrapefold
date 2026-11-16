@@ -6,6 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-16
+
+### Added
+
+- `linkedin_public` engine: keyless LinkedIn profile, company and job reader.
+  It fetches the public page (crawler User-Agent first, then a browser one)
+  and returns its schema.org JSON-LD (`Person` / `Organization` /
+  `JobPosting`, plus up to 10 recent posts) in `ScrapeResult.json`. Free, no
+  account or cookies; raises `EngineError` on an auth wall or throttling so
+  the ladder escalates (SCRAPEFOLD-32).
+
+### Changed
+
+- `linkedin_profile`, `linkedin_company` and `linkedin_job` ladders now start
+  with `linkedin_public`, then `keenable` (its page fetch needs
+  `KEENABLE_API_KEY` for linkedin.com, about $0.004 per call), then the paid
+  vendor steps as before. Live check 2026-11-16 from a datacenter IP: 6 of 6
+  URLs through `linkedin_public`; in a burst of 15 profiles LinkedIn throttled
+  after 3 and `keenable` served the rest that are public (SCRAPEFOLD-32).
+
 ## [0.14.0] - 2026-11-14
 
 ### Added
@@ -904,7 +924,8 @@ Seven Codex round-3 implementation items tracked in `docs/TECH_DEBT.md`:
 - GitHub Actions CI: lint + type-check + offline tests on Python 3.10/3.11/3.12; PyPI publish via trusted publishing on `v*` tag; opt-in `paid` and `network` test jobs via `workflow_dispatch`.
 - Smoke tests + `ScrapeEngine` ABC contract tests.
 
-[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/mihailorama/scrapefold/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/mihailorama/scrapefold/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/mihailorama/scrapefold/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/mihailorama/scrapefold/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/mihailorama/scrapefold/compare/v0.11.0...v0.12.0

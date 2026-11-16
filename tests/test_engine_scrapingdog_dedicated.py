@@ -201,9 +201,12 @@ def test_registered() -> None:
     "site_class",
     ["linkedin_profile", "linkedin_company", "linkedin_job", "amazon_product", "twitter"],
 )
-def test_first_step_of_ai_utils_classes(site_class: str) -> None:
+def test_first_paid_step_of_ai_utils_classes(site_class: str) -> None:
     ladder = get_ladder(site_class)
-    assert step_engines(ladder[0]) == ("scrapingdog_dedicated",)
+    # LinkedIn tries the keyless linkedin_public and keenable first (SCRAPEFOLD-32).
+    free = ("linkedin_public", "keenable") if site_class.startswith("linkedin") else ()
+    assert [step_engines(s)[0] for s in ladder[: len(free)]] == list(free)
+    assert step_engines(ladder[len(free)]) == ("scrapingdog_dedicated",)
     # The previous ladder stays behind it as the fallback.
     assert len(ladder) > 1
 

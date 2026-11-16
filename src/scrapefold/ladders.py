@@ -349,6 +349,7 @@ _FREE = 0.0
 _LOW = 0.0005  # $0.50 per 1k
 _MED = 0.001  # $1.00 per 1k
 _HIGH = 0.0015  # $1.50 per 1k
+_KEENABLE = 0.004  # keyed Keenable fetch
 _SD_DEDICATED = 0.005  # Scrapingdog dedicated endpoints (placeholder, see engine)
 
 
@@ -380,9 +381,13 @@ _GENERAL_LADDER: Ladder = (
 
 
 LADDERS: dict[SiteClass, Ladder] = {
-    # LinkedIn — vendor-specialized endpoints first, never plain HTTP.
+    # LinkedIn — keyless public JSON-LD, then Keenable, then vendor endpoints; never plain HTTP.
     "linkedin_profile": (
-        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
+        # SCRAPEFOLD-32: keyless public JSON-LD first, then Keenable's page fetch
+        # (needs KEENABLE_API_KEY for linkedin.com, ~$0.004/call).
+        _seq("linkedin_public", cost=_FREE),
+        _seq("keenable", cost=_KEENABLE),
+        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint next.
         _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
         _race(
             "enrichlayer",
@@ -396,7 +401,11 @@ LADDERS: dict[SiteClass, Ladder] = {
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "linkedin_company": (
-        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
+        # SCRAPEFOLD-32: keyless public JSON-LD first, then Keenable's page fetch
+        # (needs KEENABLE_API_KEY for linkedin.com, ~$0.004/call).
+        _seq("linkedin_public", cost=_FREE),
+        _seq("keenable", cost=_KEENABLE),
+        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint next.
         _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
         _race(
             "enrichlayer",
@@ -414,7 +423,11 @@ LADDERS: dict[SiteClass, Ladder] = {
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "linkedin_job": (
-        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
+        # SCRAPEFOLD-32: keyless public JSON-LD first, then Keenable's page fetch
+        # (needs KEENABLE_API_KEY for linkedin.com, ~$0.004/call).
+        _seq("linkedin_public", cost=_FREE),
+        _seq("keenable", cost=_KEENABLE),
+        # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint next.
         _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
         _race(
             "enrichlayer",
