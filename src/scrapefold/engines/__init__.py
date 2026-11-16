@@ -57,6 +57,11 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
     "nimble": lambda: (
         __import__("scrapefold.engines.nimble", fromlist=["NimbleEngine"]).NimbleEngine
     ),
+    "linkedin_public": lambda: (
+        __import__(
+            "scrapefold.engines.linkedin_public", fromlist=["LinkedInPublicEngine"]
+        ).LinkedInPublicEngine
+    ),
     "keenable": lambda: (
         __import__("scrapefold.engines.keenable", fromlist=["KeenableEngine"]).KeenableEngine
     ),
