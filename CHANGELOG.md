@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- `lurkapi` engine: LurkAPI, a Scrape Creators-compatible social API at
+  about half the price ($0.59-0.94 per 1,000 calls). Reuses the Scrape
+  Creators routing with `LURKAPI_API_KEY`; TikTok video goes to
+  `/v2/tiktok/video`, Reddit posts to `/v1/reddit/post/comments`, Instagram
+  profiles take `username`. Joins the twitter, instagram, tiktok, youtube and
+  reddit ladders next to `scrapecreators` (SCRAPEFOLD-33).
+- `sociavault` engine (`SOCIAVAULT_API_KEY`, `/v1/scrape/<platform>/...`,
+  about $2 per 1,000 calls) and `socialfetch` engine (`SOCIALFETCH_API_KEY`,
+  resource paths such as `/v1/twitter/profiles/<handle>`, $1.50-2.36 per
+  1,000). A Social Fetch answer whose `lookupStatus` is not `found` raises, so
+  the ladder escalates. Both race as a fallback step before Bright Data in the
+  same five social ladders, because they cost more than the first race
+  (SCRAPEFOLD-33).
+
+### Fixed
+
+- `platform_kind` skips any version segment (`/v2/`, `/v3/`), and
+  `normalize_social` unwraps `{success, credits_*, data}` gateway envelopes
+  (also `credits_used`, `endpoint` and `meta` bookkeeping keys)
+  (SCRAPEFOLD-33).
+
 ## [0.15.0] - 2026-11-16
 
 ### Added

@@ -22,6 +22,7 @@ Design notes:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -478,6 +479,10 @@ _BUILDERS: dict[Kind, Callable[[dict[str, Any], str | None], SocialEntity]] = {
 # ---------------------------------------------------------------------------
 
 # Endpoint resource segment -> entity kind. Consumed by ``platform_kind``.
+_ENVELOPE_META = frozenset(
+    {"success", "credits_remaining", "credits_charged", "credits_used", "endpoint", "meta"}
+)
+
 _RESOURCE_KIND: dict[str, Kind] = {
     "profile": "profile",
     "channel": "profile",
@@ -486,6 +491,12 @@ _RESOURCE_KIND: dict[str, Kind] = {
     "account": "profile",
     "post": "post",
     "posts": "post",
+    "post-info": "post",
+    "video-info": "post",
+    "videos": "post",
+    "tweets": "post",
+    "media": "post",
+    "profiles": "profile",
     "video": "post",
     "tweet": "post",
     "reel": "post",
@@ -546,7 +557,11 @@ def platform_kind(endpoint: str) -> tuple[str | None, Kind | None]:
     ``("instagram", "profile")``. Returns ``(None, None)`` when the path is
     too short to classify.
     """
-    segments = [seg for seg in endpoint.split("/") if seg and seg != "v1"]
+    segments = [
+        seg
+        for seg in endpoint.split("/")
+        if seg and seg != "scrape" and not re.fullmatch(r"v\d+", seg)
+    ]
     if not segments:
         return None, None
     platform = segments[0]
@@ -589,9 +604,11 @@ def normalize_social(
     if not isinstance(payload, dict):
         return None
 
-    # Unwrap a common single-key envelope: {"data": {...}}, {"result": [...]}.
-    if len(payload) == 1:
-        only = next(iter(payload.values()))
+    # Unwrap a common single-key envelope: {"data": {...}}, {"result": [...]},
+    # ignoring gateway bookkeeping keys ({"success", "credits_*", "data"}).
+    body = {k: v for k, v in payload.items() if k not in _ENVELOPE_META}
+    if len(body) == 1:
+        only = next(iter(body.values()))
         if isinstance(only, (dict, list)):
             return normalize_social(only, platform=platform, kind=kind)
 
