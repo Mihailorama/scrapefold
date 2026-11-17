@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 from urllib.parse import urlparse
 
@@ -79,7 +79,17 @@ _VERIFIED = ("isVerified", "is_verified", "verified")
 
 _POST_ID = ("postId", "post_id", "id", "pk", "shortcode", "tweetId", "videoId", "aweme_id")
 _POST_URL = ("postUrl", "post_url", "permalink", "webVideoUrl", "url", "link")
-_POST_TEXT = ("caption", "text", "full_text", "content", "message", "desc", "description", "title")
+_POST_TEXT = (
+    "caption",
+    "text",
+    "full_text",
+    "content",
+    "message",
+    "desc",
+    "selftext",
+    "description",
+    "title",
+)
 _CREATED_AT = (
     "created_at",
     "createdAt",
@@ -97,7 +107,9 @@ _LIKES = (
     "favoriteCount",
     "diggCount",
     "reactionCount",
+    "likeCountInt",
     "likes",
+    "ups",
 )
 _COMMENTS = (
     "commentCount",
@@ -105,6 +117,9 @@ _COMMENTS = (
     "comment_count",
     "replyCount",
     "reply_count",
+    "commentCountInt",
+    "num_comments",
+    "replies",
     "comments",
 )
 _SHARES = (
@@ -114,6 +129,7 @@ _SHARES = (
     "retweetCount",
     "retweet_count",
     "repostCount",
+    "retweets",
     "shares",
 )
 _VIEWS = (
@@ -123,6 +139,7 @@ _VIEWS = (
     "playCount",
     "play_count",
     "videoViewCount",
+    "viewCountInt",
     "views",
 )
 
@@ -612,10 +629,22 @@ def normalize_social(
         if isinstance(only, (dict, list)):
             return normalize_social(only, platform=platform, kind=kind)
 
+    # Gateways nest counters ({"stats"|"counts": {...}}), the account of a profile
+    # ({"user": {...}}) or the post next to its comments ({"post": {...}}). Lift them so the
+    # flat alias tables see them; top-level keys win, ``raw`` stays untouched.
     resolved = kind or _infer_kind(payload)
+    nested = ("stats", "statistics", "counts") + (
+        ("user",) if resolved in (None, "profile") else ("post",) if resolved == "post" else ()
+    )
+    flat = dict(payload)
+    for key in nested:
+        if isinstance(payload.get(key), dict):
+            for k, v in payload[key].items():
+                flat.setdefault(k, v)
+    resolved = resolved or _infer_kind(flat)
     if resolved is None:
         return None
-    return _BUILDERS[resolved](payload, platform)
+    return replace(_BUILDERS[resolved](flat, platform), raw=payload)
 
 
 __all__ = [

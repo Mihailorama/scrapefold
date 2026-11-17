@@ -28,6 +28,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   `normalize_social` unwraps `{success, credits_*, data}` gateway envelopes
   (also `credits_used`, `endpoint` and `meta` bookkeeping keys)
   (SCRAPEFOLD-33).
+- `normalize_social` reads counters nested under `stats`/`counts`, a TikTok
+  profile's `user` object and a Reddit post returned next to its comments, and
+  knows the YouTube `*CountInt`, Reddit `selftext`/`ups`/`num_comments` and X
+  `retweets` fields. TikTok profiles and videos, tweets, YouTube videos and
+  Reddit posts previously came back without handle or counts. Verified live
+  against LurkAPI on 2026-11-17 (SCRAPEFOLD-33).
 
 ## [0.15.0] - 2026-11-16
 

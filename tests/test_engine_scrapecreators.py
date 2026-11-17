@@ -127,7 +127,7 @@ async def test_routing_hits_correct_endpoint(httpx_mock: HTTPXMock) -> None:
 
 
 def test_route_for_unknown_platform_raises() -> None:
-    with pytest.raises(ValueError, match="no endpoint"):
+    with pytest.raises(ValueError, match="no social endpoint"):
         _route_for("https://example.com/blog/post")
 
 

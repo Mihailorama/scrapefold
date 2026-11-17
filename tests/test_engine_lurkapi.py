@@ -71,3 +71,51 @@ def test_missing_key_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_platform_kind_skips_any_version() -> None:
     assert platform_kind("/v2/tiktok/video") == ("tiktok", "post")
     assert platform_kind("/v3/tiktok/profile/videos") == ("tiktok", "profile")
+
+
+def test_tiktok_nested_stats_and_user() -> None:
+    from scrapefold.social import Post, normalize_social
+
+    prof = normalize_social(
+        {"success": True, "user": {"uniqueId": "khaby.lame"}, "stats": {"followerCount": 5}},
+        platform="tiktok",
+        kind="profile",
+    )
+    assert isinstance(prof, Profile)
+    assert (prof.handle, prof.followers) == ("khaby.lame", 5)
+    assert "stats" in prof.raw and "followerCount" not in prof.raw
+
+    post = normalize_social(
+        {"id": "1", "desc": "hi", "author": {"uniqueId": "a"}, "stats": {"playCount": 9}},
+        platform="tiktok",
+        kind="post",
+    )
+    assert isinstance(post, Post)
+    assert (post.text, post.view_count, post.author.handle) == ("hi", 9, "a")
+
+
+def test_nested_counts_and_reddit_post() -> None:
+    from scrapefold.social import Post, normalize_social
+
+    tweet = normalize_social(
+        {"id": "1", "text": "t", "counts": {"likes": 3, "retweets": 2, "views": 7}},
+        platform="twitter",
+        kind="post",
+    )
+    assert isinstance(tweet, Post)
+    assert (tweet.like_count, tweet.share_count, tweet.view_count) == (3, 2, 7)
+
+    yt = normalize_social({"id": "v", "viewCountInt": 9, "likeCountInt": 4}, kind="post")
+    assert isinstance(yt, Post)
+    assert (yt.view_count, yt.like_count) == (9, 4)
+
+    rd = normalize_social(
+        {
+            "post": {"id": "p", "title": "T", "selftext": "body", "ups": 5, "num_comments": 2},
+            "comments": [{"id": "c", "body": "x"}],
+        },
+        platform="reddit",
+        kind="post",
+    )
+    assert isinstance(rd, Post)
+    assert (rd.id, rd.text, rd.like_count, rd.comment_count) == ("p", "body", 5, 2)

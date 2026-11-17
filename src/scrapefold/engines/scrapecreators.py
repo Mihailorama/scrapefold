@@ -134,8 +134,7 @@ def _route_for(url: str) -> tuple[str, dict[str, str]]:
         return "/v1/reddit/post", {"url": url}
 
     raise ValueError(
-        f"scrapecreators has no endpoint for URL {url!r}; "
-        "force one via opts.extra['scrapecreators_endpoint']"
+        f"no social endpoint for URL {url!r}; force one via opts.extra['<engine>_endpoint']"
     )
 
 
