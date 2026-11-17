@@ -463,34 +463,40 @@ LADDERS: dict[SiteClass, Ladder] = {
         # ai-utils parity (AIDE-164): Scrapingdog's dedicated JSON endpoint first.
         _seq("scrapingdog_dedicated", cost=_SD_DEDICATED),
         _race(
+            "lurkapi",
             "scrapecreators",
             "socialcrawl",
             "apify_actor",
             "scrapingdog",
             budget_accounting="sum_all",
         ),
+        _race("sociavault", "socialfetch", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     # Other social
     "instagram": (
         _race(
+            "lurkapi",
             "scrapecreators",
             "socialcrawl",
             "apify_actor",
             "anysite",
             budget_accounting="sum_all",
         ),
+        _race("sociavault", "socialfetch", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "tiktok": (
         # TikTok has no plain-HTTP path — lead with structured social gateways
         # and the Apify TikTok actor, then fall back to a stealth unlocker.
         _race(
+            "lurkapi",
             "scrapecreators",
             "socialcrawl",
             "apify_actor",
             budget_accounting="sum_all",
         ),
+        _race("sociavault", "socialfetch", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "facebook": (
@@ -500,11 +506,13 @@ LADDERS: dict[SiteClass, Ladder] = {
     "youtube": (
         _race(
             "socialcrawl",
+            "lurkapi",
             "scrapecreators",
             "apify_actor",
             "anysite",
             budget_accounting="sum_all",
         ),
+        _race("sociavault", "socialfetch", budget_accounting="sum_all"),
         _seq("brightdata_unlocker_sync", cost=_HIGH),
     ),
     "reddit": (
@@ -512,12 +520,14 @@ LADDERS: dict[SiteClass, Ladder] = {
         # social structured endpoints first.
         # PROBE_SCOPE = per_domain on the requests engine validates viability.
         _race(
+            "lurkapi",
             "scrapecreators",
             "socialcrawl",
             "apify_actor",
             "requests",
             budget_accounting="sum_all",
         ),
+        _race("sociavault", "socialfetch", budget_accounting="sum_all"),
         _race("lightpanda", "scrapling_stealth"),
         _seq("firecrawl", cost=_MED),
     ),

@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 44 URL engines — with automatic anti-bot escalation and LLM-ready output. Search delegates to Enrichfold.
+  One async Python interface over 47 URL engines — with automatic anti-bot escalation and LLM-ready output. Search delegates to Enrichfold.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <strong>44 URL engines</strong> · <strong>5 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai · AWS WAF) · <strong>MIT</strong>
+  <strong>47 URL engines</strong> · <strong>5 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai · AWS WAF) · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -81,6 +81,9 @@ Need a stealth browser, a paid vendor, or a whole-site crawl? Same call — Scra
 | [**Apify Actor**](https://apify.com/) | ✅ | SaaS | Paid | ★★☆ | ★★★ | ★★★ | Medium | $$$ |
 | [**Anysite**](https://anysite.dev/) | ✅ | SaaS | Paid | ★★★ | ★★★ | ★★★ | Medium | $$ |
 | [**Scrape Creators**](https://scrapecreators.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
+| [**LurkAPI**](https://lurkapi.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $ |
+| [**SociaVault**](https://sociavault.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
+| [**Social Fetch**](https://www.socialfetch.dev/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
 | [**SocialCrawl**](https://www.socialcrawl.dev/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$ |
 | [**EnrichLayer**](https://enrichlayer.com/) | ✅ | SaaS | Paid | — | — | ★★★ | Fast | $$$ |
 | [**SpyTrend**](https://spytrend.com/) | ✅ | SaaS | Free tier | — | — | ★★★ | Fast | $ |
@@ -250,6 +253,9 @@ asyncio.run(main())
 | [**Apify Actor**](https://apify.com/) | SaaS | Paid | Universal public-social actor adapter | `pip install scrapefold[apify]` |
 | [**Anysite**](https://anysite.dev/) | SaaS | Paid | General-purpose vendor | `pip install scrapefold[anysite]` |
 | [**Scrape Creators**](https://scrapecreators.com/) | SaaS | Paid | Social-media JSON API (TikTok, IG, YouTube, X, Reddit) | (built-in — pure httpx) |
+| [**LurkAPI**](https://lurkapi.com/) | SaaS | Paid | Scrape Creators-compatible social JSON API, about half the price | (built-in — pure httpx) |
+| [**SociaVault**](https://sociavault.com/) | SaaS | Paid | Social-media JSON API, Scrape Creators-like resources | (built-in — pure httpx) |
+| [**Social Fetch**](https://www.socialfetch.dev/) | SaaS | Paid | Normalized social-media JSON API | (built-in — pure httpx) |
 | [**SocialCrawl**](https://www.socialcrawl.dev/) | SaaS | Paid | Social-data JSON gateway (TikTok, IG, YouTube, Facebook, X, LinkedIn, Reddit, plus endpoint overrides) | (built-in — pure httpx) |
 | [**EnrichLayer**](https://enrichlayer.com/) | SaaS | Paid | LinkedIn person/company/school/job enrichment JSON, Proxycurl-compatible (person also via X/Facebook URL, plus endpoint overrides) | (built-in — pure httpx) |
 | [**SpyTrend**](https://spytrend.com/) | SaaS | Free tier | Facebook/TikTok ad-intelligence via MCP — ads, advertisers, webmaster networks, creatives | (built-in — pure httpx) |
@@ -600,6 +606,9 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 | `apify_actor` | SaaS · site | ✓ | ✓ | — | — | residential | ✓ | ✓ | $1.50 |
 | `cloudflare` | SaaS | ✓ | — | — | ✓ | none | ✓ | — | $1.80 |
 | `anysite` | SaaS | ✓ | ✓ | — | ✓ | residential | ✓ | ✓ | $2.00 |
+| `lurkapi` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $0.94 |
+| `sociavault` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
+| `socialfetch` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.40 |
 | `scrapecreators` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
 | `socialcrawl` | SaaS · site | — | ✓ | — | — | residential | ✓ | ✓ | $2.00 |
 | `spytrend` | SaaS · ads | — | ✓ | — | — | none | ✓ | ✓ | $0 |

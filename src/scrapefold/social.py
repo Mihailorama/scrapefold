@@ -22,8 +22,9 @@ Design notes:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 from urllib.parse import urlparse
 
@@ -78,7 +79,17 @@ _VERIFIED = ("isVerified", "is_verified", "verified")
 
 _POST_ID = ("postId", "post_id", "id", "pk", "shortcode", "tweetId", "videoId", "aweme_id")
 _POST_URL = ("postUrl", "post_url", "permalink", "webVideoUrl", "url", "link")
-_POST_TEXT = ("caption", "text", "full_text", "content", "message", "desc", "description", "title")
+_POST_TEXT = (
+    "caption",
+    "text",
+    "full_text",
+    "content",
+    "message",
+    "desc",
+    "selftext",
+    "description",
+    "title",
+)
 _CREATED_AT = (
     "created_at",
     "createdAt",
@@ -96,7 +107,9 @@ _LIKES = (
     "favoriteCount",
     "diggCount",
     "reactionCount",
+    "likeCountInt",
     "likes",
+    "ups",
 )
 _COMMENTS = (
     "commentCount",
@@ -104,6 +117,9 @@ _COMMENTS = (
     "comment_count",
     "replyCount",
     "reply_count",
+    "commentCountInt",
+    "num_comments",
+    "replies",
     "comments",
 )
 _SHARES = (
@@ -113,6 +129,7 @@ _SHARES = (
     "retweetCount",
     "retweet_count",
     "repostCount",
+    "retweets",
     "shares",
 )
 _VIEWS = (
@@ -122,6 +139,7 @@ _VIEWS = (
     "playCount",
     "play_count",
     "videoViewCount",
+    "viewCountInt",
     "views",
 )
 
@@ -478,6 +496,10 @@ _BUILDERS: dict[Kind, Callable[[dict[str, Any], str | None], SocialEntity]] = {
 # ---------------------------------------------------------------------------
 
 # Endpoint resource segment -> entity kind. Consumed by ``platform_kind``.
+_ENVELOPE_META = frozenset(
+    {"success", "credits_remaining", "credits_charged", "credits_used", "endpoint", "meta"}
+)
+
 _RESOURCE_KIND: dict[str, Kind] = {
     "profile": "profile",
     "channel": "profile",
@@ -486,6 +508,12 @@ _RESOURCE_KIND: dict[str, Kind] = {
     "account": "profile",
     "post": "post",
     "posts": "post",
+    "post-info": "post",
+    "video-info": "post",
+    "videos": "post",
+    "tweets": "post",
+    "media": "post",
+    "profiles": "profile",
     "video": "post",
     "tweet": "post",
     "reel": "post",
@@ -546,7 +574,11 @@ def platform_kind(endpoint: str) -> tuple[str | None, Kind | None]:
     ``("instagram", "profile")``. Returns ``(None, None)`` when the path is
     too short to classify.
     """
-    segments = [seg for seg in endpoint.split("/") if seg and seg != "v1"]
+    segments = [
+        seg
+        for seg in endpoint.split("/")
+        if seg and seg != "scrape" and not re.fullmatch(r"v\d+", seg)
+    ]
     if not segments:
         return None, None
     platform = segments[0]
@@ -589,16 +621,30 @@ def normalize_social(
     if not isinstance(payload, dict):
         return None
 
-    # Unwrap a common single-key envelope: {"data": {...}}, {"result": [...]}.
-    if len(payload) == 1:
-        only = next(iter(payload.values()))
+    # Unwrap a common single-key envelope: {"data": {...}}, {"result": [...]},
+    # ignoring gateway bookkeeping keys ({"success", "credits_*", "data"}).
+    body = {k: v for k, v in payload.items() if k not in _ENVELOPE_META}
+    if len(body) == 1:
+        only = next(iter(body.values()))
         if isinstance(only, (dict, list)):
             return normalize_social(only, platform=platform, kind=kind)
 
+    # Gateways nest counters ({"stats"|"counts": {...}}), the account of a profile
+    # ({"user": {...}}) or the post next to its comments ({"post": {...}}). Lift them so the
+    # flat alias tables see them; top-level keys win, ``raw`` stays untouched.
     resolved = kind or _infer_kind(payload)
+    nested = ("stats", "statistics", "counts") + (
+        ("user",) if resolved in (None, "profile") else ("post",) if resolved == "post" else ()
+    )
+    flat = dict(payload)
+    for key in nested:
+        if isinstance(payload.get(key), dict):
+            for k, v in payload[key].items():
+                flat.setdefault(k, v)
+    resolved = resolved or _infer_kind(flat)
     if resolved is None:
         return None
-    return _BUILDERS[resolved](payload, platform)
+    return replace(_BUILDERS[resolved](flat, platform), raw=payload)
 
 
 __all__ = [

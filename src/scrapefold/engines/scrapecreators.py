@@ -55,6 +55,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from collections.abc import Callable
 from urllib.parse import urlparse
 
 import httpx
@@ -133,18 +134,23 @@ def _route_for(url: str) -> tuple[str, dict[str, str]]:
         return "/v1/reddit/post", {"url": url}
 
     raise ValueError(
-        f"scrapecreators has no endpoint for URL {url!r}; "
-        "force one via opts.extra['scrapecreators_endpoint']"
+        f"no social endpoint for URL {url!r}; force one via opts.extra['<engine>_endpoint']"
     )
 
 
-def _adapt(opts: ScrapeOptions, url: str) -> tuple[str, dict[str, str]]:
+def _adapt(
+    opts: ScrapeOptions,
+    url: str,
+    *,
+    prefix: str = "scrapecreators_",
+    route: Callable[[str], tuple[str, dict[str, str]]] = _route_for,
+) -> tuple[str, dict[str, str]]:
     """Resolve ``(endpoint, params)`` for ``url``, applying ``scrapecreators_*`` extras.
 
     ``scrapecreators_endpoint`` forces the endpoint path; every other
     ``scrapecreators_*`` extra becomes a query parameter (prefix stripped).
     """
-    extra = strip_extra_prefix(opts.extra, "scrapecreators_")
+    extra = strip_extra_prefix(opts.extra, prefix)
     forced_endpoint = extra.pop("endpoint", None)
 
     if forced_endpoint is not None:
@@ -153,7 +159,7 @@ def _adapt(opts: ScrapeOptions, url: str) -> tuple[str, dict[str, str]]:
             params["url"] = url
         return str(forced_endpoint), params
 
-    endpoint, params = _route_for(url)
+    endpoint, params = route(url)
     params.update({str(k): str(v) for k, v in extra.items()})
     return endpoint, params
 
@@ -184,19 +190,27 @@ class ScrapeCreatorsEngine(ScrapeEngine):
         bills_failed_attempts=True,
     )
     SUPPORTED_OPTIONS = frozenset({"output_format", "timeout_s", "extra"})
+    # Overridden by API-compatible vendors (see engines/lurkapi.py).
+    BASE_URL = _BASE_URL
+    API_KEY_ENV = "SCRAPECREATORS_API_KEY"
 
     def __init__(self, api_key: str | None = None) -> None:
-        super().__init__(api_key or os.getenv("SCRAPECREATORS_API_KEY"))
+        super().__init__(api_key or os.getenv(self.API_KEY_ENV))
+
+    def _route(self, url: str) -> tuple[str, dict[str, str]]:
+        return _route_for(url)
 
     async def _fetch(self, url: str, opts: ScrapeOptions) -> ScrapeResult:
         """Fetch *url* via the Scrape Creators API and return a ``ScrapeResult``."""
-        endpoint, params = _adapt(opts, url)
+        endpoint, params = _adapt(opts, url, prefix=f"{self.NAME}_", route=self._route)
         headers = {"x-api-key": self.api_key or ""}
 
-        logger.debug("scrapecreators endpoint=%s params=%s", endpoint, params)
+        logger.debug("%s endpoint=%s params=%s", self.NAME, endpoint, params)
 
         async with httpx.AsyncClient(timeout=float(opts.timeout_s)) as client:
-            response = await client.get(f"{_BASE_URL}{endpoint}", params=params, headers=headers)
+            response = await client.get(
+                f"{self.BASE_URL}{endpoint}", params=params, headers=headers
+            )
 
         # Surface upstream failures (401 bad key, 402 out of credits, 5xx) so the
         # router can distinguish "no data" from "API error" and escalate.
@@ -219,7 +233,7 @@ class ScrapeCreatorsEngine(ScrapeEngine):
             social=normalize_social(payload, platform=platform, kind=kind),
             meta={
                 "status_code": response.status_code,
-                "scrapecreators_endpoint": endpoint,
+                f"{self.NAME}_endpoint": endpoint,
             },
         )
 

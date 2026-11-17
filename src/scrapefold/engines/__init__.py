@@ -91,6 +91,17 @@ _REGISTRY: dict[str, Callable[[], type[ScrapeEngine]]] = {
             "scrapefold.engines.scrapecreators", fromlist=["ScrapeCreatorsEngine"]
         ).ScrapeCreatorsEngine
     ),
+    "lurkapi": lambda: (
+        __import__("scrapefold.engines.lurkapi", fromlist=["LurkAPIEngine"]).LurkAPIEngine
+    ),
+    "sociavault": lambda: (
+        __import__("scrapefold.engines.sociavault", fromlist=["SociaVaultEngine"]).SociaVaultEngine
+    ),
+    "socialfetch": lambda: (
+        __import__(
+            "scrapefold.engines.socialfetch", fromlist=["SocialFetchEngine"]
+        ).SocialFetchEngine
+    ),
     "socialcrawl": lambda: (
         __import__(
             "scrapefold.engines.socialcrawl", fromlist=["SocialCrawlEngine"]

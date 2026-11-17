@@ -6,13 +6,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Added
+
+- `lurkapi` engine: LurkAPI, a Scrape Creators-compatible social API at
+  about half the price ($0.59-0.94 per 1,000 calls). Reuses the Scrape
+  Creators routing with `LURKAPI_API_KEY`; TikTok video goes to
+  `/v2/tiktok/video`, Reddit posts to `/v1/reddit/post/comments`, Instagram
+  profiles take `username`. Joins the twitter, instagram, tiktok, youtube and
+  reddit ladders next to `scrapecreators` (SCRAPEFOLD-33).
+- `sociavault` engine (`SOCIAVAULT_API_KEY`, `/v1/scrape/<platform>/...`,
+  about $2 per 1,000 calls) and `socialfetch` engine (`SOCIALFETCH_API_KEY`,
+  resource paths such as `/v1/twitter/profiles/<handle>`, $1.50-2.36 per
+  1,000). A Social Fetch answer whose `lookupStatus` is not `found` raises, so
+  the ladder escalates. Both race as a fallback step before Bright Data in the
+  same five social ladders, because they cost more than the first race
+  (SCRAPEFOLD-33).
+
 ### Fixed
 
+- `platform_kind` skips any version segment (`/v2/`, `/v3/`), and
+  `normalize_social` unwraps `{success, credits_*, data}` gateway envelopes
+  (also `credits_used`, `endpoint` and `meta` bookkeeping keys)
+  (SCRAPEFOLD-33).
+- `normalize_social` reads counters nested under `stats`/`counts`, a TikTok
+  profile's `user` object and a Reddit post returned next to its comments, and
+  knows the YouTube `*CountInt`, Reddit `selftext`/`ups`/`num_comments` and X
+  `retweets` fields. TikTok profiles and videos, tweets, YouTube videos and
+  Reddit posts previously came back without handle or counts. Verified live
+  against LurkAPI on 2026-11-17 (SCRAPEFOLD-33).
 - README, scrapefold.com and `llms.txt` stated 39, 42 or 43 URL engines; the
   registry has 44. All counts now say 44, the landing engine grid lists all 44,
   the landing version reads v0.15.0 and the search count reads Enrichfold's 18.
   A smoke test fails when a stated count drifts from `list_engine_names()`
   (SCRAPEFOLD-34).
+- With `lurkapi`, `sociavault` and `socialfetch` the registry has 47 URL
+  engines; README, the landing (grid included), `llms.txt` and the social card
+  say 47 (SCRAPEFOLD-33).
 
 ## [0.15.0] - 2026-11-16
 
