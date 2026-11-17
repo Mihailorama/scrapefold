@@ -10,7 +10,7 @@ related:
 
 # scrapefold docs
 
-Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, visual screenshot capture, and LLM-ready output. Wraps 39 URL engines across vendor APIs, local stealth browsers, visual capture tools, search indexes, and a baseline `requests` engine behind one async interface. Query search delegates to Enrichfold.
+Unified Python library for web scraping — single URL or whole-site → markdown, with stealth, JS rendering, visual screenshot capture, and LLM-ready output. Wraps 47 URL engines across vendor APIs, local stealth browsers, visual capture tools, search indexes, and a baseline `requests` engine behind one async interface. Query search delegates to Enrichfold.
 
 ## Where to look
 

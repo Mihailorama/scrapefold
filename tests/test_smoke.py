@@ -154,3 +154,20 @@ def test_dist_metadata_version_matches_dunder_version() -> None:
     assert scrapefold.__version__ == version("scrapefold"), (
         f"drift: __init__.py={scrapefold.__version__!r} metadata={version('scrapefold')!r}"
     )
+
+
+def test_published_engine_counts_match_registry() -> None:
+    """Every "N URL engines" on the site, README and llms.txt matches the registry
+    (SCRAPEFOLD-34: the landing once said 39 and 42 at the same time)."""
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    expected = len(list_engine_names())
+    for rel in ("README.md", "docs/README.md", "docs/index.html", "docs/llms.txt"):
+        counts = {int(n) for n in re.findall(r"(\d+) URL engines", (root / rel).read_text())}
+        assert counts == {expected}, f"{rel}: {counts} != registry {expected}"
+    page = (root / "docs/index.html").read_text()
+    grid = page[page.index('id="engines"') : page.index("</section>", page.index('id="engines"'))]
+    assert grid.count('class="engine"') == expected, "landing engine grid out of sync"
+    assert f"<strong>v{scrapefold.__version__}</strong>" in page, "landing version is stale"

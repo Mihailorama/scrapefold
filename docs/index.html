@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scrapefold — turn any URL into clean markdown</title>
-<meta name="description" content="One async Python interface over 39 URL engines, with automatic anti-bot escalation and LLM-ready markdown output. Search delegates to Enrichfold. Open source, MIT.">
+<meta name="description" content="One async Python interface over 47 URL engines, with automatic anti-bot escalation and LLM-ready markdown output. Search delegates to Enrichfold. Open source, MIT.">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="canonical" href="https://scrapefold.com/">
 
 <!-- Open Graph / Twitter -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Scrapefold — turn any URL into clean markdown">
-<meta property="og:description" content="39 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
+<meta property="og:description" content="47 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
 <meta property="og:url" content="https://scrapefold.com/">
 <meta property="og:image" content="https://scrapefold.com/assets/social-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Scrapefold — turn any URL into clean markdown">
-<meta name="twitter:description" content="39 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
+<meta name="twitter:description" content="47 URL engines plus Enrichfold-backed search, with automatic anti-bot escalation and LLM-ready output.">
 <meta name="twitter:image" content="https://scrapefold.com/assets/social-card.png">
 
 <style>
@@ -213,7 +213,7 @@
 <header class="hero" id="top">
   <img class="logo" src="assets/logo-dark.svg" alt="Scrapefold">
   <h1>Turn any URL into clean markdown.</h1>
-  <p class="tag">One async Python interface over <strong>39 URL engines</strong> — with automatic anti-bot escalation and LLM-ready output. Search powered by Enrichfold. Open source, MIT.</p>
+  <p class="tag">One async Python interface over <strong>47 URL engines</strong> — with automatic anti-bot escalation and LLM-ready output. Search powered by Enrichfold. Open source, MIT.</p>
 
   <div class="agent-cta">
     <button class="btn btn-primary btn-lg" id="agentPrompt" title="Click to copy"
@@ -229,7 +229,7 @@
     </button>
   </div>
 
-  <p class="stats"><strong>v0.12.0</strong> · <strong>42 URL engines</strong> · <strong>12 search engines via Enrichfold</strong> · <strong>MIT</strong></p>
+  <p class="stats"><strong>v0.15.0</strong> · <strong>47 URL engines</strong> · <strong>18 search engines via Enrichfold</strong> · <strong>MIT</strong></p>
   <p class="hero-links"><a href="https://github.com/mihailorama/scrapefold">⭐ Star on GitHub</a> · <a href="https://pypi.org/project/scrapefold/">PyPI</a></p>
 
   <div class="hero-demo">
@@ -302,7 +302,7 @@ page = <span class="k">await</span> scrape(hits[0].url, ScrapeOptions(engines=("
 
 <section id="engines">
   <div class="wrap">
-    <h2>39 URL engines, one interface</h2>
+    <h2>47 URL engines, one interface</h2>
     <p class="lead">Local engines are free and fast; SaaS engines add premium proxies and stealth. The router picks the cheapest tier that works. Ratings: ★★★ excellent · ★★☆ good · ★☆☆ basic.</p>
     <div class="engines">
       <div class="engine"><span class="name">requests</span> <span class="type">local</span><div class="caps">Static HTML · ultra-fast · <span class="stars">★★★</span></div></div>
@@ -311,6 +311,8 @@ page = <span class="k">await</span> scrape(hits[0].url, ScrapeOptions(engines=("
       <div class="engine"><span class="name">crawl4ai</span> <span class="type">local</span><div class="caps">JS render · native markdown · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">PixelRAG</span> <span class="type">local · visual</span><div class="caps">pixelshot + VLM/OCR reader · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">cloakbrowser</span> <span class="type">local</span><div class="caps">Anti-fingerprint browser · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">pydoll</span> <span class="type">local</span><div class="caps">Stealth Chromium over CDP · clears Turnstile · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Camoufox</span> <span class="type">local</span><div class="caps">Anti-detect Firefox · source-level fingerprint · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Lightpanda</span> <span class="type">local</span><div class="caps">~1 s JS render · no stealth · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Obscura</span> <span class="type">local</span><div class="caps">Rust headless browser · Chrome fingerprint · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">selenium</span> <span class="type">local</span><div class="caps">Classic JS rendering · <span class="stars">★★☆</span></div></div>
@@ -321,6 +323,7 @@ page = <span class="k">await</span> scrape(hits[0].url, ScrapeOptions(engines=("
       <div class="engine"><span class="name">Bright Data</span> <span class="type">saas</span><div class="caps">Web Unlocker · last-resort unblocking · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">ScrapingBee</span> <span class="type">saas</span><div class="caps">Premium proxy + JS · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Scrapingdog</span> <span class="type">saas</span><div class="caps">Affordable proxy + browser · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Scrapingdog dedicated</span> <span class="type">saas · site</span><div class="caps">LinkedIn, Amazon, Twitter endpoints → JSON</div></div>
       <div class="engine"><span class="name">ScraperAPI</span> <span class="type">saas</span><div class="caps">Proxy + JS render · native markdown · AI Parser → JSON · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Exa</span> <span class="type">saas · search</span><div class="caps">Search · Contents · Answer · Agent · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Linkup</span> <span class="type">saas · fetch</span><div class="caps">Rendered page → markdown</div></div>
@@ -334,6 +337,9 @@ page = <span class="k">await</span> scrape(hits[0].url, ScrapeOptions(engines=("
       <div class="engine"><span class="name">Oxylabs</span> <span class="type">saas</span><div class="caps">Web Scraper API · residential geo · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Anysite</span> <span class="type">saas</span><div class="caps">General-purpose · native markdown · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Scrape Creators</span> <span class="type">saas · site</span><div class="caps">Social-media JSON APIs · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">LurkAPI</span> <span class="type">saas · site</span><div class="caps">Scrape Creators-compatible social API · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">SociaVault</span> <span class="type">saas · site</span><div class="caps">Social-media JSON APIs · <span class="stars">★★★</span></div></div>
+      <div class="engine"><span class="name">Social Fetch</span> <span class="type">saas · site</span><div class="caps">Social profiles and posts API · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">SocialCrawl</span> <span class="type">saas · site</span><div class="caps">Social-data JSON gateway · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">SpyTrend</span> <span class="type">saas · ads</span><div class="caps">FB/TikTok ad-intelligence · advertiser + webmaster networks · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Telegram</span> <span class="type">local · social</span><div class="caps">Public channel previews · <span class="stars">★★☆</span></div></div>
@@ -342,6 +348,7 @@ page = <span class="k">await</span> scrape(hits[0].url, ScrapeOptions(engines=("
       <div class="engine"><span class="name">LabelUp</span> <span class="type">saas · social</span><div class="caps">Cross-platform stats · <span class="stars">★★★</span></div></div>
       <div class="engine"><span class="name">Apify Actor</span> <span class="type">saas · site</span><div class="caps">Universal social actors · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Apify (LinkedIn)</span> <span class="type">saas · site</span><div class="caps">Vendor-managed actor runs · <span class="stars">★★☆</span></div></div>
+      <div class="engine"><span class="name">LinkedIn public</span> <span class="type">local · site</span><div class="caps">Keyless LinkedIn profile/company/job → JSON-LD</div></div>
       <div class="engine"><span class="name">Outscraper</span> <span class="type">saas · site</span><div class="caps">Niche aggregator scrapes · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">EnrichLayer</span> <span class="type">saas · site</span><div class="caps">LinkedIn person/company enrichment JSON · <span class="stars">★★☆</span></div></div>
       <div class="engine"><span class="name">Wayback</span> <span class="type">local · fallback</span><div class="caps">Dead-link recovery via archive.org, honestly marked · <span class="stars">★★☆</span></div></div>

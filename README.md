@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>Turn any URL into clean markdown.</strong><br>
-  One async Python interface over 39 URL engines — with automatic anti-bot escalation and LLM-ready output. Search delegates to Enrichfold.
+  One async Python interface over 47 URL engines — with automatic anti-bot escalation and LLM-ready output. Search delegates to Enrichfold.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <strong>39 URL engines</strong> · <strong>5 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai · AWS WAF) · <strong>MIT</strong>
+  <strong>47 URL engines</strong> · <strong>5 anti-bot stacks handled</strong> (Cloudflare · Datadome · PerimeterX · Akamai · AWS WAF) · <strong>MIT</strong>
 </p>
 
 > ⭐ **If Scrapefold saves you a vendor rewrite, [star the repo](https://github.com/mihailorama/scrapefold) — it's the #1 way to help others find it.**
@@ -627,7 +627,7 @@ Sorted cheapest-first. The **cost** column is scrapefold's internal per-1000-cal
 
 ### SERP APIs
 
-Scrapefold's public `search()` delegates to Enrichfold's 12 search engines.
+Scrapefold's public `search()` delegates to Enrichfold's 18 search engines.
 The table below compares specialist SERP APIs that are not part of that
 registry; several URL vendors also expose separate SERP endpoints.
 

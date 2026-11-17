@@ -34,6 +34,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
   `retweets` fields. TikTok profiles and videos, tweets, YouTube videos and
   Reddit posts previously came back without handle or counts. Verified live
   against LurkAPI on 2026-11-17 (SCRAPEFOLD-33).
+- README, scrapefold.com and `llms.txt` stated 39, 42 or 43 URL engines; the
+  registry has 44. All counts now say 44, the landing engine grid lists all 44,
+  the landing version reads v0.15.0 and the search count reads Enrichfold's 18.
+  A smoke test fails when a stated count drifts from `list_engine_names()`
+  (SCRAPEFOLD-34).
+- With `lurkapi`, `sociavault` and `socialfetch` the registry has 47 URL
+  engines; README, the landing (grid included), `llms.txt` and the social card
+  say 47 (SCRAPEFOLD-33).
 
 ## [0.15.0] - 2026-11-16
 
