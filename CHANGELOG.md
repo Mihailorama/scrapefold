@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 ## [Unreleased]
 
+### Fixed
+
+- README, scrapefold.com and `llms.txt` stated 39, 42 or 43 URL engines; the
+  registry has 44. All counts now say 44, the landing engine grid lists all 44,
+  the landing version reads v0.15.0 and the search count reads Enrichfold's 18.
+  A smoke test fails when a stated count drifts from `list_engine_names()`
+  (SCRAPEFOLD-34).
+
 ## [0.15.0] - 2026-11-16
 
 ### Added
